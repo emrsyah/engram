@@ -1,0 +1,24 @@
+{
+  "name": "@alphonse/auth",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@alphonse/db": "workspace:*",
+    "@alphonse/env": "workspace:*",
+    "better-auth": "catalog:",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@alphonse/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
