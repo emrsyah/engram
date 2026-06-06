@@ -1,1 +1,64 @@
 @import "@alphonse/ui/globals.css";
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  overflow: hidden;
+}
+
+.engram-shell {
+  display: flex;
+  height: 100svh;
+  width: 100vw;
+  overflow: hidden;
+  background: #0b0b0a;
+  color: #efe9df;
+}
+
+.engram-main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  background: #151310;
+}
+
+.engram-card {
+  border: 1px solid #34302b;
+  border-radius: 8px;
+  background: #211e1a;
+  box-shadow: 0 16px 40px rgb(0 0 0 / 24%);
+  color: #efe9df;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease;
+}
+
+.engram-card:hover {
+  border-color: #4c463e;
+}
+
+.engram-grid {
+  background-image: radial-gradient(circle at 1px 1px, rgb(255 255 255 / 7%) 1px, transparent 0);
+  background-size: 28px 28px;
+}
+
+.engram-scrollbar {
+  scrollbar-color: #4a433b transparent;
+  scrollbar-width: thin;
+}
+
+.engram-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.engram-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #4a433b;
+}
