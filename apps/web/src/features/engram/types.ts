@@ -3,6 +3,12 @@ export type ItemType = "thought" | "task" | "image" | "link" | "file";
 export type Priority = 1 | 2 | 3;
 export type Accent = "violet" | "gold" | "teal" | "red" | "blue";
 
+export type ChecklistItem = {
+  id: string;
+  text: string;
+  done: boolean;
+};
+
 export type Space = {
   id: string;
   name: string;
@@ -29,6 +35,7 @@ export type Item = {
   done: boolean;
   priority?: Priority;
   dueAt?: string;
+  checklistItems?: ChecklistItem[];
   createdAt: string;
   updatedAt: string;
 };
@@ -57,6 +64,5 @@ export type EngramData = {
   links: ItemLink[];
   viewStates: CanvasViewState[];
   activeSpaceId: string;
-  activeView: EngramView;
   selectedItemId?: string;
 };

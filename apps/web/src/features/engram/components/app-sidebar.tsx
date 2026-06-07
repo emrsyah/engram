@@ -1,102 +1,112 @@
 "use client";
 
-import { Button } from "@alphonse/ui/components/button";
+import { Button, buttonVariants } from "@alphonse/ui/components/button";
 import { cn } from "@alphonse/ui/lib/utils";
+import type { Route } from "next";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
-import { Icons } from "./icons";
+import { NAV_VIEWS, SPACE_ICONS } from "../nav";
 import { useEngramStore } from "../store";
-import type { EngramView, Item } from "../types";
+import { useUIStore } from "../ui-store";
+import type { Item } from "../types";
+import { Icons } from "./icons";
 
-const viewItems: { view: EngramView; label: string; icon: keyof typeof Icons; badge?: string }[] = [
-  { view: "canvas", label: "Canvas", icon: "layout" },
-  { view: "timeline", label: "Timeline", icon: "calendar", badge: "3" },
-  { view: "priorities", label: "Priorities", icon: "flag", badge: "*" },
-];
+const navItemClass = "h-[36px] w-full justify-between rounded-[7px] px-3 py-2 text-sm font-normal";
 
 export function AppSidebar() {
-  const { activeView, setActiveView, spaces, activeSpaceId, setActiveSpace, recentItems } =
-    useEngramStore();
+  const pathname = usePathname();
+  const { spaces, activeSpaceId, setActiveSpace, recentItems } = useEngramStore();
+  const { sidebarCollapsed, toggleSidebar } = useUIStore();
 
   return (
-    <aside className="hidden w-[252px] shrink-0 border-[#292622] border-r bg-[#0b0b0a] text-[#c7bfb4] md:flex md:flex-col">
-      <div className="flex h-16 items-center justify-between px-5">
+    <aside
+      className={cn(
+        "hidden shrink-0 border-[#292622] border-r bg-[#0b0b0a] text-[#c7bfb4] md:flex md:flex-col",
+        "overflow-hidden transition-[width] duration-200",
+        sidebarCollapsed ? "w-0 border-r-0" : "w-[252px]",
+      )}
+    >
+      <div className="flex h-16 w-[252px] items-center justify-between px-5">
         <div className="flex items-center gap-3 font-bold text-lg text-white">
           <Icons.sparkles className="size-4 text-[#9b88ff]" />
           Engram
         </div>
-        <Button variant="ghost" size="icon-xs" className="text-[#706a62]">
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          className="text-[#706a62] hover:text-[#c8bfb2]"
+          onClick={toggleSidebar}
+          title="Toggle sidebar  ["
+        >
           <Icons.chevronLeft className="size-4" />
         </Button>
       </div>
 
       <nav className="space-y-1 px-3">
-        {viewItems.map(({ view, label, icon, badge }) => {
+        {NAV_VIEWS.map(({ href, label, icon }) => {
           const Icon = Icons[icon];
+          const active = pathname === href;
           return (
-            <button
-              type="button"
-              key={view}
-              onClick={() => setActiveView(view)}
+            <Link
+              key={href}
+              href={href as Route<string>}
               className={cn(
-                "flex h-[36px] w-full items-center justify-between rounded-[7px] px-3 py-2 text-left text-sm transition",
-                activeView === view
+                buttonVariants({ variant: "ghost" }),
+                navItemClass,
+                active
                   ? "bg-[#22201f] text-white"
                   : "text-[#b7afa5] hover:bg-[#171614] hover:text-white",
               )}
             >
               <span className="flex items-center gap-3">
-                <Icon className={cn("size-4", activeView === view && "text-[#9b88ff]")} />
+                <Icon className={cn("size-4", active && "text-[#9b88ff]")} />
                 <span className="font-semibold">{label}</span>
               </span>
-              {badge ? (
-                <span className={cn("text-xs", badge === "*" ? "text-[#f2765f]" : "text-[#8c857b]")}>
-                  {badge}
-                </span>
-              ) : null}
-            </button>
+            </Link>
           );
         })}
       </nav>
 
       <div className="mt-8 px-3">
-        <p className="mb-2 px-3 text-[11px] font-bold tracking-[0.14em] text-[#736c63] uppercase">
+        <p className="mb-2 px-3 font-bold text-[#736c63] text-[11px] uppercase tracking-[0.14em]">
           Spaces
         </p>
         <div className="space-y-1">
-          {spaces.map((space) => (
-            <button
-              type="button"
-              key={space.id}
-              onClick={() => setActiveSpace(space.id)}
-              className={cn(
-                "flex h-[36px] w-full items-center gap-3 rounded-[7px] px-3 py-2 text-left text-sm transition",
-                activeSpaceId === space.id
-                  ? "bg-[#22201f] font-semibold text-white"
-                  : "text-[#b7afa5] hover:bg-[#171614] hover:text-white",
-              )}
-            >
-              {space.icon === "briefcase" ? (
-                <Icons.briefcase className="size-4" />
-              ) : space.icon === "book" ? (
-                <Icons.book className="size-4" />
-              ) : (
-                <Icons.sparkles className="size-4 text-[#9b88ff]" />
-              )}
-              {space.name}
-            </button>
-          ))}
-          <button
+          {spaces.map((space) => {
+            const iconKey = (space.icon in SPACE_ICONS ? space.icon : "sparkles") as keyof typeof SPACE_ICONS;
+            const Icon = Icons[SPACE_ICONS[iconKey]];
+            return (
+              <Button
+                type="button"
+                key={space.id}
+                variant="ghost"
+                onClick={() => setActiveSpace(space.id)}
+                className={cn(
+                  "h-[36px] w-full justify-start gap-3 rounded-[7px] px-3 py-2 text-sm font-normal",
+                  activeSpaceId === space.id
+                    ? "bg-[#22201f] font-semibold text-white"
+                    : "text-[#b7afa5] hover:bg-[#171614] hover:text-white",
+                )}
+              >
+                <Icon className="size-4" />
+                {space.name}
+              </Button>
+            );
+          })}
+          <Button
             type="button"
-            className="flex h-[36px] w-full items-center gap-3 rounded-[7px] px-3 py-2 text-left text-sm text-[#8c857b]"
+            variant="ghost"
+            className="h-[36px] w-full justify-start gap-3 rounded-[7px] px-3 py-2 text-[#8c857b] text-sm font-normal"
           >
             <Icons.plus className="size-4" />
             New space
-          </button>
+          </Button>
         </div>
       </div>
 
       <div className="mt-8 min-h-0 px-3">
-        <p className="mb-2 px-3 text-[11px] font-bold tracking-[0.14em] text-[#736c63] uppercase">
+        <p className="mb-2 px-3 font-bold text-[#736c63] text-[11px] uppercase tracking-[0.14em]">
           Recent
         </p>
         <div className="space-y-1">
@@ -121,13 +131,14 @@ function RecentItem({ item }: { item: Item }) {
   const Icon = item.type === "task" ? Icons.check : item.type === "link" ? Icons.link : Icons.file;
 
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
       onClick={() => jumpToItem(item.id)}
-      className="flex w-full items-center gap-3 overflow-hidden rounded-[7px] px-3 py-2 text-left text-sm text-[#b7afa5] hover:bg-[#171614] hover:text-white"
+      className="h-[36px] w-full justify-start gap-3 overflow-hidden rounded-[7px] px-3 py-2 text-left text-[#b7afa5] text-sm font-normal hover:bg-[#171614] hover:text-white"
     >
       <Icon className="size-4 shrink-0 text-[#8b8378]" />
       <span className="truncate">{label}</span>
-    </button>
+    </Button>
   );
 }

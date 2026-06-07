@@ -1,5 +1,6 @@
-import { EngramApp } from "@/features/engram/components/engram-app";
+import type { Route } from "next";
+import { redirect } from "next/navigation";
 
 export default function Home() {
-  return <EngramApp />;
+  redirect("/canvas" as Route<string>);
 }

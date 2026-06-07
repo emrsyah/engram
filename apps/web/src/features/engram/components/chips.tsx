@@ -1,3 +1,4 @@
+import { Badge } from "@alphonse/ui/components/badge";
 import { cn } from "@alphonse/ui/lib/utils";
 
 import type { Accent, Item, Priority } from "../types";
@@ -42,10 +43,10 @@ export function PriorityChip({ priority }: { priority?: Priority }) {
         : "bg-[#183d4b] text-[#58b8d8]";
 
   return (
-    <span className={cn("inline-flex h-6 items-center gap-1 rounded-[5px] px-2 text-xs font-bold", color)}>
+    <Badge variant="secondary" className={cn("h-6 gap-1 rounded-[5px] px-2 font-bold", color)}>
       <span className="size-1.5 rounded-full bg-current" />
       {priorityLabels[priority]}
-    </span>
+    </Badge>
   );
 }
 
@@ -55,8 +56,9 @@ export function DueChip({ dueAt }: { dueAt?: string }) {
   }
 
   const due = new Date(dueAt);
-  const today = new Date("2026-06-06T00:00:00.000Z");
-  const tomorrow = new Date("2026-06-07T00:00:00.000Z");
+  const today = new Date();
+  const tomorrow = new Date();
+  tomorrow.setDate(today.getDate() + 1);
   const isToday = due.toDateString() === today.toDateString();
   const isTomorrow = due.toDateString() === tomorrow.toDateString();
   const label = isToday
@@ -66,9 +68,12 @@ export function DueChip({ dueAt }: { dueAt?: string }) {
       : `${due.toLocaleDateString("en-US", { weekday: "short" })} ${formatTime(due)}`;
 
   return (
-    <span className="inline-flex h-6 items-center rounded-[5px] bg-[#3a3327] px-2 font-mono text-xs font-bold text-[#d6a93a]">
+    <Badge
+      variant="secondary"
+      className="h-6 rounded-[5px] bg-[#3a3327] px-2 font-mono font-bold text-[#d6a93a]"
+    >
       {label}
-    </span>
+    </Badge>
   );
 }
 

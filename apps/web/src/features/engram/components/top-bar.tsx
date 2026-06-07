@@ -1,25 +1,36 @@
 "use client";
 
-import { Button } from "@alphonse/ui/components/button";
+import { Button, buttonVariants } from "@alphonse/ui/components/button";
 import { cn } from "@alphonse/ui/lib/utils";
+import type { Route } from "next";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
-import { Icons } from "./icons";
+import { NAV_VIEWS } from "../nav";
 import { useEngramStore } from "../store";
-import type { EngramView } from "../types";
-
-const views: { view: EngramView; label: string; icon: keyof typeof Icons }[] = [
-  { view: "canvas", label: "Canvas", icon: "layout" },
-  { view: "timeline", label: "Timeline", icon: "calendar" },
-  { view: "priorities", label: "Priorities", icon: "flag" },
-];
+import { useUIStore } from "../ui-store";
+import { Icons } from "./icons";
 
 export function TopBar() {
-  const { activeView, setActiveView, activeSpace, activeItems, openSearch, openCapture } =
-    useEngramStore();
+  const pathname = usePathname();
+  const { activeSpace, activeItems } = useEngramStore();
+  const { openSearch, expandQuickCapture, sidebarCollapsed, toggleSidebar, openShortcuts } = useUIStore();
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-[#292622] border-b bg-[#171512] px-5">
       <div className="flex min-w-0 items-center gap-3">
+        {sidebarCollapsed && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onClick={toggleSidebar}
+            title="Open sidebar  ["
+            className="mr-1 text-[#706a62] hover:text-[#c8bfb2]"
+          >
+            <Icons.chevronRight className="size-4" />
+          </Button>
+        )}
         <Icons.layout className="size-4 text-[#8a8378]" />
         <h1 className="truncate font-bold text-white">{activeSpace?.name ?? "Mind"}</h1>
         <span className="text-[#776f65] text-sm">/ {activeItems.length} items</span>
@@ -27,43 +38,56 @@ export function TopBar() {
 
       <div className="flex items-center gap-4">
         <div className="hidden rounded-[8px] bg-[#23201d] p-1 lg:flex">
-          {views.map(({ view, label, icon }) => {
+          {NAV_VIEWS.map(({ href, label, icon }) => {
             const Icon = Icons[icon];
+            const active = pathname === href;
             return (
-              <button
-                type="button"
-                key={view}
-                onClick={() => setActiveView(view)}
+              <Link
+                key={href}
+                href={href as Route<string>}
                 className={cn(
-                  "flex h-8 items-center gap-2 rounded-[6px] px-3 text-sm font-semibold transition",
-                  activeView === view
+                  buttonVariants({ variant: active ? "secondary" : "ghost", size: "sm" }),
+                  "h-8 gap-2 rounded-[6px] px-3 font-semibold",
+                  active
                     ? "bg-[#312d28] text-white shadow-sm"
                     : "text-[#948c82] hover:text-white",
                 )}
               >
                 <Icon className="size-4" />
                 {label}
-              </button>
+              </Link>
             );
           })}
         </div>
 
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={openSearch}
-          className="hidden h-10 w-[260px] items-center justify-between rounded-[8px] border border-[#342f2a] bg-[#211f1c] px-3 text-[#8d857a] text-sm xl:flex"
+          className="hidden h-10 w-[260px] justify-between rounded-[8px] border-[#342f2a] bg-[#211f1c] px-3 text-[#8d857a] text-sm xl:flex"
         >
           <span className="flex items-center gap-2">
             <Icons.search className="size-4" />
             Search
           </span>
           <span className="rounded-[5px] bg-[#34302b] px-2 py-0.5 font-mono text-xs">Cmd+K</span>
-        </button>
+        </Button>
 
         <Button
           type="button"
-          onClick={openCapture}
-          className="h-10 rounded-[8px] bg-[#907ce8] px-4 font-bold text-[#17131f] hover:bg-[#a08ef2]"
+          variant="ghost"
+          size="icon-xs"
+          onClick={openShortcuts}
+          title="Keyboard shortcuts  ?"
+          className="hidden size-8 text-[#706a62] hover:text-[#c8bfb2] lg:grid"
+        >
+          <Icons.keyboard className="size-4" />
+        </Button>
+
+        <Button
+          type="button"
+          onClick={() => expandQuickCapture(pathname === "/timeline" || pathname === "/priorities" ? "task" : undefined)}
+          className="h-10 rounded-[8px] bg-[#907ce8] px-4 font-bold text-[#17131f] hover:bg-[#a08ef2] active:scale-[0.97] transition-transform duration-100"
         >
           <Icons.plus className="size-4" />
           Capture

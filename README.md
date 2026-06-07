@@ -1,111 +1,191 @@
-# alphonse
+# Engram
 
-This project was created with [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack), a modern TypeScript stack that combines Next.js, Hono, TRPC, and more.
+Engram is a local-first spatial workspace for capturing thoughts, tasks, links,
+images, and files on a canvas. The canvas is the source of truth; Timeline and
+Priorities are projections over the same item records.
 
-## Features
+The current project is a high-fidelity v1 prototype built in a Bun/Turborepo
+monorepo. It persists Engram data in browser `localStorage` through an adapter
+boundary that is intended to be replaced by a sync-backed adapter later.
 
-- **TypeScript** - For type safety and improved developer experience
-- **Next.js** - Full-stack React framework
-- **TailwindCSS** - Utility-first CSS for rapid UI development
-- **Shared UI package** - shadcn/ui primitives live in `packages/ui`
-- **Hono** - Lightweight, performant server framework
-- **tRPC** - End-to-end type-safe APIs
-- **Bun** - Runtime environment
-- **Drizzle** - TypeScript-first ORM
-- **PostgreSQL** - Database engine
-- **Authentication** - Better-Auth
-- **Turborepo** - Optimized monorepo build system
-- **Biome** - Linting and formatting
-- **Oxlint** - Oxlint + Oxfmt (linting & formatting)
-- **Tauri** - Build native desktop applications
+> Note: the generated workspace/package scope is still `alphonse` / `@alphonse`.
+> The product and app feature are Engram.
+
+## What Engram Does
+
+- Spatial canvas for notes, tasks, links, images, and file cards.
+- Drag cards around an infinite-feeling React Flow canvas.
+- Create visible curved links between cards.
+- Quick capture for thoughts, tasks, links, and attachments.
+- Task priority and due-date capture, including lightweight natural-language
+  parsing such as `tomorrow 3pm` and `!p1`.
+- Timeline and Priorities views computed from task items.
+- Search and jump-to-item behavior.
+- Local persistence with validation and corrupt-payload backup.
+
+## Tech Stack
+
+- **Runtime/package manager:** Bun
+- **Monorepo:** Turborepo
+- **Frontend:** Next.js, React, Tailwind CSS
+- **Canvas:** React Flow (`@xyflow/react`)
+- **UI primitives:** shadcn-style components in `packages/ui`
+- **Backend:** Hono and tRPC
+- **Auth:** Better Auth
+- **Database:** PostgreSQL with Drizzle ORM for server/auth tables
+- **Desktop shell:** Tauri
+- **Validation:** Zod
+- **Formatting/linting:** Oxlint and Oxfmt
+
+## Repository Layout
+
+```txt
+engram/
++-- apps/
+|   +-- web/                 # Next.js app and Tauri desktop shell
+|   +-- server/              # Hono server, auth routes, tRPC endpoint
++-- packages/
+|   +-- api/                 # tRPC router/context package
+|   +-- auth/                # Better Auth configuration
+|   +-- db/                  # Drizzle config and database schema
+|   +-- env/                 # Shared environment validation
+|   +-- config/              # Shared TypeScript config
+|   +-- ui/                  # Shared UI primitives and global styles
++-- docs/
+    +-- plans/               # Product and architecture plans
+    +-- superpowers/         # Prototype planning notes
+```
+
+The Engram feature itself lives in:
+
+```txt
+apps/web/src/features/engram/
++-- engram-core.ts           # Pure domain mutations and invariants
++-- projections.ts           # Timeline, priorities, recent items, search
++-- persistence.ts           # Persistence adapter seam and localStorage adapter
++-- store.tsx                # React store wrapper around the domain core
++-- ui-store.tsx             # UI-only state
++-- types.ts                 # Space, Item, ItemLink, CanvasViewState
++-- components/              # Canvas, sidebar, capture, search, task views
+```
 
 ## Getting Started
 
-First, install the dependencies:
+Install dependencies:
 
 ```bash
 bun install
 ```
 
-## Database Setup
+Create `apps/server/.env` for the server and database packages:
 
-This project uses PostgreSQL with Drizzle ORM.
+```bash
+DATABASE_URL=postgres://user:password@localhost:5432/engram
+BETTER_AUTH_SECRET=replace-with-at-least-32-characters
+BETTER_AUTH_URL=http://localhost:3000
+CORS_ORIGIN=http://localhost:3001
+NODE_ENV=development
+```
 
-1. Make sure you have a PostgreSQL database set up.
-2. Update your `apps/server/.env` file with your PostgreSQL connection details.
+Create `apps/web/.env.local` for the web app:
 
-3. Apply the schema to your database:
+```bash
+NEXT_PUBLIC_SERVER_URL=http://localhost:3000
+```
+
+Push the Drizzle schema when using the auth/server flow:
 
 ```bash
 bun run db:push
 ```
 
-Then, run the development server:
+Run the full development stack:
 
 ```bash
 bun run dev
 ```
 
-Open [http://localhost:3001](http://localhost:3001) in your browser to see the web application.
-The API is running at [http://localhost:3000](http://localhost:3000).
+Open the web app at [http://localhost:3001](http://localhost:3001).
+The API server runs at [http://localhost:3000](http://localhost:3000).
 
-## UI Customization
-
-React web apps in this stack share shadcn/ui primitives through `packages/ui`.
-
-- Change design tokens and global styles in `packages/ui/src/styles/globals.css`
-- Update shared primitives in `packages/ui/src/components/*`
-- Adjust shadcn aliases or style config in `packages/ui/components.json` and `apps/web/components.json`
-
-### Add more shared components
-
-Run this from the project root to add more primitives to the shared UI package:
+To run only one side:
 
 ```bash
-npx shadcn@latest add accordion dialog popover sheet table -c packages/ui
+bun run dev:web
+bun run dev:server
 ```
 
-Import shared components like this:
+## App Routes
 
-```tsx
-import { Button } from "@alphonse/ui/components/button";
+- `/` redirects to `/canvas`
+- `/canvas` is the main Engram workspace
+- `/timeline` shows task items grouped by time
+- `/priorities` shows task items grouped by priority
+- `/login` and `/dashboard` are scaffolded auth/dashboard routes
+
+## Development Commands
+
+```bash
+bun run dev             # Start all apps through Turborepo
+bun run dev:web         # Start only the Next.js app on port 3001
+bun run dev:server      # Start only the Hono server on port 3000
+bun run build           # Build all apps/packages
+bun run check-types     # Typecheck all apps/packages
+bun run check           # Run Oxlint and Oxfmt
+bun run db:push         # Push Drizzle schema
+bun run db:generate     # Generate Drizzle migrations
+bun run db:migrate      # Run Drizzle migrations
+bun run db:studio       # Open Drizzle Studio
 ```
 
-### Add app-specific blocks
+Desktop development:
 
-If you want to add app-specific blocks instead of shared primitives, run the shadcn CLI from `apps/web`.
-
-## Git Hooks and Formatting
-
-- Format and lint fix: `bun run check`
-
-## Project Structure
-
-```
-alphonse/
-├── apps/
-│   ├── web/         # Frontend application (Next.js)
-│   └── server/      # Backend API (Hono, TRPC)
-├── packages/
-│   ├── ui/          # Shared shadcn/ui components and styles
-│   ├── api/         # API layer / business logic
-│   ├── auth/        # Authentication configuration & logic
-│   └── db/          # Database schema & queries
+```bash
+cd apps/web
+bun run desktop:dev
+bun run desktop:build
 ```
 
-## Available Scripts
+Desktop builds use the Tauri app under `apps/web/src-tauri`. Packaging static
+web assets may require additional Next.js export/static-build configuration.
 
-- `bun run dev`: Start all applications in development mode
-- `bun run build`: Build all applications
-- `bun run dev:web`: Start only the web application
-- `bun run dev:server`: Start only the server
-- `bun run check-types`: Check TypeScript types across all apps
-- `bun run db:push`: Push schema changes to database
-- `bun run db:generate`: Generate database client/types
-- `bun run db:migrate`: Run database migrations
-- `bun run db:studio`: Open database studio UI
-- `bun run check`: Run Biome formatting and linting
-- `bun run check`: Run Oxlint and Oxfmt
-- `cd apps/web && bun run desktop:dev`: Start Tauri desktop app in development
-- `cd apps/web && bun run desktop:build`: Build Tauri desktop app
-- Note: Desktop builds package static web assets. Next.js needs a static/export build configuration before desktop packaging will work.
+## Architecture Notes
+
+Engram keeps domain behavior separate from React and storage:
+
+- `engram-core.ts` owns mutations and invariants.
+- `projections.ts` derives read-only views from stored records.
+- `persistence.ts` defines the storage adapter boundary.
+- `store.tsx` wires React state, domain mutations, and debounced persistence.
+- Canvas cards are React Flow nodes, and item links are React Flow edges.
+
+The stored records are intentionally shaped like future synced rows:
+
+- `Space`
+- `Item`
+- `ItemLink`
+- `CanvasViewState`
+
+Tasks are `Item` records, not separate task records. Timeline and Priorities
+should remain projections instead of persisted views.
+
+## Current Scope
+
+Implemented for v1:
+
+- Single-user local prototype.
+- Local browser persistence.
+- Canvas-first data model.
+- Search, quick capture, task projections, and link deletion.
+
+Out of scope for v1:
+
+- Real multi-device sync.
+- Multi-user collaboration.
+- External calendar sync.
+- AI features.
+- Full file storage pipeline.
+- Rich document editing.
+
+See [docs/plans/2026-06-06-engram-design.md](docs/plans/2026-06-06-engram-design.md)
+for the detailed product and architecture plan.

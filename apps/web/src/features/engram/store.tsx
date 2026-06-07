@@ -1,6 +1,9 @@
 "use client";
 
+import type { Route } from "next";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import React from "react";
 import {
   createContext,
   useCallback,
@@ -11,40 +14,57 @@ import {
   useState,
 } from "react";
 
+import {
+  addChecklistItem as coreAddChecklistItem,
+  addItem,
+  addLink,
+  buildItem,
+  centerItem,
+  type CreateItemInput,
+  deleteItem,
+  deleteItems,
+  patchItem,
+  patchViewState,
+  removeChecklistItem as coreRemoveChecklistItem,
+  reorderChecklistItems as coreReorderChecklistItems,
+  removeLink,
+  toggleChecklistItem as coreToggleChecklistItem,
+  toggleItemDone,
+} from "./engram-core";
+import { DEFAULT_SPACE_ID, PERSIST_DEBOUNCE_MS } from "./config";
+import { createLocalStorageAdapter } from "./persistence";
+import {
+  recentItems,
+  scheduledTasks,
+  searchItems as projectSearchItems,
+  selectActiveItems,
+  selectActiveLinks,
+  selectActiveSpace,
+  selectActiveViewState,
+  tasksByPriority,
+} from "./projections";
 import { seedItems, seedLinks, seedSpaces, seedViewStates } from "./seed";
+import { DeleteToast } from "./components/delete-toast";
+import { TaskCompleteToast } from "./components/task-complete-toast";
 import type {
   CanvasViewState,
+  ChecklistItem,
   EngramData,
-  EngramView,
   Item,
   ItemLink,
-  ItemType,
   Priority,
   Space,
 } from "./types";
 
-const STORAGE_KEY = "engram.prototype.v1";
-const STORAGE_BACKUP_KEY = "engram.prototype.v1.backup";
-
-type CreateItemInput = {
-  type: ItemType;
-  text?: string;
-  title?: string;
-  x?: number;
-  y?: number;
-  priority?: Priority;
-  dueAt?: string;
-  url?: string;
-  source?: string;
-  caption?: string;
-};
-
-type PersistedEngramData = EngramData;
-
-type EngramStore = PersistedEngramData & {
-  captureOpen: boolean;
-  searchOpen: boolean;
-  linkSourceId?: string;
+type EngramStore = {
+  // Raw data
+  spaces: Space[];
+  items: Item[];
+  links: ItemLink[];
+  viewStates: CanvasViewState[];
+  activeSpaceId: string;
+  selectedItemId?: string;
+  // Derived / projected
   activeSpace?: Space;
   activeItems: Item[];
   activeLinks: ItemLink[];
@@ -52,7 +72,7 @@ type EngramStore = PersistedEngramData & {
   recentItems: Item[];
   scheduledTasks: Item[];
   tasksByPriority: Record<Priority, Item[]>;
-  setActiveView: (view: EngramView) => void;
+  // Mutations
   setActiveSpace: (spaceId: string) => void;
   createItem: (input: CreateItemInput) => Item;
   updateItem: (id: string, patch: Partial<Item>) => void;
@@ -62,143 +82,107 @@ type EngramStore = PersistedEngramData & {
   deleteLink: (id: string) => void;
   setViewState: (spaceId: string, patch: Partial<CanvasViewState>) => void;
   jumpToItem: (id: string) => void;
-  openCapture: () => void;
-  closeCapture: () => void;
-  openSearch: () => void;
-  closeSearch: () => void;
-  setLinkSource: (id?: string) => void;
   searchItems: (query: string) => Item[];
+  removeItem: (id: string) => void;
+  removeItems: (ids: string[]) => void;
+  undoDelete: () => void;
+  addChecklistItem: (itemId: string, text: string) => void;
+  toggleChecklistItem: (itemId: string, ciId: string) => void;
+  removeChecklistItem: (itemId: string, ciId: string) => void;
+  reorderChecklistItems: (itemId: string, checklistItems: ChecklistItem[]) => void;
 };
 
 const EngramContext = createContext<EngramStore | null>(null);
 
-const createInitialData = (): PersistedEngramData => ({
+const createInitialData = (): EngramData => ({
   spaces: seedSpaces,
   items: seedItems,
   links: seedLinks,
   viewStates: seedViewStates,
-  activeSpaceId: "space-mind",
-  activeView: "canvas",
+  activeSpaceId: DEFAULT_SPACE_ID,
   selectedItemId: undefined,
 });
 
-const createId = (prefix: string) => `${prefix}-${crypto.randomUUID()}`;
-
-const isTypingTarget = (target: EventTarget | null) => {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-
-  return ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable;
-};
+const persistence = createLocalStorageAdapter();
 
 export function EngramProvider({ children }: { children: React.ReactNode }) {
-  const [data, setData] = useState<PersistedEngramData>(createInitialData);
-  const [captureOpen, setCaptureOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [linkSourceId, setLinkSourceId] = useState<string>();
+  const router = useRouter();
+  const [data, setData] = useState<EngramData>(createInitialData);
   const hydrated = useRef(false);
+  const dataRef = useRef(data);
 
   useEffect(() => {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      hydrated.current = true;
-      return;
-    }
+    dataRef.current = data;
+  }, [data]);
 
-    try {
-      const parsed = JSON.parse(raw) as PersistedEngramData;
-      if (!Array.isArray(parsed.items) || !Array.isArray(parsed.spaces)) {
-        throw new Error("Invalid Engram payload");
-      }
-      setData(parsed);
-    } catch {
-      localStorage.setItem(STORAGE_BACKUP_KEY, raw);
+  // Hydrate from localStorage once on mount.
+  useEffect(() => {
+    const result = persistence.load();
+    if (result.status === "ok") {
+      setData(result.data);
+    } else if (result.status === "corrupt") {
       toast.error("Engram loaded seed data because saved data was invalid.");
-    } finally {
-      hydrated.current = true;
     }
+    hydrated.current = true;
   }, []);
 
+  // Debounced persist on every data change.
   useEffect(() => {
-    if (!hydrated.current) {
-      return;
-    }
-
+    if (!hydrated.current) return;
     const timeout = window.setTimeout(() => {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        persistence.save(data);
       } catch {
         toast.error("Engram could not save changes locally.");
       }
-    }, 120);
-
+    }, PERSIST_DEBOUNCE_MS);
     return () => window.clearTimeout(timeout);
   }, [data]);
 
-  const setActiveView = useCallback((view: EngramView) => {
-    setData((current) => ({ ...current, activeView: view }));
+  useEffect(() => {
+    const saveNow = () => {
+      if (!hydrated.current) return;
+      try {
+        persistence.save(dataRef.current);
+      } catch {
+        // Avoid surfacing unload-time storage errors; normal save path will toast.
+      }
+    };
+
+    window.addEventListener("pagehide", saveNow);
+    document.addEventListener("visibilitychange", saveNow);
+    return () => {
+      window.removeEventListener("pagehide", saveNow);
+      document.removeEventListener("visibilitychange", saveNow);
+    };
   }, []);
 
-  const setActiveSpace = useCallback((spaceId: string) => {
-    setData((current) => ({ ...current, activeSpaceId: spaceId, activeView: "canvas" }));
-  }, []);
+  const setActiveSpace = useCallback(
+    (spaceId: string) => {
+      setData((current) => ({ ...current, activeSpaceId: spaceId }));
+      router.push("/canvas" as Route<string>);
+    },
+    [router],
+  );
 
   const setViewState = useCallback((spaceId: string, patch: Partial<CanvasViewState>) => {
-    setData((current) => {
-      const timestamp = new Date().toISOString();
-      return {
-        ...current,
-        viewStates: current.viewStates.map((viewState) =>
-          viewState.spaceId === spaceId ? { ...viewState, ...patch, updatedAt: timestamp } : viewState,
-        ),
-      };
-    });
+    setData((current) => patchViewState(current, spaceId, patch));
   }, []);
 
   const createItem = useCallback(
     (input: CreateItemInput) => {
-      const timestamp = new Date().toISOString();
-      const viewState = data.viewStates.find((view) => view.spaceId === data.activeSpaceId);
-      const item: Item = {
-        id: createId("item"),
-        spaceId: data.activeSpaceId,
-        type: input.type,
-        x: input.x ?? (viewState ? (520 - viewState.panX) / viewState.zoom : 260),
-        y: input.y ?? (viewState ? (260 - viewState.panY) / viewState.zoom : 220),
-        width: input.type === "image" ? 260 : 280,
-        height: input.type === "image" ? 280 : input.type === "task" ? 112 : 126,
-        title: input.title,
-        text: input.text,
-        url: input.url,
-        source: input.source,
-        caption: input.caption,
-        accent: input.type === "task" ? (input.priority === 1 ? "red" : input.priority === 3 ? "blue" : "gold") : "violet",
-        done: false,
-        priority: input.priority,
-        dueAt: input.dueAt,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      };
-
-      setData((current) => ({
-        ...current,
-        items: [...current.items, item],
-        selectedItemId: item.id,
-        activeView: "canvas",
-      }));
+      const item = buildItem(input, data);
+      setData((current) => addItem(current, item));
+      if (!input.stayOnCurrentView) {
+        router.push("/canvas" as Route<string>);
+      }
       return item;
     },
-    [data.activeSpaceId, data.viewStates],
+    [data, router],
   );
 
   const updateItem = useCallback((id: string, patch: Partial<Item>) => {
-    setData((current) => ({
-      ...current,
-      items: current.items.map((item) =>
-        item.id === id ? { ...item, ...patch, updatedAt: new Date().toISOString() } : item,
-      ),
-    }));
+    setData((current) => patchItem(current, id, patch));
   }, []);
 
   const moveItem = useCallback(
@@ -207,164 +191,202 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
   );
 
   const toggleDone = useCallback((id: string) => {
-    setData((current) => ({
-      ...current,
-      items: current.items.map((item) =>
-        item.id === id ? { ...item, done: !item.done, updatedAt: new Date().toISOString() } : item,
-      ),
-    }));
-  }, []);
+    const before = data.items.find((item) => item.id === id);
+    setData((current) => toggleItemDone(current, id));
+    if (!before || before.type !== "task" || before.done) return;
 
-  const connectItems = useCallback((fromItemId: string, toItemId: string) => {
-    if (fromItemId === toItemId) {
-      setLinkSourceId(undefined);
-      return;
-    }
-
-    setData((current) => {
-      const from = current.items.find((item) => item.id === fromItemId);
-      const to = current.items.find((item) => item.id === toItemId);
-      if (!from || !to || from.spaceId !== to.spaceId) {
-        return current;
+    const label = before.title ?? "Task";
+    let toastId: string | number | undefined;
+    const keep = () => {
+      if (toastId !== undefined) toast.dismiss(toastId);
+    };
+    const deleteCompleted = () => {
+      if (toastId !== undefined) toast.dismiss(toastId);
+      setData((current) => deleteItem(current, id));
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() === "d") {
+        event.preventDefault();
+        window.removeEventListener("keydown", onKey);
+        deleteCompleted();
       }
-
-      const exists = current.links.some(
-        (link) =>
-          link.spaceId === from.spaceId &&
-          ((link.fromItemId === fromItemId && link.toItemId === toItemId) ||
-            (link.fromItemId === toItemId && link.toItemId === fromItemId)),
-      );
-
-      if (exists) {
-        return current;
-      }
-
-      return {
-        ...current,
-        links: [
-          ...current.links,
-          {
-            id: createId("link"),
-            spaceId: from.spaceId,
-            fromItemId,
-            toItemId,
-            createdAt: new Date().toISOString(),
-          },
-        ],
-      };
-    });
-    setLinkSourceId(undefined);
-  }, []);
-
-  const deleteLink = useCallback((id: string) => {
-    setData((current) => ({ ...current, links: current.links.filter((link) => link.id !== id) }));
-  }, []);
-
-  const jumpToItem = useCallback((id: string) => {
-    setData((current) => {
-      const item = current.items.find((candidate) => candidate.id === id);
-      if (!item) {
-        return current;
-      }
-
-      const viewStates = current.viewStates.map((viewState) =>
-        viewState.spaceId === item.spaceId
-          ? {
-              ...viewState,
-              panX: 760 - (item.x + item.width / 2) * viewState.zoom,
-              panY: 420 - (item.y + item.height / 2) * viewState.zoom,
-              updatedAt: new Date().toISOString(),
-            }
-          : viewState,
-      );
-
-      return {
-        ...current,
-        activeSpaceId: item.spaceId,
-        activeView: "canvas",
-        selectedItemId: id,
-        viewStates,
-      };
-    });
-    setSearchOpen(false);
-  }, []);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (isTypingTarget(event.target)) {
-        return;
-      }
-
       if (event.key === "Escape") {
-        setLinkSourceId(undefined);
-      }
-
-      if (event.key.toLowerCase() === "n") {
-        event.preventDefault();
-        setCaptureOpen(true);
-      }
-
-      if (event.key === "/" || ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k")) {
-        event.preventDefault();
-        setSearchOpen(true);
+        window.removeEventListener("keydown", onKey);
+        keep();
       }
     };
 
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    toastId = toast.custom(
+      () => React.createElement(TaskCompleteToast, { label, onDelete: deleteCompleted, onKeep: keep }),
+      {
+        duration: 7000,
+        onDismiss: () => window.removeEventListener("keydown", onKey),
+        onAutoClose: () => window.removeEventListener("keydown", onKey),
+      },
+    );
+    window.addEventListener("keydown", onKey);
+  }, [data.items]);
+
+  const connectItems = useCallback((fromItemId: string, toItemId: string) => {
+    setData((current) => addLink(current, fromItemId, toItemId));
   }, []);
 
-  const activeSpace = data.spaces.find((space) => space.id === data.activeSpaceId);
-  const activeItems = data.items.filter((item) => item.spaceId === data.activeSpaceId);
-  const activeLinks = data.links.filter((link) => link.spaceId === data.activeSpaceId);
-  const activeViewState =
-    data.viewStates.find((viewState) => viewState.spaceId === data.activeSpaceId) ?? seedViewStates[0];
-  const recentItems = [...data.items]
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, 5);
-  const scheduledTasks = data.items
-    .filter((item) => item.type === "task")
-    .sort((a, b) => (a.dueAt ?? "9999").localeCompare(b.dueAt ?? "9999"));
-  const tasksByPriority = {
-    1: data.items.filter((item) => item.type === "task" && item.priority === 1),
-    2: data.items.filter((item) => item.type === "task" && item.priority === 2),
-    3: data.items.filter((item) => item.type === "task" && item.priority === 3),
-  };
+  const deleteLink = useCallback((id: string) => {
+    setData((current) => removeLink(current, id));
+  }, []);
+
+  const jumpToItem = useCallback(
+    (id: string) => {
+      setData((current) => centerItem(current, id));
+      router.push("/canvas" as Route<string>);
+    },
+    [router],
+  );
+
+  const lastDeletedRef = useRef<{ items: Item[]; links: ItemLink[] } | null>(null);
+  const undoToastIdRef = useRef<string | number | null>(null);
+  const undoClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const undoDelete = useCallback(() => {
+    if (!lastDeletedRef.current) return;
+    const { items, links } = lastDeletedRef.current;
+    lastDeletedRef.current = null;
+    if (undoClearRef.current) clearTimeout(undoClearRef.current);
+    if (undoToastIdRef.current !== null) toast.dismiss(undoToastIdRef.current);
+    setData((current) => ({
+      ...current,
+      items: [...current.items, ...items],
+      links: [...current.links, ...links],
+    }));
+  }, []);
+
+  const removeItem = useCallback(
+    (id: string) => {
+      const item = data.items.find((i) => i.id === id);
+      const links = data.links.filter((l) => l.fromItemId === id || l.toItemId === id);
+      if (item) lastDeletedRef.current = { items: [item], links };
+
+      setData((current) => deleteItem(current, id));
+
+      if (undoClearRef.current) clearTimeout(undoClearRef.current);
+      undoClearRef.current = setTimeout(() => { lastDeletedRef.current = null; }, 5000);
+
+      const label = item?.title ?? item?.text ?? item?.url ?? "item";
+      if (undoToastIdRef.current !== null) toast.dismiss(undoToastIdRef.current);
+      undoToastIdRef.current = toast.custom(
+        () => React.createElement(DeleteToast, { label, onUndo: undoDelete }),
+        { duration: 5000 },
+      );
+    },
+    [data.items, data.links, undoDelete],
+  );
+
+  const removeItems = useCallback(
+    (ids: string[]) => {
+      if (ids.length === 0) return;
+      if (ids.length === 1) { removeItem(ids[0]); return; }
+
+      const items = data.items.filter((i) => ids.includes(i.id));
+      const links = data.links.filter((l) => ids.includes(l.fromItemId) || ids.includes(l.toItemId));
+      lastDeletedRef.current = { items, links };
+
+      setData((current) => deleteItems(current, ids));
+
+      if (undoClearRef.current) clearTimeout(undoClearRef.current);
+      undoClearRef.current = setTimeout(() => { lastDeletedRef.current = null; }, 5000);
+
+      const label = `${items.length} items`;
+      if (undoToastIdRef.current !== null) toast.dismiss(undoToastIdRef.current);
+      undoToastIdRef.current = toast.custom(
+        () => React.createElement(DeleteToast, { label, onUndo: undoDelete }),
+        { duration: 5000 },
+      );
+    },
+    [data.items, data.links, removeItem, undoDelete],
+  );
+
+  const addChecklistItemFn = useCallback((itemId: string, text: string) => {
+    setData((current) => coreAddChecklistItem(current, itemId, text));
+  }, []);
+
+  const toggleChecklistItemFn = useCallback((itemId: string, ciId: string) => {
+    const before = data.items.find((item) => item.id === itemId);
+    const wasComplete =
+      before?.type === "task" &&
+      before.done &&
+      (before.checklistItems?.length ?? 0) > 0 &&
+      before.checklistItems!.every((ci) => ci.done);
+    setData((current) => coreToggleChecklistItem(current, itemId, ciId));
+    if (!before || before.type !== "task" || wasComplete) return;
+    const toggled = before.checklistItems?.map((ci) =>
+      ci.id === ciId ? { ...ci, done: !ci.done } : ci,
+    );
+    if (!toggled?.length || !toggled.every((ci) => ci.done)) return;
+
+    const label = before.title ?? "Task";
+    let toastId: string | number | undefined;
+    const keep = () => {
+      if (toastId !== undefined) toast.dismiss(toastId);
+    };
+    const deleteCompleted = () => {
+      if (toastId !== undefined) toast.dismiss(toastId);
+      setData((current) => deleteItem(current, itemId));
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() === "d") {
+        event.preventDefault();
+        window.removeEventListener("keydown", onKey);
+        deleteCompleted();
+      }
+      if (event.key === "Escape") {
+        window.removeEventListener("keydown", onKey);
+        keep();
+      }
+    };
+
+    toastId = toast.custom(
+      () => React.createElement(TaskCompleteToast, { label, onDelete: deleteCompleted, onKeep: keep }),
+      {
+        duration: 7000,
+        onDismiss: () => window.removeEventListener("keydown", onKey),
+        onAutoClose: () => window.removeEventListener("keydown", onKey),
+      },
+    );
+    window.addEventListener("keydown", onKey);
+  }, [data.items]);
+
+  const removeChecklistItemFn = useCallback((itemId: string, ciId: string) => {
+    setData((current) => coreRemoveChecklistItem(current, itemId, ciId));
+  }, []);
+
+  const reorderChecklistItemsFn = useCallback((itemId: string, checklistItems: ChecklistItem[]) => {
+    setData((current) => coreReorderChecklistItems(current, itemId, checklistItems));
+  }, []);
+
+  // Projections — derived from data, recomputed only when data changes.
+  const activeSpace = useMemo(() => selectActiveSpace(data), [data]);
+  const activeItems = useMemo(() => selectActiveItems(data), [data]);
+  const activeLinks = useMemo(() => selectActiveLinks(data), [data]);
+  const activeViewState = useMemo(() => selectActiveViewState(data), [data]);
+  const recent = useMemo(() => recentItems(data.items), [data.items]);
+  const scheduled = useMemo(() => scheduledTasks(data.items), [data.items]);
+  const byPriority = useMemo(() => tasksByPriority(data.items), [data.items]);
 
   const searchItems = useCallback(
-    (query: string) => {
-      const normalized = query.trim().toLowerCase();
-      if (!normalized) {
-        return recentItems;
-      }
-
-      return data.items
-        .filter((item) =>
-          [item.title, item.text, item.url, item.caption, item.source]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase()
-            .includes(normalized),
-        )
-        .slice(0, 8);
-    },
-    [data.items, recentItems],
+    (query: string) => projectSearchItems(data.items, query, recent),
+    [data.items, recent],
   );
 
   const value = useMemo<EngramStore>(
     () => ({
       ...data,
-      captureOpen,
-      searchOpen,
-      linkSourceId,
       activeSpace,
       activeItems,
       activeLinks,
       activeViewState,
-      recentItems,
-      scheduledTasks,
-      tasksByPriority,
-      setActiveView,
+      recentItems: recent,
+      scheduledTasks: scheduled,
+      tasksByPriority: byPriority,
       setActiveSpace,
       createItem,
       updateItem,
@@ -374,26 +396,24 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
       deleteLink,
       setViewState,
       jumpToItem,
-      openCapture: () => setCaptureOpen(true),
-      closeCapture: () => setCaptureOpen(false),
-      openSearch: () => setSearchOpen(true),
-      closeSearch: () => setSearchOpen(false),
-      setLinkSource: setLinkSourceId,
       searchItems,
+      removeItem,
+      removeItems,
+      undoDelete,
+      addChecklistItem: addChecklistItemFn,
+      toggleChecklistItem: toggleChecklistItemFn,
+      removeChecklistItem: removeChecklistItemFn,
+      reorderChecklistItems: reorderChecklistItemsFn,
     }),
     [
       data,
-      captureOpen,
-      searchOpen,
-      linkSourceId,
       activeSpace,
       activeItems,
       activeLinks,
       activeViewState,
-      recentItems,
-      scheduledTasks,
-      tasksByPriority,
-      setActiveView,
+      recent,
+      scheduled,
+      byPriority,
       setActiveSpace,
       createItem,
       updateItem,
@@ -404,6 +424,13 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
       setViewState,
       jumpToItem,
       searchItems,
+      removeItem,
+      removeItems,
+      undoDelete,
+      addChecklistItemFn,
+      toggleChecklistItemFn,
+      removeChecklistItemFn,
+      reorderChecklistItemsFn,
     ],
   );
 
@@ -412,8 +439,6 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
 
 export function useEngramStore() {
   const context = useContext(EngramContext);
-  if (!context) {
-    throw new Error("useEngramStore must be used inside EngramProvider");
-  }
+  if (!context) throw new Error("useEngramStore must be used inside EngramProvider");
   return context;
 }
