@@ -34,6 +34,7 @@ import {
 import { DEFAULT_SPACE_ID, PERSIST_DEBOUNCE_MS } from "./config";
 import { createLocalStorageAdapter } from "./persistence";
 import {
+  focusPinnedItems as projectFocusPinnedItems,
   recentItems,
   scheduledTasks,
   searchItems as projectSearchItems,
@@ -42,6 +43,10 @@ import {
   selectActiveSpace,
   selectActiveViewState,
   tasksByPriority,
+  todayItems as projectTodayItems,
+  todayPrefix,
+  todayTasks as projectTodayTasks,
+  todayUnpinnedTasks as projectTodayUnpinnedTasks,
 } from "./projections";
 import { seedItems, seedLinks, seedSpaces, seedViewStates } from "./seed";
 import { DeleteToast } from "./components/delete-toast";
@@ -90,6 +95,13 @@ type EngramStore = {
   toggleChecklistItem: (itemId: string, ciId: string) => void;
   removeChecklistItem: (itemId: string, ciId: string) => void;
   reorderChecklistItems: (itemId: string, checklistItems: ChecklistItem[]) => void;
+  todayTasks: Item[];
+  todayItems: Item[];
+  focusPinnedItems: Item[];
+  todayUnpinnedTasks: Item[];
+  pinToFocus: (id: string) => void;
+  unpinFromFocus: (id: string) => void;
+  upsertDailyNote: (text: string) => void;
 };
 
 const EngramContext = createContext<EngramStore | null>(null);
@@ -363,6 +375,23 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
     setData((current) => coreReorderChecklistItems(current, itemId, checklistItems));
   }, []);
 
+  const upsertDailyNote = useCallback((text: string) => {
+    const prefix = todayPrefix();
+    const noteTitle = `Daily Note — ${prefix}`;
+    const existing = data.items.find(
+      (item) => item.type === "thought" && item.title === noteTitle,
+    );
+    if (existing) {
+      setData((current) => patchItem(current, existing.id, { text }));
+    } else {
+      const item = buildItem(
+        { type: "thought", title: noteTitle, text, stayOnCurrentView: true },
+        data,
+      );
+      setData((current) => addItem(current, item));
+    }
+  }, [data]);
+
   // Projections — derived from data, recomputed only when data changes.
   const activeSpace = useMemo(() => selectActiveSpace(data), [data]);
   const activeItems = useMemo(() => selectActiveItems(data), [data]);
@@ -371,6 +400,18 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
   const recent = useMemo(() => recentItems(data.items), [data.items]);
   const scheduled = useMemo(() => scheduledTasks(data.items), [data.items]);
   const byPriority = useMemo(() => tasksByPriority(data.items), [data.items]);
+  const todayTasksList = useMemo(() => projectTodayTasks(data.items), [data.items]);
+  const todayItemsList = useMemo(() => projectTodayItems(data.items), [data.items]);
+  const focusPinnedList = useMemo(() => projectFocusPinnedItems(data.items), [data.items]);
+  const todayUnpinnedList = useMemo(() => projectTodayUnpinnedTasks(data.items), [data.items]);
+
+  const pinToFocus = useCallback((id: string) => {
+    setData((current) => patchItem(current, id, { focusPinned: true }));
+  }, []);
+
+  const unpinFromFocus = useCallback((id: string) => {
+    setData((current) => patchItem(current, id, { focusPinned: false }));
+  }, []);
 
   const searchItems = useCallback(
     (query: string) => projectSearchItems(data.items, query, recent),
@@ -387,6 +428,12 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
       recentItems: recent,
       scheduledTasks: scheduled,
       tasksByPriority: byPriority,
+      todayTasks: todayTasksList,
+      todayItems: todayItemsList,
+      focusPinnedItems: focusPinnedList,
+      todayUnpinnedTasks: todayUnpinnedList,
+      pinToFocus,
+      unpinFromFocus,
       setActiveSpace,
       createItem,
       updateItem,
@@ -404,6 +451,7 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
       toggleChecklistItem: toggleChecklistItemFn,
       removeChecklistItem: removeChecklistItemFn,
       reorderChecklistItems: reorderChecklistItemsFn,
+      upsertDailyNote,
     }),
     [
       data,
@@ -414,6 +462,12 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
       recent,
       scheduled,
       byPriority,
+      todayTasksList,
+      todayItemsList,
+      focusPinnedList,
+      todayUnpinnedList,
+      pinToFocus,
+      unpinFromFocus,
       setActiveSpace,
       createItem,
       updateItem,
@@ -431,6 +485,9 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
       toggleChecklistItemFn,
       removeChecklistItemFn,
       reorderChecklistItemsFn,
+      upsertDailyNote,
+      pinToFocus,
+      unpinFromFocus,
     ],
   );
 

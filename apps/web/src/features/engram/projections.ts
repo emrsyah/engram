@@ -75,6 +75,46 @@ export function tasksForDay(tasks: Item[], datePrefix: string): Item[] {
   return tasks.filter((task) => task.dueAt?.startsWith(datePrefix));
 }
 
+/** All items marked as pinned to the focus panel (across all spaces). */
+export function focusPinnedItems(items: Item[]): Item[] {
+  return items.filter((item) => item.focusPinned);
+}
+
+/** Tasks due today that have NOT been pinned to the focus panel. */
+export function todayUnpinnedTasks(items: Item[]): Item[] {
+  const prefix = todayPrefix();
+  return items.filter(
+    (item) => item.type === "task" && !item.done && item.dueAt?.startsWith(prefix) && !item.focusPinned,
+  );
+}
+
+/** Returns today's YYYY-MM-DD prefix in local time. */
+export function todayPrefix(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Tasks due today (across all spaces), sorted by done status then creation order. */
+export function todayTasks(items: Item[]): Item[] {
+  const prefix = todayPrefix();
+  return items
+    .filter((item) => item.type === "task" && item.dueAt?.startsWith(prefix))
+    .sort((a, b) => {
+      if (a.done !== b.done) return a.done ? 1 : -1;
+      return a.createdAt.localeCompare(b.createdAt);
+    });
+}
+
+/** All items created today or due today (for the focus mini-canvas). */
+export function todayItems(items: Item[]): Item[] {
+  const prefix = todayPrefix();
+  return items.filter(
+    (item) =>
+      item.createdAt.startsWith(prefix) ||
+      (item.dueAt?.startsWith(prefix)),
+  );
+}
+
 /** Builds the 7-day window starting from today for the Timeline view. */
 export function buildWeekDays(): { label: string; datePrefix: string }[] {
   const days = [];

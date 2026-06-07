@@ -6,6 +6,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { TODAY_FOCUS_SPACE_ID } from "../config";
 import { NAV_VIEWS, SPACE_ICONS } from "../nav";
 import { useEngramStore } from "../store";
 import { useUIStore } from "../ui-store";
@@ -69,11 +70,33 @@ export function AppSidebar() {
       </nav>
 
       <div className="mt-8 px-3">
+        {/* Today's Focus — always pinned at top */}
+        {spaces.filter((s) => s.id === TODAY_FOCUS_SPACE_ID).map((space) => {
+          const active = activeSpaceId === space.id;
+          return (
+            <Button
+              type="button"
+              key={space.id}
+              variant="ghost"
+              onClick={() => setActiveSpace(space.id)}
+              className={cn(
+                "mb-3 h-[36px] w-full justify-start gap-3 rounded-[7px] px-3 py-2 text-sm",
+                active
+                  ? "bg-[#251f38] font-semibold text-[#c4b5fd]"
+                  : "font-medium text-[#907ce8] hover:bg-[#1e1928] hover:text-[#c4b5fd]",
+              )}
+            >
+              <Icons.target className={cn("size-4", active ? "text-[#907ce8]" : "text-[#6b5fb0]")} />
+              {space.name}
+            </Button>
+          );
+        })}
+
         <p className="mb-2 px-3 font-bold text-[#736c63] text-[11px] uppercase tracking-[0.14em]">
           Spaces
         </p>
         <div className="space-y-1">
-          {spaces.map((space) => {
+          {spaces.filter((s) => s.id !== TODAY_FOCUS_SPACE_ID).map((space) => {
             const iconKey = (space.icon in SPACE_ICONS ? space.icon : "sparkles") as keyof typeof SPACE_ICONS;
             const Icon = Icons[SPACE_ICONS[iconKey]];
             return (

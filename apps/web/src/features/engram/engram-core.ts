@@ -29,6 +29,9 @@ export type CreateItemInput = {
   url?: string;
   source?: string;
   caption?: string;
+  focusPinned?: boolean;
+  /** Override which space the item is created in (defaults to activeSpaceId). */
+  spaceId?: string;
   stayOnCurrentView?: boolean;
 };
 
@@ -43,13 +46,14 @@ function taskAccent(priority?: Priority): Accent {
 /** Build the Item a capture would create, positioned in the active viewport. */
 export function buildItem(input: CreateItemInput, data: EngramData): Item {
   const timestamp = now();
-  const viewState = data.viewStates.find((view) => view.spaceId === data.activeSpaceId);
+  const targetSpaceId = input.spaceId ?? data.activeSpaceId;
+  const viewState = data.viewStates.find((view) => view.spaceId === targetSpaceId);
   const drop = viewState ? screenToWorld(CAPTURE_ANCHOR, viewState) : FALLBACK_DROP;
 
   const dims = ITEM_DIMENSIONS[input.type];
   return {
     id: createId("item"),
-    spaceId: data.activeSpaceId,
+    spaceId: targetSpaceId,
     type: input.type,
     x: input.x ?? drop.x,
     y: input.y ?? drop.y,
@@ -64,6 +68,7 @@ export function buildItem(input: CreateItemInput, data: EngramData): Item {
     done: false,
     priority: input.priority,
     dueAt: input.dueAt,
+    focusPinned: input.focusPinned,
     createdAt: timestamp,
     updatedAt: timestamp,
   };

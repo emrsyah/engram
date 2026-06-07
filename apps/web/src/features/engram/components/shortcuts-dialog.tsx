@@ -38,6 +38,7 @@ const SECTIONS: { title: string; shortcuts: { keys: string[]; label: string }[] 
   {
     title: "Canvas",
     shortcuts: [
+      { keys: ["F"], label: "Toggle focus pin on selected task" },
       { keys: ["Dbl-click"], label: "Create thought at cursor" },
       { keys: ["Drag"], label: "Pan canvas" },
       { keys: ["Scroll"], label: "Zoom in / out" },

@@ -1,12 +1,11 @@
 "use client";
 
 import type { Route } from "next";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useHotkeys } from "react-hotkeys-hook";
 
 import { useEngramStore } from "../store";
 import { useUIStore } from "../ui-store";
-import { usePathname } from "next/navigation";
 
 /**
  * Mounts all global keyboard shortcuts for the app.
@@ -15,7 +14,7 @@ import { usePathname } from "next/navigation";
 export function Hotkeys() {
   const router = useRouter();
   const pathname = usePathname();
-  const { spaces, setActiveSpace, removeItems, undoDelete } = useEngramStore();
+  const { spaces, items, setActiveSpace, removeItems, undoDelete, pinToFocus, unpinFromFocus } = useEngramStore();
   const {
     expandQuickCapture,
     quickCaptureExpanded,
@@ -101,6 +100,24 @@ export function Hotkeys() {
     "delete,backspace",
     () => { removeItems(canvasSelectedIds); },
     { description: "Delete selected node", enabled: onCanvas && !anyDialogOpen && canvasSelectedIds.length > 0 },
+  );
+
+  // ── Pin selected task nodes to focus ─────────────────────────────────
+  useHotkeys(
+    "f",
+    () => {
+      for (const id of canvasSelectedIds) {
+        const item = items.find((i) => i.id === id);
+        if (!item || item.type !== "task") continue;
+        if (item.focusPinned) unpinFromFocus(id);
+        else pinToFocus(id);
+      }
+    },
+    {
+      description: "Toggle focus pin on selected task(s)",
+      preventDefault: true,
+      enabled: onCanvas && !anyDialogOpen && canvasSelectedIds.length > 0,
+    },
   );
 
 

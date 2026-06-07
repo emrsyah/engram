@@ -36,6 +36,7 @@ export type Item = {
   priority?: Priority;
   dueAt?: string;
   checklistItems?: ChecklistItem[];
+  focusPinned?: boolean;
   createdAt: string;
   updatedAt: string;
 };

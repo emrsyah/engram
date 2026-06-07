@@ -1,27 +1,12 @@
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+"use client";
 
-import { authClient } from "@/lib/auth-client";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-import Dashboard from "./dashboard";
-
-export default async function DashboardPage() {
-  const session = await authClient.getSession({
-    fetchOptions: {
-      headers: await headers(),
-      throw: true,
-    },
-  });
-
-  if (!session?.user) {
-    redirect("/login");
-  }
-
-  return (
-    <div>
-      <h1>Dashboard</h1>
-      <p>Welcome {session.user.name}</p>
-      <Dashboard session={session} />
-    </div>
-  );
+export default function DashboardPage() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace("/canvas");
+  }, [router]);
+  return null;
 }

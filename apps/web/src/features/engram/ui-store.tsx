@@ -5,6 +5,12 @@ import { createContext, useCallback, useContext, useState } from "react";
 type QuickCaptureMode = "thought" | "task" | "link" | "attach";
 
 type UIStore = {
+  timerOpen: boolean;
+  scratchpadOpen: boolean;
+  focusTasksOpen: boolean;
+  toggleTimer: () => void;
+  toggleScratchpad: () => void;
+  toggleFocusTasks: () => void;
   quickCaptureExpanded: boolean;
   quickCaptureHighlight: number;
   quickCaptureMode?: QuickCaptureMode;
@@ -51,6 +57,12 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const setCanvasSelectedId = useCallback((id?: string) => setCanvasSelectedIds(id ? [id] : []), []);
   const [minimapVisible, setMinimapVisible] = useState(true);
   const toggleMinimap = useCallback(() => setMinimapVisible((v) => !v), []);
+  const [timerOpen, setTimerOpen] = useState(false);
+  const [scratchpadOpen, setScratchpadOpen] = useState(false);
+  const [focusTasksOpen, setFocusTasksOpen] = useState(false);
+  const toggleTimer = useCallback(() => setTimerOpen((v) => !v), []);
+  const toggleScratchpad = useCallback(() => setScratchpadOpen((v) => !v), []);
+  const toggleFocusTasks = useCallback(() => setFocusTasksOpen((v) => !v), []);
 
   const expandQuickCapture = useCallback((mode?: QuickCaptureMode) => {
     setQuickCaptureMode(mode);
@@ -76,6 +88,12 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   return (
     <UIContext.Provider
       value={{
+        timerOpen,
+        scratchpadOpen,
+        focusTasksOpen,
+        toggleTimer,
+        toggleScratchpad,
+        toggleFocusTasks,
         quickCaptureExpanded,
         quickCaptureHighlight,
         quickCaptureMode,

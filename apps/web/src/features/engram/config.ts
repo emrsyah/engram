@@ -27,3 +27,6 @@ export const PERSIST_DEBOUNCE_MS = 120;
 
 /** Default space to activate on first load. */
 export const DEFAULT_SPACE_ID = "space-mind";
+
+/** The always-present Today's Focus space ID. */
+export const TODAY_FOCUS_SPACE_ID = "space-today-focus";

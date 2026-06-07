@@ -16,6 +16,7 @@ export const SPACE_ICONS = {
   sparkles: "sparkles",
   briefcase: "briefcase",
   book: "book",
+  target: "target",
 } as const satisfies Record<string, keyof typeof Icons>;
 
 export type SpaceIconKey = keyof typeof SPACE_ICONS;
