@@ -490,11 +490,11 @@ Expected: PASS.
 
 Run: `bun run dev:web`
 
-Expected: Next app starts on `http://localhost:3001`.
+Expected: Next app starts on `http://localhost:3031`.
 
 - [ ] **Step 2: Open the app**
 
-Open: `http://localhost:3001`
+Open: `http://localhost:3031`
 
 Expected: Engram canvas appears immediately.
 

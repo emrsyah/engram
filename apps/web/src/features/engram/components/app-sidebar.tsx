@@ -30,7 +30,12 @@ export function AppSidebar() {
     >
       <div className="flex h-16 w-[252px] items-center justify-between px-5">
         <div className="flex items-center gap-3 font-bold text-lg text-white">
-          <Icons.sparkles className="size-4 text-[#9b88ff]" />
+          <img
+            src="/favicon.ico"
+            alt=""
+            aria-hidden="true"
+            className="size-7 shrink-0 rounded-[6px]"
+          />
           Engram
         </div>
         <Button

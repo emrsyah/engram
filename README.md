@@ -82,15 +82,15 @@ Create `apps/server/.env` for the server and database packages:
 ```bash
 DATABASE_URL=postgres://user:password@localhost:5432/engram
 BETTER_AUTH_SECRET=replace-with-at-least-32-characters
-BETTER_AUTH_URL=http://localhost:3000
-CORS_ORIGIN=http://localhost:3001
+BETTER_AUTH_URL=http://localhost:3030
+CORS_ORIGIN=http://localhost:3031
 NODE_ENV=development
 ```
 
 Create `apps/web/.env.local` for the web app:
 
 ```bash
-NEXT_PUBLIC_SERVER_URL=http://localhost:3000
+NEXT_PUBLIC_SERVER_URL=http://localhost:3030
 ```
 
 Push the Drizzle schema when using the auth/server flow:
@@ -105,8 +105,8 @@ Run the full development stack:
 bun run dev
 ```
 
-Open the web app at [http://localhost:3001](http://localhost:3001).
-The API server runs at [http://localhost:3000](http://localhost:3000).
+Open the web app at [http://localhost:3031](http://localhost:3031).
+The API server runs at [http://localhost:3030](http://localhost:3030).
 
 To run only one side:
 
@@ -127,8 +127,8 @@ bun run dev:server
 
 ```bash
 bun run dev             # Start all apps through Turborepo
-bun run dev:web         # Start only the Next.js app on port 3001
-bun run dev:server      # Start only the Hono server on port 3000
+bun run dev:web         # Start only the Next.js app on port 3031
+bun run dev:server      # Start only the Hono server on port 3030
 bun run build           # Build all apps/packages
 bun run check-types     # Typecheck all apps/packages
 bun run check           # Run Oxlint and Oxfmt
