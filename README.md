@@ -1,3 +1,6 @@
+<img width="1200" height="600" alt="ChatGPT Image 7 Jun 2026, 13 17 02" src="https://github.com/user-attachments/assets/5f50a6f1-1f8d-4c27-b10d-0dc67cfa72e5" />
+
+
 # Engram
 
 Engram is a local-first spatial workspace for capturing thoughts, tasks, links,
