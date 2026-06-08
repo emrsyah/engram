@@ -28,6 +28,7 @@ import {
   deleteItem,
   deleteItems,
   deleteSpace as coreDeleteSpace,
+  fileItem as coreFileItem,
   moveItemToSpace as coreMoveItemToSpace,
   patchItem,
   patchViewState,
@@ -45,6 +46,7 @@ import { createLocalStorageAdapter } from "./persistence";
 import {
   allTags as projectAllTags,
   focusPinnedItems as projectFocusPinnedItems,
+  inboxItems as projectInboxItems,
   overdueNotPinned as projectOverdueNotPinned,
   recentItems,
   scheduledTasks,
@@ -121,6 +123,8 @@ type EngramStore = {
   addItemTag: (id: string, tag: string) => void;
   removeItemTag: (id: string, tag: string) => void;
   moveItemToSpace: (itemId: string, targetSpaceId: string) => void;
+  fileItem: (itemId: string, targetSpaceId: string) => void;
+  inboxItems: Item[];
   overdueNotPinnedTasks: Item[];
   allTags: string[];
 };
@@ -465,6 +469,12 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
     setData((current) => coreMoveItemToSpace(current, itemId, targetSpaceId));
   }, []);
 
+  const fileItemFn = useCallback((itemId: string, targetSpaceId: string) => {
+    setData((current) => coreFileItem(current, itemId, targetSpaceId));
+  }, []);
+
+  const inboxList = useMemo(() => projectInboxItems(data.items), [data.items]);
+
   const searchItems = useCallback(
     (query: string) => {
       if (query.startsWith("#")) return projectSearchItemsByTag(data.items, query);
@@ -514,6 +524,8 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
       addItemTag: addItemTagFn,
       removeItemTag: removeItemTagFn,
       moveItemToSpace: moveItemToSpaceFn,
+      fileItem: fileItemFn,
+      inboxItems: inboxList,
       overdueNotPinnedTasks: overdueNotPinnedList,
       allTags: allTagsList,
     }),
@@ -559,6 +571,8 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
       addItemTagFn,
       removeItemTagFn,
       moveItemToSpaceFn,
+      fileItemFn,
+      inboxList,
     ],
   );
 

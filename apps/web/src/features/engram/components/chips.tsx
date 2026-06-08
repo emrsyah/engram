@@ -78,6 +78,17 @@ export function DueChip({ dueAt }: { dueAt?: string }) {
   );
 }
 
+export function SomedayChip() {
+  return (
+    <Badge
+      variant="secondary"
+      className="h-6 rounded-[5px] bg-[#2a2433] px-2 font-mono font-bold text-[#b3a4ff]"
+    >
+      Someday
+    </Badge>
+  );
+}
+
 export function TagChip({ tag, onRemove }: { tag: string; onRemove?: () => void }) {
   return (
     <Badge

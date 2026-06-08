@@ -33,6 +33,10 @@ export type CreateItemInput = {
   tags?: string[];
   /** Override which space the item is created in (defaults to activeSpaceId). */
   spaceId?: string;
+  /** Land in the Inbox instead of being placed on a canvas. */
+  inbox?: boolean;
+  /** Deferred with no due date on purpose. */
+  someday?: boolean;
   stayOnCurrentView?: boolean;
 };
 
@@ -125,12 +129,30 @@ function taskAccent(priority?: Priority): Accent {
   return priority ? TASK_ACCENT[priority] : "gold";
 }
 
+/**
+ * Where a freshly placed item should land in a space's viewport. Cascades
+ * diagonally based on how many items the space already holds so successive
+ * captures don't stack on the exact same coordinate.
+ */
+export function dropPosition(data: EngramData, targetSpaceId: string): { x: number; y: number } {
+  const viewState = data.viewStates.find((view) => view.spaceId === targetSpaceId);
+  const base = viewState ? screenToWorld(CAPTURE_ANCHOR, viewState) : FALLBACK_DROP;
+
+  const placedCount = data.items.filter((i) => i.spaceId === targetSpaceId && !i.inbox).length;
+  const STEP = 34;
+  const PER_ROW = 5;
+  const slot = placedCount % (PER_ROW * PER_ROW);
+  return {
+    x: base.x + (slot % PER_ROW) * STEP,
+    y: base.y + Math.floor(slot / PER_ROW) * STEP,
+  };
+}
+
 /** Build the Item a capture would create, positioned in the active viewport. */
 export function buildItem(input: CreateItemInput, data: EngramData): Item {
   const timestamp = now();
   const targetSpaceId = input.spaceId ?? data.activeSpaceId;
-  const viewState = data.viewStates.find((view) => view.spaceId === targetSpaceId);
-  const drop = viewState ? screenToWorld(CAPTURE_ANCHOR, viewState) : FALLBACK_DROP;
+  const drop = dropPosition(data, targetSpaceId);
 
   const dims = ITEM_DIMENSIONS[input.type];
   return {
@@ -152,6 +174,8 @@ export function buildItem(input: CreateItemInput, data: EngramData): Item {
     dueAt: input.dueAt,
     focusPinned: input.focusPinned,
     tags: input.tags,
+    inbox: input.inbox,
+    someday: input.someday,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -352,6 +376,32 @@ export function moveItemToSpace(data: EngramData, itemId: string, targetSpaceId:
   return {
     ...data,
     items: data.items.map((i) => i.id === itemId ? { ...i, spaceId: targetSpaceId, updatedAt: now() } : i),
+    links: validLinks,
+  };
+}
+
+/**
+ * File an Inbox item into a space: clear the inbox flag, assign it to the space,
+ * and give it a fresh canvas position. Links to items in other spaces are dropped
+ * (links are space-scoped), mirroring moveItemToSpace.
+ */
+export function fileItem(data: EngramData, itemId: string, targetSpaceId: string): EngramData {
+  const item = data.items.find((i) => i.id === itemId);
+  if (!item) return data;
+  const pos = dropPosition(data, targetSpaceId);
+  const validLinks = data.links.filter((l) => {
+    if (l.fromItemId !== itemId && l.toItemId !== itemId) return true;
+    const otherId = l.fromItemId === itemId ? l.toItemId : l.fromItemId;
+    const other = data.items.find((i) => i.id === otherId);
+    return other?.spaceId === targetSpaceId;
+  });
+  return {
+    ...data,
+    items: data.items.map((i) =>
+      i.id === itemId
+        ? { ...i, spaceId: targetSpaceId, inbox: false, x: pos.x, y: pos.y, updatedAt: now() }
+        : i,
+    ),
     links: validLinks,
   };
 }

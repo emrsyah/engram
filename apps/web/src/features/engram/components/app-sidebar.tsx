@@ -141,7 +141,7 @@ function SortableSpaceItem({
 
 export function AppSidebar() {
 	const pathname = usePathname();
-	const { spaces, activeSpaceId, setActiveSpace, updateSpace } = useEngramStore();
+	const { spaces, activeSpaceId, setActiveSpace, updateSpace, inboxItems } = useEngramStore();
 	const { sidebarCollapsed, toggleSidebar, openNewSpaceDialog, openEditSpaceDialog, openDeleteSpaceDialog } = useUIStore();
 
 	const [activeId, setActiveId] = useState<string | null>(null);
@@ -223,6 +223,11 @@ export function AppSidebar() {
 							<span className="flex items-center gap-3">
 								<Icon className={cn("size-4", active && "text-[#9b88ff]")} />
 								<span className="font-semibold">{label}</span>
+									{href === "/inbox" && inboxItems.length > 0 && (
+										<span className="ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-[#3a3252] px-1.5 font-mono text-[11px] font-semibold text-[#cfc7ff]">
+											{inboxItems.length}
+										</span>
+									)}
 							</span>
 						</Link>
 					);

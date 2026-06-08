@@ -15,11 +15,26 @@ export function selectActiveSpace(data: EngramData): Space | undefined {
 }
 
 export function selectActiveItems(data: EngramData): Item[] {
-  return data.items.filter((item) => item.spaceId === data.activeSpaceId);
+  return data.items.filter((item) => item.spaceId === data.activeSpaceId && !item.inbox);
 }
 
 export function selectActiveLinks(data: EngramData): ItemLink[] {
-  return data.links.filter((link) => link.spaceId === data.activeSpaceId);
+  // Only links whose endpoints are both visible on the active canvas (excludes
+  // links touching Inbox items, which aren't placed yet).
+  const visible = new Set(
+    data.items.filter((i) => i.spaceId === data.activeSpaceId && !i.inbox).map((i) => i.id),
+  );
+  return data.links.filter(
+    (link) =>
+      link.spaceId === data.activeSpaceId &&
+      visible.has(link.fromItemId) &&
+      visible.has(link.toItemId),
+  );
+}
+
+/** Untriaged captures awaiting a home, newest first. */
+export function inboxItems(items: Item[]): Item[] {
+  return items.filter((item) => item.inbox).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export function selectActiveViewState(data: EngramData): CanvasViewState {
@@ -30,20 +45,24 @@ export function selectActiveViewState(data: EngramData): CanvasViewState {
 }
 
 export function recentItems(items: Item[]): Item[] {
-  return [...items].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, RECENT_ITEMS_LIMIT);
+  return [...items]
+    .filter((item) => !item.inbox)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .slice(0, RECENT_ITEMS_LIMIT);
 }
 
 export function scheduledTasks(items: Item[]): Item[] {
   return items
-    .filter((item) => item.type === "task")
+    .filter((item) => item.type === "task" && !item.inbox)
     .sort((a, b) => (a.dueAt ?? "9999").localeCompare(b.dueAt ?? "9999"));
 }
 
 export function tasksByPriority(items: Item[]): Record<Priority, Item[]> {
+  const placed = items.filter((item) => item.type === "task" && !item.inbox);
   return {
-    1: items.filter((item) => item.type === "task" && item.priority === 1),
-    2: items.filter((item) => item.type === "task" && item.priority === 2),
-    3: items.filter((item) => item.type === "task" && item.priority === 3),
+    1: placed.filter((item) => item.priority === 1),
+    2: placed.filter((item) => item.priority === 2),
+    3: placed.filter((item) => item.priority === 3),
   };
 }
 
@@ -77,14 +96,14 @@ export function tasksForDay(tasks: Item[], datePrefix: string): Item[] {
 
 /** All items marked as pinned to the focus panel (across all spaces). */
 export function focusPinnedItems(items: Item[]): Item[] {
-  return items.filter((item) => item.focusPinned);
+  return items.filter((item) => item.focusPinned && !item.inbox);
 }
 
 /** Tasks due today that have NOT been pinned to the focus panel. */
 export function todayUnpinnedTasks(items: Item[]): Item[] {
   const prefix = todayPrefix();
   return items.filter(
-    (item) => item.type === "task" && !item.done && item.dueAt?.startsWith(prefix) && !item.focusPinned,
+    (item) => item.type === "task" && !item.inbox && !item.done && item.dueAt?.startsWith(prefix) && !item.focusPinned,
   );
 }
 
@@ -98,7 +117,7 @@ export function todayPrefix(): string {
 export function todayTasks(items: Item[]): Item[] {
   const prefix = todayPrefix();
   return items
-    .filter((item) => item.type === "task" && item.dueAt?.startsWith(prefix))
+    .filter((item) => item.type === "task" && !item.inbox && item.dueAt?.startsWith(prefix))
     .sort((a, b) => {
       if (a.done !== b.done) return a.done ? 1 : -1;
       return a.createdAt.localeCompare(b.createdAt);
@@ -110,8 +129,8 @@ export function todayItems(items: Item[]): Item[] {
   const prefix = todayPrefix();
   return items.filter(
     (item) =>
-      item.createdAt.startsWith(prefix) ||
-      (item.dueAt?.startsWith(prefix)),
+      !item.inbox &&
+      (item.createdAt.startsWith(prefix) || item.dueAt?.startsWith(prefix)),
   );
 }
 
@@ -131,7 +150,7 @@ export function searchItemsByTag(items: Item[], query: string): Item[] {
 export function overdueTasks(items: Item[]): Item[] {
   const now = new Date().toISOString();
   return items
-    .filter((i) => i.type === "task" && !i.done && i.dueAt && i.dueAt < now)
+    .filter((i) => i.type === "task" && !i.inbox && !i.done && i.dueAt && i.dueAt < now)
     .sort((a, b) => a.dueAt!.localeCompare(b.dueAt!));
 }
 

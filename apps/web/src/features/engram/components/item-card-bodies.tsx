@@ -6,7 +6,7 @@ import { PopoverContent, PopoverRoot, PopoverTrigger } from "@alphonse/ui/compon
 import { cn } from "@alphonse/ui/lib/utils";
 import { CalendarIcon } from "lucide-react";
 
-import { TagChip, TypeLabel } from "./chips";
+import { SomedayChip, TagChip, TypeLabel } from "./chips";
 import { Icons } from "./icons";
 import { LinkifiedText } from "./linkified-text";
 import { useEngramStore } from "../store";
@@ -124,6 +124,7 @@ export function TaskCard({ item, onToggle }: { item: Item; onToggle: () => void 
             dueAt={item.dueAt}
             onChange={(dueAt) => updateItem(item.id, { dueAt })}
           />
+          {item.someday && !item.dueAt && <SomedayChip />}
         </div>
         {item.tags && item.tags.length > 0 && (
           <div className="nodrag nopan mt-2 flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>

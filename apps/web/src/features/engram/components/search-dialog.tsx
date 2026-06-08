@@ -38,7 +38,7 @@ const TYPE_BADGE: Record<ItemType, { label: string; color: string }> = {
 
 export function SearchDialog() {
   const { searchItems, jumpToItem, spaces, setActiveSpace } = useEngramStore();
-  const { searchOpen, closeSearch } = useUIStore();
+  const { searchOpen, closeSearch, openDetail } = useUIStore();
   const router = useRouter();
   const [query, setQuery] = useState("");
 
@@ -149,7 +149,12 @@ export function SearchDialog() {
                     onSelect={() => {
                       setQuery("");
                       closeSearch();
-                      jumpToItem(item.id);
+                      if (item.inbox) {
+                        router.push("/inbox" as Route<string>);
+                        openDetail(item.id);
+                      } else {
+                        jumpToItem(item.id);
+                      }
                     }}
                   >
                     <span className={cn("mt-0.5 size-2 shrink-0 rounded-[2px]", ACCENT_DOT[item.accent])} />

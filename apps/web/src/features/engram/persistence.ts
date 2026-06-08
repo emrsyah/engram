@@ -62,6 +62,8 @@ const ItemSchema = z.object({
 	checklistItems: z.array(ChecklistItemSchema).optional(),
 	focusPinned: z.boolean().optional(),
 	tags: z.array(z.string()).optional(),
+	inbox: z.boolean().optional(),
+	someday: z.boolean().optional(),
 	createdAt: z.string(),
 	updatedAt: z.string(),
 });

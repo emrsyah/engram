@@ -3,6 +3,13 @@
 import { Button } from "@alphonse/ui/components/button";
 import { Calendar } from "@alphonse/ui/components/calendar";
 import { Checkbox } from "@alphonse/ui/components/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@alphonse/ui/components/dropdown-menu";
 import { Input } from "@alphonse/ui/components/input";
 import { PopoverContent, PopoverRoot, PopoverTrigger } from "@alphonse/ui/components/popover";
 import { ToggleGroup, ToggleGroupItem } from "@alphonse/ui/components/toggle-group";
@@ -36,10 +43,14 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { toast } from "sonner";
 
+import { CaptureInput, type MentionItem } from "./capture-input";
+import { Icons } from "./icons";
+import { SPACE_ICONS, type SpaceIconKey } from "../nav";
 import { useEngramStore } from "../store";
 import { useUIStore } from "../ui-store";
-import type { Priority } from "../types";
+import type { Priority, Space } from "../types";
 
 type Mode = "thought" | "task" | "link" | "attach";
 
@@ -72,8 +83,9 @@ type ParsedTaskText = {
   priority?: Priority;
   dueDate?: Date;
   dueHasTime?: boolean;
+  someday?: boolean;
   tags: string[];
-  tokens: { kind: "priority" | "date" | "tag"; label: string }[];
+  tokens: { kind: "priority" | "date" | "tag" | "someday"; label: string }[];
 };
 
 function formatBytes(bytes: number) {
@@ -138,6 +150,9 @@ function parseTaskText(value: string, base = new Date()): ParsedTaskText {
     cleanText = cleanText.replace(priorityMatch[0], priorityMatch[0].startsWith(" ") ? " " : "");
   }
 
+  // Strip @mentions — these become explicit node connections, not part of the title.
+  cleanText = cleanText.replace(/(?:^|\s)@\w[\w-]*/g, "");
+
   const tagMatches = [...cleanText.matchAll(/#(\w[\w-]*)/g)];
   const tags = tagMatches.map((m) => m[1]);
   for (const tag of tags) {
@@ -145,7 +160,16 @@ function parseTaskText(value: string, base = new Date()): ParsedTaskText {
     cleanText = cleanText.replace(`#${tag}`, "");
   }
 
-  const parsedDue = parseDuePhrase(cleanText, base);
+  // "someday" / "later" defers with no due date — and wins over date parsing.
+  const somedayMatch = cleanText.match(/\b(?:someday|later)\b/i);
+  let someday = false;
+  if (somedayMatch) {
+    someday = true;
+    tokens.push({ kind: "someday", label: "Someday" });
+    cleanText = cleanText.replace(somedayMatch[0], "");
+  }
+
+  const parsedDue = someday ? null : parseDuePhrase(cleanText, base);
   if (parsedDue) {
     tokens.push({ kind: "date", label: parsedDue.label });
     cleanText = cleanText.slice(0, parsedDue.start) + cleanText.slice(parsedDue.end);
@@ -156,6 +180,7 @@ function parseTaskText(value: string, base = new Date()): ParsedTaskText {
     priority,
     dueDate: parsedDue?.date,
     dueHasTime: parsedDue?.hasTime,
+    someday,
     tags,
     tokens,
   };
@@ -235,7 +260,8 @@ function normalizeTime(hourText: string, minuteText: string | undefined, meridie
 
 export function QuickCaptureBar() {
   const pathname = usePathname();
-  const { createItem, addChecklistItem } = useEngramStore();
+  const { createItem, addChecklistItem, connectItems, activeItems, spaces, activeSpaceId } =
+    useEngramStore();
   const {
     openNoteEditor,
     quickCaptureExpanded: expanded,
@@ -265,6 +291,14 @@ export function QuickCaptureBar() {
 
   // Task chaining — pending tasks above the active row
   const [pendingTasks, setPendingTasks] = useState<string[]>([]);
+  // Tags accumulated from chained task lines (the live line's tags are added on commit).
+  const [batchTags, setBatchTags] = useState<string[]>([]);
+  // Whether any chained line deferred the batch to "someday".
+  const [batchSomeday, setBatchSomeday] = useState(false);
+  // Nodes to connect the new item to, chosen via "@" mention.
+  const [connections, setConnections] = useState<MentionItem[]>([]);
+  // Where the capture lands: the Inbox (default) or a specific space.
+  const [captureTarget, setCaptureTarget] = useState<"inbox" | string>("inbox");
 
   // Attach
   const [file, setFile] = useState<FileState | null>(null);
@@ -274,6 +308,26 @@ export function QuickCaptureBar() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const taskSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+  // Candidate nodes for "@" linking — same space only (links are space-scoped), and
+  // hide ones already chosen.
+  const mentionItems: MentionItem[] = activeItems
+    .filter((i) => !connections.some((c) => c.id === i.id))
+    .map((i) => ({
+      id: i.id,
+      label: i.title?.trim() || i.text?.trim() || i.url || i.source || "Untitled",
+      type: i.type,
+    }));
+
+  const addConnection = useCallback((item: MentionItem) => {
+    setConnections((current) =>
+      current.some((c) => c.id === item.id) ? current : [...current, item],
+    );
+  }, []);
+
+  const removeConnection = useCallback((id: string) => {
+    setConnections((current) => current.filter((c) => c.id !== id));
+  }, []);
 
   const reset = useCallback(() => {
     setText("");
@@ -285,6 +339,10 @@ export function QuickCaptureBar() {
     setMode(quickCaptureMode ?? contextualMode);
     setThoughtNotesMode(false);
     setPendingTasks([]);
+    setBatchTags([]);
+    setBatchSomeday(false);
+    setConnections([]);
+    setCaptureTarget("inbox");
   }, [contextualMode, quickCaptureMode]);
 
   const collapse = useCallback(() => { collapseQuickCapture(); reset(); }, [collapseQuickCapture, reset]);
@@ -307,7 +365,7 @@ export function QuickCaptureBar() {
   // Reset thought notes mode when leaving Thought
   useEffect(() => {
     if (mode !== "thought") setThoughtNotesMode(false);
-    if (mode !== "task") setPendingTasks([]);
+    if (mode !== "task") { setPendingTasks([]); setBatchTags([]); setBatchSomeday(false); }
   }, [mode]);
 
   // Auto-detect URL paste -> link mode (only when not in notes mode)
@@ -364,7 +422,13 @@ export function QuickCaptureBar() {
   const effectivePriority = parsedTask?.priority ?? priority;
   const effectiveDueDate = parsedTask?.dueDate ?? dueDate;
   const effectiveDueHasTime = parsedTask?.dueDate ? !!parsedTask.dueHasTime : dueHasTime;
-  const effectiveTags = parsedTask?.tags ?? [];
+  const effectiveTags = [...new Set([...batchTags, ...(parsedTask?.tags ?? [])])];
+  const effectiveSomeday = (parsedTask?.someday ?? false) || batchSomeday;
+
+  // Resolve the capture destination once per render.
+  const isInbox = captureTarget === "inbox";
+  const targetSpaceId = isInbox ? undefined : captureTarget;
+  const targetSpaceName = spaces.find((s) => s.id === captureTarget)?.name;
 
   const allTasks = (() => {
     return taskText ? [...pendingTasks, taskText] : [...pendingTasks];
@@ -379,15 +443,45 @@ export function QuickCaptureBar() {
     return false;
   })();
 
+  // Wire the chosen "@" connections from a freshly created item to their targets.
+  const linkConnections = useCallback(
+    (fromId: string) => {
+      for (const conn of connections) connectItems(fromId, conn.id);
+    },
+    [connections, connectItems],
+  );
+
+  // When the destination isn't the canvas you're looking at, don't yank the view;
+  // surface a toast instead so the capture isn't silently invisible.
+  const stayOnCurrentView = isInbox
+    ? true
+    : targetSpaceId !== activeSpaceId
+      ? true
+      : pathname !== "/canvas";
+
+  const notifyTarget = () => {
+    if (isInbox) toast.success("Added to Inbox");
+    else if (targetSpaceId !== activeSpaceId) toast.success(`Added to ${targetSpaceName}`);
+  };
+
   const commit = () => {
     if (!canCommit) return;
     const trimmed = text.trim();
 
     if (mode === "thought") {
-      createItem({ type: "thought", text: trimmed, stayOnCurrentView: pathname !== "/canvas" });
+      const item = createItem({
+        type: "thought",
+        text: trimmed,
+        inbox: isInbox || undefined,
+        spaceId: targetSpaceId,
+        stayOnCurrentView,
+      });
+      linkConnections(item.id);
+      notifyTarget();
       if (keepCaptureOpen) {
         setText("");
         setThoughtNotesMode(false);
+        setConnections([]);
         setMode("thought");
         requestAnimationFrame(() => inputRef.current?.focus());
         return;
@@ -404,15 +498,23 @@ export function QuickCaptureBar() {
         title: main,
         priority: effectivePriority,
         dueAt: due,
+        someday: !due && effectiveSomeday ? true : undefined,
         tags: effectiveTags.length > 0 ? effectiveTags : undefined,
-        stayOnCurrentView: pathname !== "/canvas",
+        inbox: isInbox || undefined,
+        spaceId: targetSpaceId,
+        stayOnCurrentView,
       });
       for (const sub of subs) addChecklistItem(item.id, sub);
+      linkConnections(item.id);
+      notifyTarget();
       if (keepCaptureOpen) {
         setText("");
         setDueDate(null);
         setDueHasTime(false);
         setPendingTasks([]);
+        setBatchTags([]);
+        setBatchSomeday(false);
+        setConnections([]);
         setMode("task");
         requestAnimationFrame(() => inputRef.current?.focus());
         return;
@@ -422,8 +524,11 @@ export function QuickCaptureBar() {
         type: "link",
         url: trimmed,
         title: extractDomain(trimmed),
-        stayOnCurrentView: pathname !== "/canvas",
+        inbox: isInbox || undefined,
+        spaceId: targetSpaceId,
+        stayOnCurrentView,
       });
+      notifyTarget();
       if (keepCaptureOpen) {
         setText("");
         setMode("link");
@@ -436,8 +541,11 @@ export function QuickCaptureBar() {
         title: file.name,
         url: file.previewUrl,
         source: file.name,
-        stayOnCurrentView: pathname !== "/canvas",
+        inbox: isInbox || undefined,
+        spaceId: targetSpaceId,
+        stayOnCurrentView,
       });
+      notifyTarget();
       if (keepCaptureOpen) {
         setFile(null);
         setMode("attach");
@@ -455,8 +563,11 @@ export function QuickCaptureBar() {
     const item = createItem({
       type: "thought",
       text: trimmed || "",
-      stayOnCurrentView: pathname !== "/canvas",
+      inbox: isInbox || undefined,
+      spaceId: targetSpaceId,
+      stayOnCurrentView: true,
     });
+    linkConnections(item.id);
     reset();
     collapseQuickCapture();
     requestAnimationFrame(() => openNoteEditor(item.id));
@@ -561,33 +672,38 @@ export function QuickCaptureBar() {
           {mode === "thought" && (
             <>
               {!thoughtNotesMode ? (
-                <div className="flex items-center gap-2.5">
-                  <ActiveIcon className={cn("size-4 shrink-0", activeAccent)} />
-                  <Input
-                    ref={inputRef}
-                    autoFocus
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) { commit(); return; }
-                      if (e.key === "Enter" && e.shiftKey) {
-                        // Morph to notes mode and inject newline at cursor
-                        e.preventDefault();
-                        setThoughtNotesMode(true);
-                        const sel = inputRef.current?.selectionStart ?? text.length;
-                        setText(text.slice(0, sel) + "\n" + text.slice(sel));
-                        requestAnimationFrame(() => {
-                          textareaRef.current?.focus();
-                          textareaRef.current?.setSelectionRange(sel + 1, sel + 1);
-                        });
-                        return;
-                      }
-                      handleArrowTabNav(e, mode, setMode);
-                    }}
-                    placeholder="Type a thought… (Shift+Enter for notes)"
-                    className="h-10 rounded-[7px] border-0 bg-transparent px-1 text-[15px] text-white placeholder:text-[#6b6460] focus-visible:ring-0"
-                  />
-                </div>
+                <>
+                  <div className="flex items-center gap-2.5">
+                    <ActiveIcon className={cn("size-4 shrink-0", activeAccent)} />
+                    <CaptureInput
+                      inputRef={inputRef}
+                      autoFocus
+                      value={text}
+                      onValueChange={setText}
+                      highlight={["mention"]}
+                      mentionItems={mentionItems}
+                      onSelectMention={addConnection}
+                      onCommitKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commit(); return; }
+                        if (e.key === "Enter" && e.shiftKey) {
+                          // Morph to notes mode and inject newline at cursor
+                          e.preventDefault();
+                          setThoughtNotesMode(true);
+                          const sel = inputRef.current?.selectionStart ?? text.length;
+                          setText(text.slice(0, sel) + "\n" + text.slice(sel));
+                          requestAnimationFrame(() => {
+                            textareaRef.current?.focus();
+                            textareaRef.current?.setSelectionRange(sel + 1, sel + 1);
+                          });
+                          return;
+                        }
+                        handleArrowTabNav(e, mode, setMode);
+                      }}
+                      placeholder="Type a thought… (Shift+Enter for notes · @ to link)"
+                    />
+                  </div>
+                  <ConnectionChips connections={connections} onRemove={removeConnection} />
+                </>
               ) : (
                 <div className="qcb-extra flex flex-col gap-2" key="thought-notes">
                   <div className="flex items-center justify-between">
@@ -696,18 +812,25 @@ export function QuickCaptureBar() {
 
               <div className="flex items-center gap-2.5">
                 <ActiveIcon className={cn("size-4 shrink-0", activeAccent)} />
-                <Input
-                  ref={inputRef}
+                <CaptureInput
+                  inputRef={inputRef}
                   autoFocus
                   value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  onKeyDown={(e) => {
+                  onValueChange={setText}
+                  highlight={["priority", "tag", "date", "mention"]}
+                  mentionItems={mentionItems}
+                  onSelectMention={addConnection}
+                  onCommitKeyDown={(e) => {
                     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); commit(); return; }
                     if (e.key === "Enter") {
                       e.preventDefault();
-                      const trimmed = text.trim();
-                      if (trimmed) {
-                        setPendingTasks((p) => [...p, trimmed]);
+                      const parsed = parseTaskText(text);
+                      if (parsed.cleanText) {
+                        setPendingTasks((p) => [...p, parsed.cleanText]);
+                        if (parsed.priority) setPriority(parsed.priority);
+                        if (parsed.dueDate) { setDueDate(parsed.dueDate); setDueHasTime(!!parsed.dueHasTime); }
+                        if (parsed.someday) setBatchSomeday(true);
+                        if (parsed.tags.length > 0) setBatchTags((t) => [...new Set([...t, ...parsed.tags])]);
                         setText("");
                       } else if (allTasks.length > 0) {
                         commit();
@@ -723,8 +846,7 @@ export function QuickCaptureBar() {
                     }
                     handleArrowTabNav(e, mode, setMode);
                   }}
-                  placeholder={pendingTasks.length === 0 ? "Main task... try tomorrow 3pm or !p1" : "Subtask..."}
-                  className="h-10 rounded-[7px] border-0 bg-transparent px-1 text-[15px] text-white placeholder:text-[#6b6460] focus-visible:ring-0"
+                  placeholder={pendingTasks.length === 0 ? "Main task… try tomorrow 3pm, !p1, #tag, @link" : "Subtask…"}
                 />
               </div>
 
@@ -739,14 +861,18 @@ export function QuickCaptureBar() {
                           ? "border-amber-400/30 bg-amber-400/15 text-amber-300"
                           : token.kind === "tag"
                             ? "border-[#1e3a45] bg-[#1e2a30] text-[#4aa5c8]"
-                            : "border-[#3a3530] bg-[#252220] text-[#c8bfb2]",
+                            : token.kind === "someday"
+                              ? "border-violet-400/30 bg-violet-400/15 text-violet-300"
+                              : "border-[#3a3530] bg-[#252220] text-[#c8bfb2]",
                       )}
                     >
-                      {token.kind === "priority" ? "Priority " : token.kind === "tag" ? "" : "Due "}{token.label}
+                      {token.kind === "priority" ? "Priority " : token.kind === "tag" || token.kind === "someday" ? "" : "Due "}{token.label}
                     </span>
                   ))}
                 </div>
               )}
+
+              <ConnectionChips connections={connections} onRemove={removeConnection} className="pl-7" />
 
               {/* Shared priority + date for the whole batch */}
               <div className="flex flex-wrap items-center gap-1.5 pl-7">
@@ -930,6 +1056,14 @@ export function QuickCaptureBar() {
             {mode === "link"    && (keepCaptureOpen ? "Enter saves and keeps link open" : "Enter to add · Esc to close")}
             {mode === "attach"  && (keepCaptureOpen ? "Save keeps attach open" : "Drop file or browse")}
           </span>
+
+          <CaptureTargetSelector
+            target={captureTarget}
+            onChange={setCaptureTarget}
+            spaces={spaces}
+            className="ml-3"
+          />
+
           {(mode === "thought" || mode === "task" || mode === "link" || mode === "attach") && (
             <label className="ml-auto mr-2 flex items-center gap-2 rounded-[6px] px-1.5 py-1 text-[11px] text-[#8d857b]">
               <Checkbox
@@ -974,6 +1108,106 @@ function handleArrowTabNav(
   const idx = MODE_TABS.findIndex((t) => t.mode === mode);
   if (e.key === "ArrowLeft" && atStart && idx > 0) { setMode(MODE_TABS[idx - 1].mode); e.preventDefault(); }
   else if (e.key === "ArrowRight" && atEnd && idx < MODE_TABS.length - 1) { setMode(MODE_TABS[idx + 1].mode); e.preventDefault(); }
+}
+
+function CaptureTargetSelector({
+  target,
+  onChange,
+  spaces,
+  className,
+}: {
+  target: "inbox" | string;
+  onChange: (target: "inbox" | string) => void;
+  spaces: Space[];
+  className?: string;
+}) {
+  const sortedSpaces = [...spaces].sort((a, b) => a.sortOrder - b.sortOrder);
+  const activeSpace = target === "inbox" ? undefined : spaces.find((s) => s.id === target);
+  const TriggerIcon = activeSpace
+    ? Icons[SPACE_ICONS[(activeSpace.icon in SPACE_ICONS ? activeSpace.icon : "sparkles") as SpaceIconKey]]
+    : Icons.inbox;
+  const triggerLabel = activeSpace ? activeSpace.name : "Inbox";
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        title="Where this capture lands"
+        className={cn(
+          "flex h-7 max-w-[140px] items-center gap-1.5 rounded-[6px] border border-[#2f2a25] bg-[#181511] px-2",
+          "text-[11px] font-medium text-[#9a9088] hover:border-[#3a3530] hover:text-[#c8bfb2]",
+          "transition-colors duration-150",
+          className,
+        )}
+      >
+        <TriggerIcon className={cn("size-3.5 shrink-0", target === "inbox" && "text-[#9b88ff]")} />
+        <span className="truncate">{triggerLabel}</span>
+        <Icons.chevronRight className="size-3 shrink-0 rotate-90 opacity-60" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        side="top"
+        align="start"
+        sideOffset={6}
+        className="min-w-[180px] rounded-[10px] border-[#2e2b26] bg-[#1a1714] text-[#efe9df]"
+      >
+        <DropdownMenuItem
+          onClick={() => onChange("inbox")}
+          className="cursor-pointer text-[#b0a99f] focus:bg-[#22201f] focus:text-white"
+        >
+          <Icons.inbox className="mr-1.5 size-4 text-[#9b88ff]" />
+          Inbox
+          <span className="ml-auto font-mono text-[10px] text-[#6b6258] uppercase">Default</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-[#2e2b26]" />
+        {sortedSpaces.map((space) => {
+          const iconKey = (space.icon in SPACE_ICONS ? space.icon : "sparkles") as SpaceIconKey;
+          const SpaceIcon = Icons[SPACE_ICONS[iconKey]];
+          return (
+            <DropdownMenuItem
+              key={space.id}
+              onClick={() => onChange(space.id)}
+              className="cursor-pointer text-[#b0a99f] focus:bg-[#22201f] focus:text-white"
+            >
+              <SpaceIcon className="mr-1.5 size-4" />
+              {space.name}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ConnectionChips({
+  connections,
+  onRemove,
+  className,
+}: {
+  connections: MentionItem[];
+  onRemove: (id: string) => void;
+  className?: string;
+}) {
+  if (connections.length === 0) return null;
+  return (
+    <div className={cn("qcb-extra flex flex-wrap gap-1.5", className)} key={connections.map((c) => c.id).join("-")}>
+      {connections.map((conn) => (
+        <span
+          key={conn.id}
+          className="flex items-center gap-1 rounded-[5px] border border-[#3a3252] bg-[#241f3a] py-0.5 pr-1 pl-2 text-[11px] text-[#cfc7ff]"
+        >
+          <LinkIcon className="size-2.5 shrink-0 text-[#9b88ff]" />
+          <span className="max-w-[160px] truncate">{conn.label}</span>
+          <button
+            type="button"
+            onClick={() => onRemove(conn.id)}
+            className="ml-0.5 flex size-4 items-center justify-center rounded-[3px] text-[#9087b8] hover:bg-[#322a52] hover:text-white"
+            aria-label={`Remove link to ${conn.label}`}
+          >
+            <XIcon className="size-2.5" />
+          </button>
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function PendingTaskRow({

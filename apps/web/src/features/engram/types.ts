@@ -39,6 +39,10 @@ export type Item = {
   checklistItems?: ChecklistItem[];
   focusPinned?: boolean;
   tags?: string[];
+  /** Captured but not yet placed in a space — lives in the Inbox until filed. */
+  inbox?: boolean;
+  /** Deferred with no due date on purpose (vs. simply undated). */
+  someday?: boolean;
   createdAt: string;
   updatedAt: string;
 };
