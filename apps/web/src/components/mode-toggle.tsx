@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@alphonse/ui/components/dropdown-menu";
-import { Moon, Sun } from "lucide-react";
+import { MoonIconComp as Moon, SunIconComp as Sun } from "@/features/engram/components/icons";
 import { useTheme } from "next-themes";
 import * as React from "react";
 

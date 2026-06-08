@@ -16,7 +16,7 @@ import { Calendar } from "@alphonse/ui/components/calendar";
 import { Checkbox } from "@alphonse/ui/components/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@alphonse/ui/components/tabs";
 import { cn } from "@alphonse/ui/lib/utils";
-import { CalendarDaysIcon, ListIcon } from "lucide-react";
+import { CalendarDays as CalendarDaysIcon, ListIcon } from "./icons";
 import { useMemo, useState } from "react";
 
 import { PriorityChip } from "./chips";

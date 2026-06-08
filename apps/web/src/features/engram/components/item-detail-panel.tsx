@@ -19,7 +19,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon } from "./icons";
 import { type KeyboardEvent, useRef, useState } from "react";
 
 import { TagChip } from "./chips";

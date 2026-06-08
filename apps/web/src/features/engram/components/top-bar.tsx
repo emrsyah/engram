@@ -2,7 +2,7 @@
 
 import { Button, buttonVariants } from "@alphonse/ui/components/button";
 import { cn } from "@alphonse/ui/lib/utils";
-import { CheckSquare, NotebookPen, Timer } from "lucide-react";
+import { CheckmarkSquareIcon as CheckSquare, NotebookPen, TimerIcon as Timer } from "./icons";
 import type { Route } from "next";
 import Link from "next/link";
 import { usePathname } from "next/navigation";

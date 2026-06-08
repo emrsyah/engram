@@ -5,7 +5,7 @@ import { Button } from "@alphonse/ui/components/button";
 import { ScrollArea } from "@alphonse/ui/components/scroll-area";
 import { Textarea } from "@alphonse/ui/components/textarea";
 import { cn } from "@alphonse/ui/lib/utils";
-import { Hash, Save } from "lucide-react";
+import { Hash, Save } from "./icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { todayPrefix } from "../projections";

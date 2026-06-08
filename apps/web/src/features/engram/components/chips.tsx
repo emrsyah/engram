@@ -1,6 +1,6 @@
 import { Badge } from "@alphonse/ui/components/badge";
 import { cn } from "@alphonse/ui/lib/utils";
-import { X } from "lucide-react";
+import { CancelIcon as X } from "./icons";
 
 import type { Accent, Item, Priority } from "../types";
 

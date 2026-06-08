@@ -4,7 +4,7 @@ import { Badge } from "@alphonse/ui/components/badge";
 import { Button } from "@alphonse/ui/components/button";
 import { Textarea } from "@alphonse/ui/components/textarea";
 import { cn } from "@alphonse/ui/lib/utils";
-import { Hash, Save, X } from "lucide-react";
+import { Hash, Save, CancelIcon as X } from "./icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { todayPrefix } from "../projections";

@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckIcon, Trash2Icon, XIcon } from "lucide-react";
+import { CheckmarkIcon as CheckIcon, DeleteIcon as Trash2Icon, CancelIcon as XIcon } from "./icons";
 
 export function TaskCompleteToast({
   label,

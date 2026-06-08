@@ -4,7 +4,7 @@ import { Calendar } from "@alphonse/ui/components/calendar";
 import { Checkbox } from "@alphonse/ui/components/checkbox";
 import { PopoverContent, PopoverRoot, PopoverTrigger } from "@alphonse/ui/components/popover";
 import { cn } from "@alphonse/ui/lib/utils";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon } from "./icons";
 
 import { SomedayChip, TagChip, TypeLabel } from "./chips";
 import { Icons } from "./icons";

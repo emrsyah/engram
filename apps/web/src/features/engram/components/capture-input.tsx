@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@alphonse/ui/lib/utils";
-import { CalendarIcon, FlagIcon, HashIcon, LayoutDashboardIcon } from "lucide-react";
+import { CalendarIcon, FlagIcon, Hash as HashIcon, LayoutDashboard as LayoutDashboardIcon } from "./icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { ItemType } from "../types";

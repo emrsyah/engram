@@ -5,7 +5,7 @@ import { Input } from "@alphonse/ui/components/input";
 import { PopoverContent, PopoverRoot, PopoverTrigger } from "@alphonse/ui/components/popover";
 import { ToggleGroup, ToggleGroupItem } from "@alphonse/ui/components/toggle-group";
 import { cn } from "@alphonse/ui/lib/utils";
-import { Clock, Pause, Play, RotateCcw, Settings2 } from "lucide-react";
+import { ClockIcon as Clock, Pause, Play, RotateCcw, Settings2 } from "./icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const EASE_OUT = "cubic-bezier(0.23, 1, 0.32, 1)";

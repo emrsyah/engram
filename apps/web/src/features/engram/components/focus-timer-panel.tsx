@@ -2,7 +2,7 @@
 
 import { Button } from "@alphonse/ui/components/button";
 import { cn } from "@alphonse/ui/lib/utils";
-import { Clock, Pause, Play, RotateCcw, X } from "lucide-react";
+import { ClockIcon as Clock, Pause, Play, RotateCcw, CancelIcon as X } from "./icons";
 import { useEffect, useRef, useState } from "react";
 
 const WORK_PRESETS = [15, 25, 30, 45, 60];

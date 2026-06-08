@@ -23,15 +23,15 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-	Check,
+	CheckmarkIcon as Check,
 	ChevronDown,
 	ChevronRight,
 	GripVertical,
 	Pin,
 	PinOff,
-	Plus,
-	X,
-} from "lucide-react";
+	PlusIcon as Plus,
+	CancelIcon as X,
+} from "./icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { TODAY_FOCUS_SPACE_ID } from "../config";

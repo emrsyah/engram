@@ -32,15 +32,15 @@ import { isToday, isTomorrow, startOfDay } from "date-fns";
 import {
   ArrowUpRightIcon,
   CalendarIcon,
-  CheckSquareIcon,
+  CheckmarkSquareIcon as CheckSquareIcon,
   FileIcon,
   FlagIcon,
   ImageIcon,
   LinkIcon,
-  SendHorizontalIcon,
-  SparklesIcon,
-  XIcon,
-} from "lucide-react";
+  SendHorizontal as SendHorizontalIcon,
+  Sparkles as SparklesIcon,
+  CancelIcon as XIcon,
+} from "./icons";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { toast } from "sonner";

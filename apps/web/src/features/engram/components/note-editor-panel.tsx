@@ -4,13 +4,13 @@ import { Button } from "@alphonse/ui/components/button";
 import { cn } from "@alphonse/ui/lib/utils";
 import { format } from "date-fns";
 import {
-  ExternalLinkIcon,
-  HashIcon,
+  ExternalLink as ExternalLinkIcon,
+  Hash as HashIcon,
   MaximizeIcon,
   MinimizeIcon,
-  Trash2Icon,
-  XIcon,
-} from "lucide-react";
+  DeleteIcon as Trash2Icon,
+  CancelIcon as XIcon,
+} from "./icons";
 import { useEffect, useRef, useState } from "react";
 
 import { useEngramStore } from "../store";
