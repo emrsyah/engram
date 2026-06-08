@@ -682,6 +682,8 @@ export function QuickCaptureBar() {
                       highlight={["mention"]}
                       mentionItems={mentionItems}
                       onSelectMention={addConnection}
+                      spaces={spaces}
+                      onSelectSpace={(id) => setCaptureTarget(id)}
                       onCommitKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commit(); return; }
                         if (e.key === "Enter" && e.shiftKey) {
@@ -698,7 +700,7 @@ export function QuickCaptureBar() {
                         }
                         handleArrowTabNav(e, mode, setMode);
                       }}
-                      placeholder="Type a thought… (Shift+Enter for notes · @ to link)"
+                      placeholder="Type a thought… (~ space · @ link · Shift+Enter for notes)"
                     />
                   </div>
                   <ConnectionChips connections={connections} onRemove={removeConnection} />
@@ -819,6 +821,11 @@ export function QuickCaptureBar() {
                   highlight={["priority", "tag", "date", "mention"]}
                   mentionItems={mentionItems}
                   onSelectMention={addConnection}
+                  spaces={spaces}
+                  onSelectSpace={(id, name) => {
+                    setCaptureTarget(id);
+                  }}
+                  onOpenDatePicker={() => setCalendarOpen(true)}
                   onCommitKeyDown={(e) => {
                     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); commit(); return; }
                     if (e.key === "Enter") {
@@ -845,7 +852,7 @@ export function QuickCaptureBar() {
                     }
                     handleArrowTabNav(e, mode, setMode);
                   }}
-                  placeholder={pendingTasks.length === 0 ? "Main task… try tomorrow 3pm, !p1, #tag, @link" : "Subtask…"}
+                  placeholder={pendingTasks.length === 0 ? "Main task… ! priority · ~ space · / commands · @ link" : "Subtask…"}
                 />
               </div>
 
@@ -915,7 +922,7 @@ export function QuickCaptureBar() {
                     <CalendarIcon className="size-2.5" />
                     {effectiveDueDate ? formatDueLabel(effectiveDueDate, effectiveDueHasTime) : "Due date"}
                   </PopoverTrigger>
-                  <PopoverContent>
+                  <PopoverContent side="top">
                     <Calendar
                       mode="single"
                       selected={effectiveDueDate ?? undefined}

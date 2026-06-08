@@ -9,16 +9,21 @@ const PopoverTrigger = PopoverPrimitive.Trigger;
 const PopoverPortal = PopoverPrimitive.Portal;
 const PopoverPositioner = PopoverPrimitive.Positioner;
 
+type PopoverContentProps = React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Popup> & {
+  side?: React.ComponentPropsWithoutRef<typeof PopoverPositioner>["side"];
+  sideOffset?: number;
+};
+
 const PopoverContent = React.forwardRef<
   React.ComponentRef<typeof PopoverPrimitive.Popup>,
-  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Popup>
->(({ className, ...props }, ref) => (
+  PopoverContentProps
+>(({ className, side, sideOffset = 8, ...props }, ref) => (
   <PopoverPortal>
-    <PopoverPositioner sideOffset={8}>
+    <PopoverPositioner side={side} sideOffset={sideOffset}>
       <PopoverPrimitive.Popup
         ref={ref}
         className={cn(
-          "z-50 rounded-[10px] border border-[#332e28] bg-[#1e1b17] shadow-xl outline-none",
+          "z-[200] rounded-[10px] border border-[#332e28] bg-[#1e1b17] shadow-xl outline-none",
           "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0 transition-opacity duration-150",
           className,
         )}
