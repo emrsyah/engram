@@ -6,7 +6,7 @@ import { NoteEditorPanel } from "@/features/engram/components/note-editor-panel"
 import { NewSpaceDialog } from "@/features/engram/components/new-space-dialog";
 import { EditSpaceDialog } from "@/features/engram/components/edit-space-dialog";
 import { DeleteSpaceDialog } from "@/features/engram/components/delete-space-dialog";
-import { QuickCaptureBar } from "@/features/engram/components/quick-capture-bar";
+import { QuickCaptureContainer } from "@/features/engram/components/quick-capture-container";
 import { SearchDialog } from "@/features/engram/components/search-dialog";
 import { ShortcutsDialog } from "@/features/engram/components/shortcuts-dialog";
 import { TopBar } from "@/features/engram/components/top-bar";
@@ -25,11 +25,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
             <SearchDialog />
             <ShortcutsDialog />
-            <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
-              <div className="pointer-events-auto">
-                <QuickCaptureBar />
-              </div>
-            </div>
+            <QuickCaptureContainer />
             <ItemDetailPanel />
             <NoteEditorPanel />
             <NewSpaceDialog />
