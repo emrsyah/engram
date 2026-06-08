@@ -33,6 +33,7 @@ import {
 	Pin,
 	PinOff,
 	Plus,
+	Target,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -500,8 +501,14 @@ function TodayUnpinnedSection() {
 // ─── Main view ────────────────────────────────────────────────────────────────
 
 export function FocusView() {
-	const { focusPinnedItems, toggleDone, unpinFromFocus, createItem } =
-		useEngramStore();
+	const {
+		focusPinnedItems,
+		toggleDone,
+		unpinFromFocus,
+		createItem,
+		overdueNotPinnedTasks,
+		todayUnpinnedTasks,
+	} = useEngramStore();
 
 	const [taskOrder, setTaskOrder] = useState<string[]>([]);
 	const [activeId, setActiveId] = useState<string | null>(null);
@@ -536,6 +543,10 @@ export function FocusView() {
 	const backlogItems = pendingItems.slice(TOP_N);
 	const doneCount = doneItems.length;
 	const totalCount = orderedItems.length;
+	const isEmpty = totalCount === 0;
+	const allDone = totalCount > 0 && pendingItems.length === 0;
+	const suggestionCount =
+		overdueNotPinnedTasks.length + todayUnpinnedTasks.length;
 
 	const sensors = useSensors(
 		useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -614,29 +625,34 @@ export function FocusView() {
 					<ScrollArea className="min-h-0 h-full w-full lg:w-[70%] lg:shrink-0">
 						<div className="p-1">
 						<div className="mb-6">
-							<h2 className="font-bold text-3xl">Focus</h2>
-							<p className="mt-2 text-[#b0a69a]">
-								Your top {TOP_N} priorities for {today}, plus backlog.
-								Drag to reorder.
+							<h2
+								className="stagger-item font-bold text-3xl"
+								style={{ animationDelay: "0ms" }}
+							>
+								Focus
+							</h2>
+							<p
+								className="stagger-item mt-3 text-[#b0a69a]"
+								style={{ animationDelay: "40ms" }}
+							>
+								Your top {TOP_N} priorities for {today}, then the backlog. Drag to reorder.
 							</p>
 						</div>
 
 						{totalCount > 0 && (
-							<div className="mb-5">
-								<div className="flex items-center gap-3">
-									<div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#252220]">
-										<div
-											className="h-full rounded-full bg-[#907ce8] transition-transform duration-500 ease-out"
-											style={{
-												transform: `scaleX(${totalCount > 0 ? doneCount / totalCount : 0})`,
-												transformOrigin: "left",
-											}}
-										/>
-									</div>
-									<span className="shrink-0 font-mono text-[#6b6560] text-xs">
-										{doneCount}/{totalCount}
-									</span>
+							<div className="mb-6 flex items-center gap-3">
+								<div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#252220]">
+									<div
+										className="h-full rounded-full bg-[#907ce8] transition-transform duration-500 ease-out"
+										style={{
+											transform: `scaleX(${doneCount / totalCount})`,
+											transformOrigin: "left",
+										}}
+									/>
 								</div>
+								<span className="shrink-0 font-mono text-[#6b6560] text-xs">
+									{doneCount}/{totalCount}
+								</span>
 							</div>
 						)}
 
@@ -694,6 +710,16 @@ export function FocusView() {
 								</div>
 							)}
 
+							{/* ── All done note ── */}
+							{allDone && (
+								<div className="mb-5 flex items-center gap-2.5 px-2">
+									<Check className="size-4 shrink-0 text-[#756e65]" />
+									<p className="text-[#8d857b] text-sm">
+										Focus cleared — everything you pinned today is done.
+									</p>
+								</div>
+							)}
+
 							{/* ── Done items ── */}
 							{doneItems.length > 0 && (
 								<div className="mb-4">
@@ -723,54 +749,107 @@ export function FocusView() {
 							)}
 
 							{/* ── Empty state ── */}
-							{orderedItems.length === 0 && (
-								<div className="py-12 text-center text-[#4a4540]">
-									<p className="text-lg">No tasks in focus yet.</p>
-									<p className="mt-1 text-sm">
-										Add one below, or pin tasks from the canvas.
+							{isEmpty && (
+								<div
+									className="stagger-item flex flex-col items-center gap-3 rounded-[10px] border border-[#34302b] border-dashed px-6 py-16 text-center"
+									style={{ animationDelay: "80ms" }}
+								>
+									<Target className="size-8 text-[#4c463e]" />
+									<p className="font-semibold text-[#c8bfb2]">
+										Nothing in focus yet
 									</p>
+									<p className="max-w-sm text-[#82786e] text-sm">
+										Pick the few tasks that would make today count. Pin
+										them here and start at the top.
+									</p>
+									{addingTask ? (
+										<div className="mt-1 flex w-full max-w-xs items-center gap-2 rounded-[7px] border border-[#907ce8]/40 bg-[#211e1a] px-3 py-2 text-left">
+											<Input
+												ref={inputRef}
+												value={newTaskText}
+												onChange={(e) => setNewTaskText(e.target.value)}
+												onKeyDown={(e) => {
+													if (e.key === "Enter") handleAddTask();
+													if (e.key === "Escape") {
+														setAddingTask(false);
+														setNewTaskText("");
+													}
+												}}
+												placeholder="Task title…"
+												className="h-7 border-0 bg-transparent text-[#e0d8cf] text-sm placeholder:text-[#4a4540] focus-visible:ring-0"
+											/>
+											<Button
+												type="button"
+												size="sm"
+												onClick={handleAddTask}
+												className="h-7 shrink-0 rounded-[6px] bg-[#907ce8] px-3 font-semibold text-[#17131f] hover:bg-[#a08ef2] active:scale-[0.96]"
+											>
+												Add
+											</Button>
+										</div>
+									) : (
+										<Button
+											type="button"
+											onClick={() => setAddingTask(true)}
+											className="mt-1 h-8 gap-1.5 rounded-[7px] bg-[#907ce8] px-3 font-semibold text-[#17131f] hover:bg-[#a08ef2] active:scale-[0.96]"
+										>
+											<Plus className="size-3.5" />
+											Add a task
+										</Button>
+									)}
+									{suggestionCount > 0 && (
+										<p className="mt-1 text-[#6b6560] text-xs">
+											or pin one of the{" "}
+											{suggestionCount === 1
+												? "tasks"
+												: `${suggestionCount} tasks`}{" "}
+											waiting below
+										</p>
+									)}
 								</div>
 							)}
 
 							{/* ── Add task ── */}
-							<div className="mt-2">
-								{addingTask ? (
-									<div className="flex items-center gap-2 rounded-[7px] border border-[#907ce8]/40 bg-[#211e1a] px-3 py-2.5">
-										<Input
-											ref={inputRef}
-											value={newTaskText}
-											onChange={(e) => setNewTaskText(e.target.value)}
-											onKeyDown={(e) => {
-												if (e.key === "Enter") handleAddTask();
-												if (e.key === "Escape") {
-													setAddingTask(false);
-													setNewTaskText("");
-												}
-											}}
-											placeholder="Task title…"
-											className="h-7 border-0 bg-transparent text-[#e0d8cf] text-sm placeholder:text-[#4a4540] focus-visible:ring-0"
-										/>
+							{!isEmpty && (
+								<div className="mt-2">
+									{addingTask ? (
+										<div className="flex items-center gap-2 rounded-[7px] border border-[#907ce8]/40 bg-[#211e1a] px-3 py-2.5">
+											<Input
+												ref={inputRef}
+												value={newTaskText}
+												onChange={(e) => setNewTaskText(e.target.value)}
+												onKeyDown={(e) => {
+													if (e.key === "Enter") handleAddTask();
+													if (e.key === "Escape") {
+														setAddingTask(false);
+														setNewTaskText("");
+													}
+												}}
+												placeholder="Task title…"
+												className="h-7 border-0 bg-transparent text-[#e0d8cf] text-sm placeholder:text-[#4a4540] focus-visible:ring-0"
+											/>
+											<Button
+												type="button"
+												size="sm"
+												onClick={handleAddTask}
+												className="h-7 gap-1.5 rounded-[6px] bg-[#907ce8] px-3 font-semibold text-[#17131f] transition-colors duration-150 hover:bg-[#a08ef2] active:scale-[0.96]"
+											>
+												Add
+											</Button>
+										</div>
+									) : (
 										<Button
 											type="button"
-											size="sm"
-											onClick={handleAddTask}
-											className="h-7 gap-1.5 rounded-[6px] bg-[#907ce8] px-3 font-semibold text-[#17131f] transition-colors duration-150 hover:bg-[#a08ef2] active:scale-[0.96]"
+											variant="outline"
+											onClick={() => setAddingTask(true)}
+											className="flex w-full items-center gap-2 rounded-[7px] border-[#2e2b26] border-dashed bg-transparent px-3 py-2.5 text-[#4a4540] text-sm transition-colors duration-150 hover:border-[#907ce8]/40 hover:text-[#907ce8] active:scale-[0.98]"
 										>
-											Add
+											<Plus className="size-4" />
+											Add to focus
 										</Button>
-									</div>
-								) : (
-									<Button
-										type="button"
-										variant="outline"
-										onClick={() => setAddingTask(true)}
-										className="flex w-full items-center gap-2 rounded-[7px] border-[#2e2b26] border-dashed bg-transparent px-3 py-2.5 text-[#4a4540] text-sm transition-colors duration-150 hover:border-[#907ce8]/40 hover:text-[#907ce8] active:scale-[0.98]"
-									>
-										<Plus className="size-4" />
-										Add to focus
-									</Button>
-								)}
-							</div>
+									)}
+								</div>
+							)}
 
 							{/* ── Overdue ── */}
 							<div className="mt-4">
@@ -799,11 +878,6 @@ export function FocusView() {
 					<ScrollArea className="min-h-0 h-full w-full lg:w-[30%]">
 						<div className="flex flex-col gap-4 p-1">
 						<Card className="gap-0 rounded-[10px] border-[#2e2b26] bg-[#1a1714] p-0 transition-colors duration-150 hover:border-[#3a3630]">
-							<div className="shrink-0 border-[#2e2b26] border-b px-4 py-3">
-								<span className="font-bold text-white text-xs uppercase tracking-widest">
-									Pomodoro
-								</span>
-							</div>
 							<FocusTimerInline />
 						</Card>
 

@@ -88,8 +88,36 @@ export function FocusTimerInline() {
 	const accent = phase === "break" ? "#43b6a6" : "#907ce8";
 	const activeMins = phase === "break" ? breakMins : workMins;
 
+	const statusLine =
+		phase === "idle"
+			? "Work in focused intervals"
+			: phase === "work"
+				? running
+					? `Focusing — ${workMins}m block`
+					: "Focus block paused"
+				: running
+					? `On a break — ${breakMins}m`
+					: "Break paused";
+
 	return (
-		<div className="flex flex-col items-center gap-5 px-4 py-6">
+		<div className="flex h-full flex-col">
+			{/* ── Header ── */}
+			<div className="shrink-0 border-[#2e2b26] border-b px-4 py-3">
+				<div className="flex items-center justify-between">
+					<span className="font-bold text-white text-xs uppercase tracking-widest">
+						Pomodoro
+					</span>
+					{sessions > 0 && (
+						<span className="font-mono text-[#6b6560] text-[10px]">
+							{sessions} {sessions === 1 ? "session" : "sessions"}
+						</span>
+					)}
+				</div>
+				<p className="mt-1 text-[#6b6560] text-[11px]">{statusLine}</p>
+			</div>
+
+			{/* ── Timer body ── */}
+			<div className="flex flex-col items-center gap-5 px-4 py-6">
 			{/* ── Circle ── */}
 			<div className="relative size-36">
 				<svg
@@ -345,21 +373,22 @@ export function FocusTimerInline() {
 
 			{/* ── Session counter ── */}
 			{sessions > 0 && (
-				<div className="flex items-center gap-2">
-					<div className="flex gap-1">
-						{Array.from({ length: Math.min(sessions, 8) }).map((_, i) => (
-							<span
-								key={i}
-								className="size-2 rounded-full bg-[#907ce8] transition-transform duration-150"
-								style={{ transitionDelay: `${i * 40}ms` }}
-							/>
-						))}
-					</div>
-					<span className="font-mono text-[#6b6560] text-[11px]">
-						{sessions} {sessions === 1 ? "session" : "sessions"}
-					</span>
+				<div className="flex items-center gap-1.5">
+					{Array.from({ length: Math.min(sessions, 8) }).map((_, i) => (
+						<span
+							key={i}
+							className="size-2 rounded-full bg-[#907ce8] transition-transform duration-150"
+							style={{ transitionDelay: `${i * 40}ms` }}
+						/>
+					))}
+					{sessions > 8 && (
+						<span className="font-mono text-[#6b6560] text-[10px]">
+							+{sessions - 8}
+						</span>
+					)}
 				</div>
 			)}
+			</div>
 		</div>
 	);
 }

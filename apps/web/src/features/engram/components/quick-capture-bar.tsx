@@ -62,8 +62,8 @@ type FileState = {
 };
 
 const MODE_TABS: { mode: Mode; icon: React.ElementType; label: string; accent: string }[] = [
-  { mode: "thought", icon: SparklesIcon,    label: "Thought", accent: "text-violet-300" },
   { mode: "task",    icon: CheckSquareIcon, label: "Task",    accent: "text-amber-300" },
+  { mode: "thought", icon: SparklesIcon,    label: "Thought", accent: "text-violet-300" },
   { mode: "link",    icon: LinkIcon,        label: "Link",    accent: "text-sky-300" },
 ];
 
@@ -271,8 +271,7 @@ export function QuickCaptureBar() {
     collapseQuickCapture,
   } = useUIStore();
 
-  const contextualMode: Mode =
-    pathname === "/timeline" || pathname === "/priorities" ? "task" : "thought";
+  const contextualMode: Mode = "task";
   const initialMode = quickCaptureMode ?? contextualMode;
 
   const [mode, setMode] = useState<Mode>(initialMode);

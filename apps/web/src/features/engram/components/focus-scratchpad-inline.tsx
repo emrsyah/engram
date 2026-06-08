@@ -26,9 +26,6 @@ export function FocusScratchpadInline() {
 	const saveStateTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-	useEffect(() => {
-		textareaRef.current?.focus();
-	}, []);
 
 	const handleChange = useCallback(
 		(e: React.ChangeEvent<HTMLTextAreaElement>) => {
