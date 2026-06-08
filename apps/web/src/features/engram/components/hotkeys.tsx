@@ -52,15 +52,19 @@ export function Hotkeys() {
   );
 
   // ── View navigation ──────────────────────────────────────────────────
-  useHotkeys("1", () => router.push("/canvas" as Route<string>), {
+  useHotkeys("1", () => router.push("/focus" as Route<string>), {
+    description: "Go to Focus",
+    enabled: !anyDialogOpen,
+  });
+  useHotkeys("2", () => router.push("/canvas" as Route<string>), {
     description: "Go to Canvas",
     enabled: !anyDialogOpen,
   });
-  useHotkeys("2", () => router.push("/timeline" as Route<string>), {
+  useHotkeys("3", () => router.push("/timeline" as Route<string>), {
     description: "Go to Timeline",
     enabled: !anyDialogOpen,
   });
-  useHotkeys("3", () => router.push("/priorities" as Route<string>), {
+  useHotkeys("4", () => router.push("/priorities" as Route<string>), {
     description: "Go to Priorities",
     enabled: !anyDialogOpen,
   });

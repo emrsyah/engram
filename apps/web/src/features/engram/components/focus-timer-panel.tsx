@@ -2,20 +2,27 @@
 
 import { Button } from "@alphonse/ui/components/button";
 import { cn } from "@alphonse/ui/lib/utils";
-import { Pause, Play, RotateCcw, X } from "lucide-react";
+import { Clock, Pause, Play, RotateCcw, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-const WORK_SECS = 25 * 60;
-const BREAK_SECS = 5 * 60;
+const WORK_PRESETS = [15, 25, 30, 45, 60];
+const DEFAULT_WORK = 25;
+const DEFAULT_BREAK = 5;
 
 type Phase = "idle" | "work" | "break";
 
 export function FocusTimerPanel({ onClose }: { onClose: () => void }) {
+	const [workMins, setWorkMins] = useState(DEFAULT_WORK);
+	const [breakMins] = useState(DEFAULT_BREAK);
 	const [phase, setPhase] = useState<Phase>("idle");
-	const [remaining, setRemaining] = useState(WORK_SECS);
+	const [remaining, setRemaining] = useState(DEFAULT_WORK * 60);
 	const [running, setRunning] = useState(false);
+	const [sessions, setSessions] = useState(0);
 	const phaseRef = useRef(phase);
 	phaseRef.current = phase;
+
+	const workSecs = workMins * 60;
+	const breakSecs = breakMins * 60;
 
 	useEffect(() => {
 		if (!running) return;
@@ -25,13 +32,14 @@ export function FocusTimerPanel({ onClose }: { onClose: () => void }) {
 				clearInterval(id);
 				setRunning(false);
 				const next: Phase = phaseRef.current === "work" ? "break" : "work";
+				if (phaseRef.current === "work") setSessions((n) => n + 1);
 				setPhase(next);
-				setRemaining(next === "break" ? BREAK_SECS : WORK_SECS);
+				setRemaining(next === "break" ? breakSecs : workSecs);
 				return 0;
 			});
 		}, 1000);
 		return () => clearInterval(id);
-	}, [running]);
+	}, [running, workSecs, breakSecs]);
 
 	const start = () => {
 		if (phase === "idle") setPhase("work");
@@ -41,23 +49,30 @@ export function FocusTimerPanel({ onClose }: { onClose: () => void }) {
 	const reset = () => {
 		setRunning(false);
 		setPhase("idle");
-		setRemaining(WORK_SECS);
+		setRemaining(workSecs);
 	};
 
 	const mins = Math.floor(remaining / 60)
 		.toString()
 		.padStart(2, "0");
 	const secs = (remaining % 60).toString().padStart(2, "0");
-	const total = phase === "break" ? BREAK_SECS : WORK_SECS;
+	const total = phase === "break" ? breakSecs : workSecs;
 	const progress = total > 0 ? (total - remaining) / total : 0;
 	const accent = phase === "break" ? "#43b6a6" : "#907ce8";
 
 	return (
-		<div className="absolute top-[calc(100%+8px)] right-0 z-50 w-[240px] rounded-[12px] border border-[#2e2b26] bg-[#1a1714] shadow-2xl">
+		<div className="absolute top-[calc(100%+8px)] right-0 z-50 w-[280px] rounded-[12px] border border-[#2e2b26] bg-[#1a1714] shadow-2xl">
 			<div className="flex items-center justify-between border-[#2e2b26] border-b px-4 py-3">
-				<span className="font-bold text-white text-xs uppercase tracking-widest">
-					Pomodoro
-				</span>
+				<div className="flex items-center gap-2">
+					<span className="font-bold text-white text-xs uppercase tracking-widest">
+						Pomodoro
+					</span>
+					{sessions > 0 && (
+						<span className="font-mono text-[#6b6560] text-[10px]">
+							{sessions} done
+						</span>
+					)}
+				</div>
 				<Button
 					variant="ghost"
 					size="icon-xs"
@@ -68,44 +83,44 @@ export function FocusTimerPanel({ onClose }: { onClose: () => void }) {
 				</Button>
 			</div>
 
-			<div className="flex flex-col items-center gap-5 px-6 py-6">
+			<div className="flex flex-col items-center gap-4 px-5 py-5">
 				{/* Circular progress */}
-				<div className="relative size-24">
+				<div className="relative size-28">
 					<svg
 						aria-label="Timer progress"
-						className="size-24 -rotate-90"
+						className="size-28 -rotate-90"
 						viewBox="0 0 100 100"
 					>
 						<circle
 							cx="50"
 							cy="50"
-							r="42"
+							r="44"
 							fill="none"
 							stroke="#252220"
-							strokeWidth="8"
+							strokeWidth="5"
 						/>
 						<circle
 							cx="50"
 							cy="50"
-							r="42"
+							r="44"
 							fill="none"
 							stroke={accent}
-							strokeWidth="8"
-							strokeDasharray="263.9"
-							strokeDashoffset={263.9 * (1 - progress)}
+							strokeWidth="5"
+							strokeDasharray="276.5"
+							strokeDashoffset={276.5 * (1 - progress)}
 							strokeLinecap="round"
 							style={{
 								transition: "stroke-dashoffset 1s linear, stroke 0.4s ease",
 							}}
 						/>
 					</svg>
-					<div className="absolute inset-0 flex flex-col items-center justify-center">
-						<span className="font-bold font-mono text-2xl text-white leading-none">
+					<div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5">
+						<span className="font-bold font-mono text-[22px] text-white leading-none tracking-tight">
 							{mins}:{secs}
 						</span>
 						<span
 							className={cn(
-								"mt-1 font-semibold text-[11px] uppercase tracking-wide",
+								"font-semibold text-[11px] uppercase tracking-wider",
 								phase === "break" ? "text-[#43b6a6]" : "text-[#907ce8]",
 							)}
 						>
@@ -125,7 +140,7 @@ export function FocusTimerPanel({ onClose }: { onClose: () => void }) {
 							variant="outline"
 							size="sm"
 							onClick={pause}
-							className="h-8 gap-2 rounded-[8px] border-[#3a3530] bg-[#252220] text-[#c8bfb2] hover:bg-[#2e2b26]"
+							className="h-8 gap-2 rounded-[8px] border-[#3a3530] bg-[#252220] px-4 text-[#c8bfb2] hover:bg-[#2e2b26]"
 						>
 							<Pause className="size-3.5" />
 							Pause
@@ -134,7 +149,7 @@ export function FocusTimerPanel({ onClose }: { onClose: () => void }) {
 						<Button
 							size="sm"
 							onClick={start}
-							className="h-8 gap-2 rounded-[8px]"
+							className="h-8 gap-2 rounded-[8px] px-4"
 							style={{ backgroundColor: accent }}
 						>
 							<Play className="size-3.5 text-[#0e0c0a]" />
@@ -154,28 +169,81 @@ export function FocusTimerPanel({ onClose }: { onClose: () => void }) {
 					</Button>
 				</div>
 
-				{/* Phase labels */}
-				<div className="flex w-full gap-2">
-					{(["work", "break"] as const).map((p) => (
+				{/* Phase toggle */}
+				<div className="flex w-full items-center gap-2">
+					<div className="flex flex-1 gap-1 rounded-[7px] bg-[#151310] p-1">
+						{(["work", "break"] as const).map((p) => {
+							const isActive =
+								p === "work"
+									? phase === "work" || phase === "idle"
+									: phase === "break";
+							return (
+								<button
+									key={p}
+									type="button"
+									onClick={() => {
+										if (running) return;
+										setPhase(p);
+										setRemaining(p === "break" ? breakSecs : workSecs);
+									}}
+									className={cn(
+										"flex flex-1 items-center justify-center gap-1.5 rounded-[5px] py-1.5 font-semibold text-xs",
+										"transition-[background-color,color,transform] duration-150",
+										"active:scale-[0.96]",
+										isActive
+											? p === "work"
+												? "bg-[#251f38] text-[#c4b5fd]"
+												: "bg-[#1a2e2a] text-[#7dd4c6]"
+											: "text-[#6b6560] hover:text-[#9a9088]",
+										running && "pointer-events-none",
+									)}
+								>
+									<Clock className="size-3" />
+									{p === "work" ? `${workMins}m` : `${breakMins}m`}
+								</button>
+							);
+						})}
+					</div>
+				</div>
+
+				{/* Quick work presets */}
+				<div className="flex w-full gap-1">
+					{WORK_PRESETS.map((m) => (
 						<button
-							key={p}
+							key={m}
 							type="button"
 							onClick={() => {
-								setRunning(false);
-								setPhase(p);
-								setRemaining(p === "break" ? BREAK_SECS : WORK_SECS);
+								if (running) return;
+								setWorkMins(m);
+								if (phase === "work" || phase === "idle") {
+									setRemaining(m * 60);
+								}
 							}}
 							className={cn(
-								"flex-1 rounded-[6px] py-1.5 font-semibold text-xs transition-colors",
-								phase === p
-									? "bg-[#252220] text-white"
-									: "text-[#6b6560] hover:text-[#9a9088]",
+								"flex-1 rounded-[4px] py-1 font-mono text-[10px]",
+								"transition-[background-color,color,transform] duration-150",
+								"active:scale-[0.95]",
+								workMins === m
+									? "bg-[#251f38] text-[#c4b5fd]"
+									: "text-[#4a4540] hover:text-[#9a9088]",
+								running && "pointer-events-none opacity-40",
 							)}
 						>
-							{p === "work" ? "25 min" : "5 min"}
+							{m}
 						</button>
 					))}
 				</div>
+
+				{/* Session dots */}
+				{sessions > 0 && (
+					<div className="flex items-center gap-2">
+						<div className="flex gap-1">
+							{Array.from({ length: Math.min(sessions, 6) }).map((_, i) => (
+								<span key={i} className="size-1.5 rounded-full bg-[#907ce8]" />
+							))}
+						</div>
+					</div>
+				)}
 			</div>
 		</div>
 	);

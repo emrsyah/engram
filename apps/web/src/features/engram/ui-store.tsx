@@ -8,9 +8,18 @@ type UIStore = {
   timerOpen: boolean;
   scratchpadOpen: boolean;
   focusTasksOpen: boolean;
+  newSpaceDialogOpen: boolean;
+  editingSpaceId?: string;
+  deletingSpaceId?: string;
   toggleTimer: () => void;
   toggleScratchpad: () => void;
   toggleFocusTasks: () => void;
+  openNewSpaceDialog: () => void;
+  closeNewSpaceDialog: () => void;
+  openEditSpaceDialog: (spaceId: string) => void;
+  closeEditSpaceDialog: () => void;
+  openDeleteSpaceDialog: (spaceId: string) => void;
+  closeDeleteSpaceDialog: () => void;
   quickCaptureExpanded: boolean;
   quickCaptureHighlight: number;
   quickCaptureMode?: QuickCaptureMode;
@@ -60,9 +69,18 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const [timerOpen, setTimerOpen] = useState(false);
   const [scratchpadOpen, setScratchpadOpen] = useState(false);
   const [focusTasksOpen, setFocusTasksOpen] = useState(false);
+  const [newSpaceDialogOpen, setNewSpaceDialogOpen] = useState(false);
+  const [editingSpaceId, setEditingSpaceId] = useState<string>();
+  const [deletingSpaceId, setDeletingSpaceId] = useState<string>();
   const toggleTimer = useCallback(() => setTimerOpen((v) => !v), []);
   const toggleScratchpad = useCallback(() => setScratchpadOpen((v) => !v), []);
   const toggleFocusTasks = useCallback(() => setFocusTasksOpen((v) => !v), []);
+  const openNewSpaceDialog = useCallback(() => setNewSpaceDialogOpen(true), []);
+  const closeNewSpaceDialog = useCallback(() => setNewSpaceDialogOpen(false), []);
+  const openEditSpaceDialog = useCallback((id: string) => setEditingSpaceId(id), []);
+  const closeEditSpaceDialog = useCallback(() => setEditingSpaceId(undefined), []);
+  const openDeleteSpaceDialog = useCallback((id: string) => setDeletingSpaceId(id), []);
+  const closeDeleteSpaceDialog = useCallback(() => setDeletingSpaceId(undefined), []);
 
   const expandQuickCapture = useCallback((mode?: QuickCaptureMode) => {
     setQuickCaptureMode(mode);
@@ -91,9 +109,18 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         timerOpen,
         scratchpadOpen,
         focusTasksOpen,
+        newSpaceDialogOpen,
+        editingSpaceId,
+        deletingSpaceId,
         toggleTimer,
         toggleScratchpad,
         toggleFocusTasks,
+        openNewSpaceDialog,
+        closeNewSpaceDialog,
+        openEditSpaceDialog,
+        closeEditSpaceDialog,
+        openDeleteSpaceDialog,
+        closeDeleteSpaceDialog,
         quickCaptureExpanded,
         quickCaptureHighlight,
         quickCaptureMode,

@@ -42,6 +42,7 @@ body {
   transition:
     border-color 150ms var(--ease-out),
     box-shadow 150ms var(--ease-out),
+    transform 150ms var(--ease-out),
     opacity 150ms var(--ease-out);
 }
 
@@ -49,6 +50,37 @@ body {
   .engram-card:hover {
     border-color: #4c463e;
   }
+}
+
+.engram-card[data-selected="true"] {
+  border-color: #d7b238;
+  box-shadow:
+    0 0 0 1px #d7b238,
+    0 0 24px -4px rgba(215, 178, 56, 0.3),
+    0 12px 32px rgb(0 0 0 / 28%);
+  transform: translateY(-1px);
+}
+
+.engram-card[data-link-source="true"] {
+  border-color: #9b88ff;
+  box-shadow:
+    0 0 0 1px #9b88ff,
+    0 0 24px -4px rgba(155, 136, 255, 0.3),
+    0 12px 32px rgb(0 0 0 / 28%);
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .engram-card[data-selected="true"],
+  .engram-card[data-link-source="true"] {
+    transform: none;
+  }
+}
+
+/* Show card actions when selected or link-source */
+.engram-card[data-selected="true"] .card-actions,
+.engram-card[data-link-source="true"] .card-actions {
+  opacity: 1 !important;
 }
 
 /* ── Stagger fade-up for list/grid items ───────────────────────────── */

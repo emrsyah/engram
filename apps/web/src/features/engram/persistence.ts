@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { TODAY_FOCUS_SPACE_ID } from "./config";
 import { seedViewStates } from "./seed";
 import type { EngramData } from "./types";
 
@@ -31,6 +30,7 @@ const SpaceSchema = z.object({
 	id: z.string(),
 	name: z.string(),
 	icon: z.string(),
+	color: z.enum(["violet", "gold", "teal", "red", "blue"]).default("violet"),
 	sortOrder: z.number(),
 	createdAt: z.string(),
 	updatedAt: z.string(),
@@ -107,33 +107,9 @@ export function createLocalStorageAdapter(): EngramPersistence {
 					throw new Error(result.error.message);
 				}
 				const data = result.data;
-				// Ensure Today's Focus space always exists (migrate existing saves).
-				const hasTFSpace = data.spaces.some(
-					(s) => s.id === TODAY_FOCUS_SPACE_ID,
-				);
-				const hasTFView = data.viewStates.some(
-					(v) => v.spaceId === TODAY_FOCUS_SPACE_ID,
-				);
-				const tfSpace = {
-					id: "space-today-focus",
-					name: "Today's Focus",
-					icon: "target",
-					sortOrder: -1,
-					createdAt: new Date().toISOString(),
-					updatedAt: new Date().toISOString(),
-				};
-				const tfView = seedViewStates.find(
-					(v) => v.spaceId === TODAY_FOCUS_SPACE_ID,
-				) ?? { id: "view-today-focus", spaceId: TODAY_FOCUS_SPACE_ID, panX: 100, panY: 100, zoom: 1, gridVisible: true, updatedAt: new Date().toISOString() };
 				return {
 					status: "ok",
-					data: {
-						...data,
-						spaces: hasTFSpace ? data.spaces : [tfSpace, ...data.spaces],
-						viewStates: hasTFView
-							? data.viewStates
-							: [...data.viewStates, tfView],
-					},
+					data,
 				};
 			} catch {
 				localStorage.setItem(STORAGE_BACKUP_KEY, raw);

@@ -18,11 +18,15 @@ import {
   addChecklistItem as coreAddChecklistItem,
   addItem,
   addLink,
+  addSpace,
   buildItem,
   centerItem,
   type CreateItemInput,
+  type CreateSpaceInput,
+  type UpdateSpaceInput,
   deleteItem,
   deleteItems,
+  deleteSpace as coreDeleteSpace,
   patchItem,
   patchViewState,
   removeChecklistItem as coreRemoveChecklistItem,
@@ -30,6 +34,7 @@ import {
   removeLink,
   toggleChecklistItem as coreToggleChecklistItem,
   toggleItemDone,
+  updateSpace as coreUpdateSpace,
 } from "./engram-core";
 import { DEFAULT_SPACE_ID, PERSIST_DEBOUNCE_MS } from "./config";
 import { createLocalStorageAdapter } from "./persistence";
@@ -102,6 +107,9 @@ type EngramStore = {
   pinToFocus: (id: string) => void;
   unpinFromFocus: (id: string) => void;
   upsertDailyNote: (text: string) => void;
+  createSpace: (input: CreateSpaceInput) => void;
+  updateSpace: (spaceId: string, patch: UpdateSpaceInput) => void;
+  deleteSpace: (spaceId: string) => void;
 };
 
 const EngramContext = createContext<EngramStore | null>(null);
@@ -392,6 +400,19 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
     }
   }, [data]);
 
+  const createSpaceFn = useCallback((input: CreateSpaceInput) => {
+    setData((current) => addSpace(current, input));
+    router.push("/canvas" as Route<string>);
+  }, [router]);
+
+  const updateSpaceFn = useCallback((spaceId: string, patch: UpdateSpaceInput) => {
+    setData((current) => coreUpdateSpace(current, spaceId, patch));
+  }, []);
+
+  const deleteSpaceFn = useCallback((spaceId: string) => {
+    setData((current) => coreDeleteSpace(current, spaceId));
+  }, []);
+
   // Projections — derived from data, recomputed only when data changes.
   const activeSpace = useMemo(() => selectActiveSpace(data), [data]);
   const activeItems = useMemo(() => selectActiveItems(data), [data]);
@@ -452,6 +473,9 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
       removeChecklistItem: removeChecklistItemFn,
       reorderChecklistItems: reorderChecklistItemsFn,
       upsertDailyNote,
+      createSpace: createSpaceFn,
+      updateSpace: updateSpaceFn,
+      deleteSpace: deleteSpaceFn,
     }),
     [
       data,
@@ -486,6 +510,9 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
       removeChecklistItemFn,
       reorderChecklistItemsFn,
       upsertDailyNote,
+      createSpaceFn,
+      updateSpaceFn,
+      deleteSpaceFn,
       pinToFocus,
       unpinFromFocus,
     ],

@@ -7,7 +7,7 @@ import {
   VIEWPORT_CENTER,
 } from "./canvas-viewport";
 import { ITEM_DIMENSIONS, TASK_ACCENT } from "./config";
-import type { Accent, CanvasViewState, ChecklistItem, EngramData, Item, ItemType, Priority } from "./types";
+import type { Accent, CanvasViewState, ChecklistItem, EngramData, Item, ItemType, Priority, Space } from "./types";
 
 /**
  * The pure Engram domain core.
@@ -38,6 +38,87 @@ export type CreateItemInput = {
 export const createId = (prefix: string) => `${prefix}-${crypto.randomUUID()}`;
 
 const now = () => new Date().toISOString();
+
+export type CreateSpaceInput = {
+  name: string;
+  icon: string;
+  color: Accent;
+};
+
+export function addSpace(data: EngramData, input: CreateSpaceInput): EngramData {
+  const timestamp = now();
+  const id = createId("space");
+  const sortOrder = data.spaces.length;
+  const space: Space = {
+    id,
+    name: input.name.trim() || "Untitled",
+    icon: input.icon,
+    color: input.color,
+    sortOrder,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  const viewState: CanvasViewState = {
+    id: createId("view"),
+    spaceId: id,
+    panX: 280,
+    panY: 90,
+    zoom: 1,
+    gridVisible: true,
+    updatedAt: timestamp,
+  };
+  return {
+    ...data,
+    spaces: [...data.spaces, space],
+    viewStates: [...data.viewStates, viewState],
+    activeSpaceId: id,
+  };
+}
+
+export type UpdateSpaceInput = {
+  name?: string;
+  icon?: string;
+  color?: Accent;
+  sortOrder?: number;
+};
+
+export function updateSpace(data: EngramData, spaceId: string, patch: UpdateSpaceInput): EngramData {
+  const timestamp = now();
+  return {
+    ...data,
+    spaces: data.spaces.map((s) =>
+      s.id === spaceId
+        ? { ...s, ...patch, updatedAt: timestamp }
+        : s,
+    ),
+  };
+}
+
+export function deleteSpace(data: EngramData, spaceId: string): EngramData {
+  const remaining = data.spaces.filter((s) => s.id !== spaceId);
+  const remainingViewStates = data.viewStates.filter((vs) => vs.spaceId !== spaceId);
+  const remainingItems = data.items.filter((i) => i.spaceId !== spaceId);
+  const remainingLinks = data.links.filter(
+    (l) => !remainingItems.some((i) => i.id === l.fromItemId) && !remainingItems.some((i) => i.id === l.toItemId)
+      ? false
+      : true,
+  ).filter((l) =>
+    remainingItems.some((i) => i.id === l.fromItemId) && remainingItems.some((i) => i.id === l.toItemId),
+  );
+
+  const activeSpaceId = data.activeSpaceId === spaceId
+    ? (remaining[0]?.id ?? data.activeSpaceId)
+    : data.activeSpaceId;
+
+  return {
+    ...data,
+    spaces: remaining,
+    viewStates: remainingViewStates,
+    items: remainingItems,
+    links: remainingLinks,
+    activeSpaceId,
+  };
+}
 
 function taskAccent(priority?: Priority): Accent {
   return priority ? TASK_ACCENT[priority] : "gold";

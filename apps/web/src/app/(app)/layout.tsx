@@ -3,6 +3,9 @@ import { AppSidebar } from "@/features/engram/components/app-sidebar";
 import { Hotkeys } from "@/features/engram/components/hotkeys";
 import { ItemDetailPanel } from "@/features/engram/components/item-detail-panel";
 import { NoteEditorPanel } from "@/features/engram/components/note-editor-panel";
+import { NewSpaceDialog } from "@/features/engram/components/new-space-dialog";
+import { EditSpaceDialog } from "@/features/engram/components/edit-space-dialog";
+import { DeleteSpaceDialog } from "@/features/engram/components/delete-space-dialog";
 import { QuickCaptureBar } from "@/features/engram/components/quick-capture-bar";
 import { SearchDialog } from "@/features/engram/components/search-dialog";
 import { ShortcutsDialog } from "@/features/engram/components/shortcuts-dialog";
@@ -29,6 +32,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
             <ItemDetailPanel />
             <NoteEditorPanel />
+            <NewSpaceDialog />
+            <EditSpaceDialog />
+            <DeleteSpaceDialog />
           </main>
         </div>
       </UIProvider>

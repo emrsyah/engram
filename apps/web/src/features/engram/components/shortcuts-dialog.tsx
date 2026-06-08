@@ -11,9 +11,10 @@ const SECTIONS: { title: string; shortcuts: { keys: string[]; label: string }[] 
   {
     title: "Navigation",
     shortcuts: [
-      { keys: ["1"], label: "Go to Canvas" },
-      { keys: ["2"], label: "Go to Timeline" },
-      { keys: ["3"], label: "Go to Priorities" },
+      { keys: ["1"], label: "Go to Focus" },
+      { keys: ["2"], label: "Go to Canvas" },
+      { keys: ["3"], label: "Go to Timeline" },
+      { keys: ["4"], label: "Go to Priorities" },
       { keys: ["["], label: "Toggle sidebar" },
     ],
   },

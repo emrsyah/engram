@@ -4,17 +4,10 @@ const now = "2026-06-06T12:00:00.000Z";
 
 export const seedSpaces: Space[] = [
   {
-    id: "space-today-focus",
-    name: "Today's Focus",
-    icon: "target",
-    sortOrder: -1,
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
     id: "space-mind",
     name: "Mind",
     icon: "sparkles",
+    color: "violet",
     sortOrder: 0,
     createdAt: now,
     updatedAt: now,
@@ -23,6 +16,7 @@ export const seedSpaces: Space[] = [
     id: "space-work",
     name: "Work",
     icon: "briefcase",
+    color: "gold",
     sortOrder: 1,
     createdAt: now,
     updatedAt: now,
@@ -31,6 +25,7 @@ export const seedSpaces: Space[] = [
     id: "space-reading",
     name: "Reading list",
     icon: "book",
+    color: "teal",
     sortOrder: 2,
     createdAt: now,
     updatedAt: now,
@@ -277,15 +272,6 @@ export const seedLinks: ItemLink[] = [
 ];
 
 export const seedViewStates: CanvasViewState[] = [
-  {
-    id: "view-today-focus",
-    spaceId: "space-today-focus",
-    panX: 100,
-    panY: 100,
-    zoom: 1,
-    gridVisible: true,
-    updatedAt: now,
-  },
   {
     id: "view-mind",
     spaceId: "space-mind",

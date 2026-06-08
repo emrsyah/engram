@@ -13,6 +13,7 @@ export type Space = {
   id: string;
   name: string;
   icon: string;
+  color: Accent;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;

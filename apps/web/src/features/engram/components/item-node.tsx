@@ -36,10 +36,10 @@ export function ItemNode({ data, selected }: NodeProps<ItemNodeType>) {
 
 	return (
 		<Card
+			data-selected={selected || undefined}
+			data-link-source={isLinkSource || undefined}
 			className={cn(
 				"engram-card group relative select-none gap-0 py-0",
-				"transition-[border-color] duration-150",
-				isLinkSource && "border-[#9b88ff]",
 			)}
 			style={{ width: item.width, minHeight: item.height }}
 			onPointerUp={(e) => {
@@ -74,17 +74,6 @@ export function ItemNode({ data, selected }: NodeProps<ItemNodeType>) {
 				position={Position.Right}
 				className="!size-0 !border-0 !bg-transparent"
 			/>
-			{/* Selection / link-source outline */}
-			{(selected || isLinkSource) && (
-				<span
-					className={cn(
-						"pointer-events-none absolute inset-0 z-10 rounded-[inherit]",
-						isLinkSource
-							? "shadow-[0_0_0_2px_#9b88ff,0_0_10px_0_rgba(155,136,255,0.25)]"
-							: "shadow-[0_0_0_2px_#d7b238,0_0_10px_0_rgba(215,178,56,0.2)]",
-					)}
-				/>
-			)}
 
 			{/* Focus pin indicator */}
 			{item.focusPinned && (
@@ -99,10 +88,9 @@ export function ItemNode({ data, selected }: NodeProps<ItemNodeType>) {
 			{/* Top-right actions: always visible on hover, always visible when selected */}
 			<div
 				className={cn(
-					"nodrag nopan absolute top-2 right-2 z-20 flex gap-1",
+					"card-actions nodrag nopan absolute top-2 right-2 z-20 flex gap-1",
 					"opacity-0 transition-opacity duration-150",
 					"group-hover:opacity-100",
-					selected && "opacity-100",
 				)}
 				onClick={(e) => e.stopPropagation()}
 			>

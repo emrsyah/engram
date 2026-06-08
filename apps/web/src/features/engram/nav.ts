@@ -7,6 +7,7 @@ export type NavView = {
 };
 
 export const NAV_VIEWS: NavView[] = [
+  { label: "Focus", href: "/focus", icon: "target" },
   { label: "Canvas", href: "/canvas", icon: "layout" },
   { label: "Timeline", href: "/timeline", icon: "calendar" },
   { label: "Priorities", href: "/priorities", icon: "flag" },
@@ -17,6 +18,14 @@ export const SPACE_ICONS = {
   briefcase: "briefcase",
   book: "book",
   target: "target",
+  flag: "flag",
+  calendar: "calendar",
+  file: "file",
+  link: "link",
+  image: "image",
+  clock: "clock",
+  archive: "archive",
+  square: "square",
 } as const satisfies Record<string, keyof typeof Icons>;
 
 export type SpaceIconKey = keyof typeof SPACE_ICONS;
