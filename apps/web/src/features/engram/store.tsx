@@ -17,6 +17,7 @@ import {
 import {
   addChecklistItem as coreAddChecklistItem,
   addItem,
+  addItemTag as coreAddItemTag,
   addLink,
   addSpace,
   buildItem,
@@ -27,11 +28,14 @@ import {
   deleteItem,
   deleteItems,
   deleteSpace as coreDeleteSpace,
+  moveItemToSpace as coreMoveItemToSpace,
   patchItem,
   patchViewState,
   removeChecklistItem as coreRemoveChecklistItem,
+  removeItemTag as coreRemoveItemTag,
   reorderChecklistItems as coreReorderChecklistItems,
   removeLink,
+  setItemTags as coreSetItemTags,
   toggleChecklistItem as coreToggleChecklistItem,
   toggleItemDone,
   updateSpace as coreUpdateSpace,
@@ -39,10 +43,13 @@ import {
 import { DEFAULT_SPACE_ID, PERSIST_DEBOUNCE_MS } from "./config";
 import { createLocalStorageAdapter } from "./persistence";
 import {
+  allTags as projectAllTags,
   focusPinnedItems as projectFocusPinnedItems,
+  overdueNotPinned as projectOverdueNotPinned,
   recentItems,
   scheduledTasks,
   searchItems as projectSearchItems,
+  searchItemsByTag as projectSearchItemsByTag,
   selectActiveItems,
   selectActiveLinks,
   selectActiveSpace,
@@ -110,6 +117,12 @@ type EngramStore = {
   createSpace: (input: CreateSpaceInput) => void;
   updateSpace: (spaceId: string, patch: UpdateSpaceInput) => void;
   deleteSpace: (spaceId: string) => void;
+  setItemTags: (id: string, tags: string[]) => void;
+  addItemTag: (id: string, tag: string) => void;
+  removeItemTag: (id: string, tag: string) => void;
+  moveItemToSpace: (itemId: string, targetSpaceId: string) => void;
+  overdueNotPinnedTasks: Item[];
+  allTags: string[];
 };
 
 const EngramContext = createContext<EngramStore | null>(null);
@@ -425,6 +438,8 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
   const todayItemsList = useMemo(() => projectTodayItems(data.items), [data.items]);
   const focusPinnedList = useMemo(() => projectFocusPinnedItems(data.items), [data.items]);
   const todayUnpinnedList = useMemo(() => projectTodayUnpinnedTasks(data.items), [data.items]);
+  const overdueNotPinnedList = useMemo(() => projectOverdueNotPinned(data.items), [data.items]);
+  const allTagsList = useMemo(() => projectAllTags(data.items), [data.items]);
 
   const pinToFocus = useCallback((id: string) => {
     setData((current) => patchItem(current, id, { focusPinned: true }));
@@ -434,8 +449,27 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
     setData((current) => patchItem(current, id, { focusPinned: false }));
   }, []);
 
+  const setItemTagsFn = useCallback((id: string, tags: string[]) => {
+    setData((current) => coreSetItemTags(current, id, tags));
+  }, []);
+
+  const addItemTagFn = useCallback((id: string, tag: string) => {
+    setData((current) => coreAddItemTag(current, id, tag));
+  }, []);
+
+  const removeItemTagFn = useCallback((id: string, tag: string) => {
+    setData((current) => coreRemoveItemTag(current, id, tag));
+  }, []);
+
+  const moveItemToSpaceFn = useCallback((itemId: string, targetSpaceId: string) => {
+    setData((current) => coreMoveItemToSpace(current, itemId, targetSpaceId));
+  }, []);
+
   const searchItems = useCallback(
-    (query: string) => projectSearchItems(data.items, query, recent),
+    (query: string) => {
+      if (query.startsWith("#")) return projectSearchItemsByTag(data.items, query);
+      return projectSearchItems(data.items, query, recent);
+    },
     [data.items, recent],
   );
 
@@ -476,6 +510,12 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
       createSpace: createSpaceFn,
       updateSpace: updateSpaceFn,
       deleteSpace: deleteSpaceFn,
+      setItemTags: setItemTagsFn,
+      addItemTag: addItemTagFn,
+      removeItemTag: removeItemTagFn,
+      moveItemToSpace: moveItemToSpaceFn,
+      overdueNotPinnedTasks: overdueNotPinnedList,
+      allTags: allTagsList,
     }),
     [
       data,
@@ -490,6 +530,8 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
       todayItemsList,
       focusPinnedList,
       todayUnpinnedList,
+      overdueNotPinnedList,
+      allTagsList,
       pinToFocus,
       unpinFromFocus,
       setActiveSpace,
@@ -513,8 +555,10 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
       createSpaceFn,
       updateSpaceFn,
       deleteSpaceFn,
-      pinToFocus,
-      unpinFromFocus,
+      setItemTagsFn,
+      addItemTagFn,
+      removeItemTagFn,
+      moveItemToSpaceFn,
     ],
   );
 

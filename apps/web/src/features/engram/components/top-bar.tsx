@@ -49,11 +49,13 @@ export function TopBar() {
 				)}
 				<Icons.layout className="size-4 text-[#8a8378]" />
 				<h1 className="truncate font-bold text-white">
-					{activeSpace?.name ?? "Mind"}
+					{pathname === "/focus" ? "Focus" : activeSpace?.name ?? "Mind"}
 				</h1>
-				<span className="text-[#776f65] text-sm">
-					/ {activeItems.length} items
-				</span>
+				{pathname !== "/focus" && (
+					<span className="text-[#776f65] text-sm">
+						/ {activeItems.length} items
+					</span>
+				)}
 			</div>
 
 			<div className="flex items-center gap-4">

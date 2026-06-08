@@ -20,8 +20,9 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { CalendarIcon } from "lucide-react";
-import { type KeyboardEvent, useState } from "react";
+import { type KeyboardEvent, useRef, useState } from "react";
 
+import { TagChip } from "./chips";
 import { Icons } from "./icons";
 import { LinkifiedText } from "./linkified-text";
 import { useEngramStore } from "../store";
@@ -30,9 +31,12 @@ import type { ChecklistItem, Priority } from "../types";
 
 export function ItemDetailPanel() {
   const { detailItemId, closeDetail, openNoteEditor } = useUIStore();
-  const { items, updateItem, removeItem, addChecklistItem, toggleChecklistItem, removeChecklistItem, reorderChecklistItems } =
+  const { items, updateItem, removeItem, addChecklistItem, toggleChecklistItem, removeChecklistItem, reorderChecklistItems, addItemTag, removeItemTag, allTags } =
     useEngramStore();
   const [newText, setNewText] = useState("");
+  const [newTag, setNewTag] = useState("");
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
+  const tagInputRef = useRef<HTMLInputElement>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const item = items.find((i) => i.id === detailItemId);
@@ -166,6 +170,60 @@ export function ItemDetailPanel() {
                         dueAt={item.dueAt}
                         onChange={(dueAt) => updateItem(item.id, { dueAt })}
                       />
+                    </div>
+                  </section>
+
+                  <section className="mb-5 rounded-[7px] border border-[#252118] bg-[#100e0c] p-4">
+                    <p className="mb-3 font-mono text-[#5c554d] text-[10px] uppercase tracking-widest">Tags</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(item.tags ?? []).map((tag) => (
+                        <TagChip key={tag} tag={tag} onRemove={() => removeItemTag(item.id, tag)} />
+                      ))}
+                    </div>
+                    <div className="relative mt-2">
+                      <input
+                        ref={tagInputRef}
+                        type="text"
+                        value={newTag}
+                        placeholder="Add tag…"
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/^#/, "").replace(/\s/g, "-");
+                          setNewTag(val);
+                          setTagSuggestions(
+                            val.length > 0
+                              ? allTags.filter((t) => t.includes(val) && !item.tags?.includes(t)).slice(0, 5)
+                              : [],
+                          );
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && newTag.trim()) {
+                            addItemTag(item.id, newTag.trim().toLowerCase());
+                            setNewTag("");
+                            setTagSuggestions([]);
+                          }
+                          if (e.key === "Escape") { setNewTag(""); setTagSuggestions([]); }
+                        }}
+                        className="w-full rounded-[6px] border border-[#252118] bg-[#1c1916] px-3 py-1.5 text-sm text-[#f0ebe3] placeholder:text-[#3d3830] focus:border-[#403b35] focus:outline-none"
+                      />
+                      {tagSuggestions.length > 0 && (
+                        <div className="absolute left-0 right-0 top-full z-10 mt-1 rounded-[6px] border border-[#252118] bg-[#1c1916] py-1 shadow-lg">
+                          {tagSuggestions.map((tag) => (
+                            <button
+                              key={tag}
+                              type="button"
+                              onClick={() => {
+                                addItemTag(item.id, tag);
+                                setNewTag("");
+                                setTagSuggestions([]);
+                                tagInputRef.current?.focus();
+                              }}
+                              className="flex w-full items-center gap-2 px-3 py-1.5 text-[#4aa5c8] text-sm hover:bg-[#252118]"
+                            >
+                              <span className="opacity-60">#</span>{tag}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </section>
 

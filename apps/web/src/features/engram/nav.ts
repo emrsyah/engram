@@ -10,7 +10,6 @@ export const NAV_VIEWS: NavView[] = [
   { label: "Focus", href: "/focus", icon: "target" },
   { label: "Canvas", href: "/canvas", icon: "layout" },
   { label: "Timeline", href: "/timeline", icon: "calendar" },
-  { label: "Priorities", href: "/priorities", icon: "flag" },
 ];
 
 export const SPACE_ICONS = {

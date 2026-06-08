@@ -38,6 +38,7 @@ export type Item = {
   dueAt?: string;
   checklistItems?: ChecklistItem[];
   focusPinned?: boolean;
+  tags?: string[];
   createdAt: string;
   updatedAt: string;
 };

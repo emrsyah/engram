@@ -2,5 +2,5 @@ import type { Route } from "next";
 import { redirect } from "next/navigation";
 
 export default function Home() {
-  redirect("/canvas" as Route<string>);
+  redirect("/focus" as Route<string>);
 }

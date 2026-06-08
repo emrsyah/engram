@@ -6,7 +6,7 @@ import { PopoverContent, PopoverRoot, PopoverTrigger } from "@alphonse/ui/compon
 import { cn } from "@alphonse/ui/lib/utils";
 import { CalendarIcon } from "lucide-react";
 
-import { TypeLabel } from "./chips";
+import { TagChip, TypeLabel } from "./chips";
 import { Icons } from "./icons";
 import { LinkifiedText } from "./linkified-text";
 import { useEngramStore } from "../store";
@@ -43,6 +43,11 @@ export function ThoughtCard({ item }: { item: Item }) {
       )}
       {!title && !body && (
         <p className="text-[#5c554d] text-sm leading-5">Untitled thought</p>
+      )}
+      {item.tags && item.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {item.tags.map((tag) => <TagChip key={tag} tag={tag} />)}
+        </div>
       )}
     </div>
   );
@@ -120,6 +125,11 @@ export function TaskCard({ item, onToggle }: { item: Item; onToggle: () => void 
             onChange={(dueAt) => updateItem(item.id, { dueAt })}
           />
         </div>
+        {item.tags && item.tags.length > 0 && (
+          <div className="nodrag nopan mt-2 flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
+            {item.tags.map((tag) => <TagChip key={tag} tag={tag} />)}
+          </div>
+        )}
       </div>
     </div>
   );

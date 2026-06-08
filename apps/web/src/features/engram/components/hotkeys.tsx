@@ -64,11 +64,6 @@ export function Hotkeys() {
     description: "Go to Timeline",
     enabled: !anyDialogOpen,
   });
-  useHotkeys("4", () => router.push("/priorities" as Route<string>), {
-    description: "Go to Priorities",
-    enabled: !anyDialogOpen,
-  });
-
   // ── Space switching ───────────────────────────────────────────────────
   useHotkeys(
     "mod+1",

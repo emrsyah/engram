@@ -30,6 +30,7 @@ export type CreateItemInput = {
   source?: string;
   caption?: string;
   focusPinned?: boolean;
+  tags?: string[];
   /** Override which space the item is created in (defaults to activeSpaceId). */
   spaceId?: string;
   stayOnCurrentView?: boolean;
@@ -150,6 +151,7 @@ export function buildItem(input: CreateItemInput, data: EngramData): Item {
     priority: input.priority,
     dueAt: input.dueAt,
     focusPinned: input.focusPinned,
+    tags: input.tags,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -317,6 +319,40 @@ export function patchViewState(
     viewStates: data.viewStates.map((viewState) =>
       viewState.spaceId === spaceId ? { ...viewState, ...patch, updatedAt: timestamp } : viewState,
     ),
+  };
+}
+
+export function setItemTags(data: EngramData, id: string, tags: string[]): EngramData {
+  return patchItem(data, id, { tags });
+}
+
+export function addItemTag(data: EngramData, id: string, tag: string): EngramData {
+  const item = data.items.find((i) => i.id === id);
+  if (!item) return data;
+  const tags = [...new Set([...(item.tags ?? []), tag])];
+  return patchItem(data, id, { tags });
+}
+
+export function removeItemTag(data: EngramData, id: string, tag: string): EngramData {
+  const item = data.items.find((i) => i.id === id);
+  if (!item) return data;
+  const tags = (item.tags ?? []).filter((t) => t !== tag);
+  return patchItem(data, id, { tags });
+}
+
+export function moveItemToSpace(data: EngramData, itemId: string, targetSpaceId: string): EngramData {
+  const item = data.items.find((i) => i.id === itemId);
+  if (!item) return data;
+  const validLinks = data.links.filter((l) => {
+    if (l.fromItemId !== itemId && l.toItemId !== itemId) return true;
+    const otherId = l.fromItemId === itemId ? l.toItemId : l.fromItemId;
+    const other = data.items.find((i) => i.id === otherId);
+    return other?.spaceId === targetSpaceId;
+  });
+  return {
+    ...data,
+    items: data.items.map((i) => i.id === itemId ? { ...i, spaceId: targetSpaceId, updatedAt: now() } : i),
+    links: validLinks,
   };
 }
 

@@ -115,6 +115,30 @@ export function todayItems(items: Item[]): Item[] {
   );
 }
 
+export function itemsByTag(items: Item[], tag: string): Item[] {
+  return items.filter((i) => i.tags?.includes(tag));
+}
+
+export function allTags(items: Item[]): string[] {
+  return [...new Set(items.flatMap((i) => i.tags ?? []))].sort();
+}
+
+export function searchItemsByTag(items: Item[], query: string): Item[] {
+  const normalized = query.toLowerCase().replace(/^#/, "");
+  return items.filter((i) => i.tags?.some((t) => t.toLowerCase().includes(normalized)));
+}
+
+export function overdueTasks(items: Item[]): Item[] {
+  const now = new Date().toISOString();
+  return items
+    .filter((i) => i.type === "task" && !i.done && i.dueAt && i.dueAt < now)
+    .sort((a, b) => a.dueAt!.localeCompare(b.dueAt!));
+}
+
+export function overdueNotPinned(items: Item[]): Item[] {
+  return overdueTasks(items).filter((i) => !i.focusPinned);
+}
+
 /** Builds the 7-day window starting from today for the Timeline view. */
 export function buildWeekDays(): { label: string; datePrefix: string }[] {
   const days = [];

@@ -1,5 +1,6 @@
 import { Badge } from "@alphonse/ui/components/badge";
 import { cn } from "@alphonse/ui/lib/utils";
+import { X } from "lucide-react";
 
 import type { Accent, Item, Priority } from "../types";
 
@@ -73,6 +74,26 @@ export function DueChip({ dueAt }: { dueAt?: string }) {
       className="h-6 rounded-[5px] bg-[#3a3327] px-2 font-mono font-bold text-[#d6a93a]"
     >
       {label}
+    </Badge>
+  );
+}
+
+export function TagChip({ tag, onRemove }: { tag: string; onRemove?: () => void }) {
+  return (
+    <Badge
+      variant="secondary"
+      className="h-5 gap-0.5 rounded-[4px] bg-[#1e2a30] px-1.5 font-mono text-[10px] text-[#4aa5c8]"
+    >
+      <span className="opacity-60">#</span>{tag}
+      {onRemove && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          className="ml-0.5 opacity-50 hover:opacity-100"
+        >
+          <X className="size-2.5" />
+        </button>
+      )}
     </Badge>
   );
 }

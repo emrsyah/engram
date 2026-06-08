@@ -353,6 +353,79 @@ function SortableBacklogRow({
 	);
 }
 
+// ─── Overdue section ─────────────────────────────────────────────────────────
+
+function OverdueSection() {
+	const { overdueNotPinnedTasks, pinToFocus } = useEngramStore();
+	const [expanded, setExpanded] = useState(true);
+
+	if (overdueNotPinnedTasks.length === 0) return null;
+
+	return (
+		<div className="border-[#252220] border-t pt-4">
+			<Button
+				type="button"
+				variant="ghost"
+				onClick={() => setExpanded((v) => !v)}
+				className="mb-2 flex w-full items-center gap-1.5 px-2 text-left active:scale-[0.98]"
+			>
+				{expanded ? (
+					<ChevronDown className="size-3 text-[#c06b4a]" />
+				) : (
+					<ChevronRight className="size-3 text-[#c06b4a]" />
+				)}
+				<span className="font-bold text-[#c06b4a] text-[11px] uppercase tracking-widest">
+					Overdue
+				</span>
+				<span className="ml-auto rounded-full bg-[#2d1a14] px-1.5 py-0.5 font-mono text-[#c06b4a] text-[10px]">
+					{overdueNotPinnedTasks.length}
+				</span>
+			</Button>
+			<div
+				className={cn(
+					"space-y-0.5 overflow-hidden transition-all",
+					expanded ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0",
+				)}
+				style={{ transition: "max-height 300ms ease-out, opacity 200ms ease-out" }}
+			>
+				{overdueNotPinnedTasks.map((task, i) => (
+					<div
+						key={task.id}
+						className="group flex items-start gap-2 rounded-[7px] px-2 py-2 transition-colors duration-150 hover:bg-[#1f1712]"
+						style={{
+							transitionDelay: expanded ? `${i * 30}ms` : "0ms",
+							transitionProperty: "background-color, opacity, transform",
+						}}
+					>
+						<div className="min-w-0 flex-1">
+							<p className="text-[#b0a99f] text-sm leading-snug">
+								{task.title ?? task.text ?? "Untitled task"}
+							</p>
+							<div className="mt-1 flex flex-wrap gap-1">
+								{task.priority && <PriorityChip priority={task.priority} />}
+								{task.dueAt && (
+									<span className="rounded-[5px] border border-[#5a2518] bg-[#2d1a14] px-2 py-0.5 font-mono text-[10px] text-[#e46f50]">
+										{new Date(task.dueAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+									</span>
+								)}
+							</div>
+						</div>
+						<Button
+							type="button"
+							variant="ghost"
+							onClick={() => pinToFocus(task.id)}
+							title="Add to focus"
+							className="mt-0.5 shrink-0 size-7 text-[#3e3a35] opacity-0 transition-opacity duration-150 active:scale-[0.95] hover:text-[#907ce8] group-hover:opacity-100"
+						>
+							<Pin className="size-3.5" />
+						</Button>
+					</div>
+				))}
+			</div>
+		</div>
+	);
+}
+
 // ─── Today's unpinned section ────────────────────────────────────────────────
 
 function TodayUnpinnedSection() {
@@ -697,6 +770,11 @@ export function FocusView() {
 										Add to focus
 									</Button>
 								)}
+							</div>
+
+							{/* ── Overdue ── */}
+							<div className="mt-4">
+								<OverdueSection />
 							</div>
 
 							{/* ── Today's unpinned ── */}

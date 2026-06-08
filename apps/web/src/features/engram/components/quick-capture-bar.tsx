@@ -30,7 +30,6 @@ import {
   FlagIcon,
   ImageIcon,
   LinkIcon,
-  PaperclipIcon,
   SendHorizontalIcon,
   SparklesIcon,
   XIcon,
@@ -55,7 +54,6 @@ const MODE_TABS: { mode: Mode; icon: React.ElementType; label: string; accent: s
   { mode: "thought", icon: SparklesIcon,    label: "Thought", accent: "text-violet-300" },
   { mode: "task",    icon: CheckSquareIcon, label: "Task",    accent: "text-amber-300" },
   { mode: "link",    icon: LinkIcon,        label: "Link",    accent: "text-sky-300" },
-  { mode: "attach",  icon: PaperclipIcon,   label: "Attach",  accent: "text-emerald-300" },
 ];
 
 const PRIORITY_CONFIG: Record<Priority, { label: string; color: string; bg: string }> = {
@@ -74,7 +72,8 @@ type ParsedTaskText = {
   priority?: Priority;
   dueDate?: Date;
   dueHasTime?: boolean;
-  tokens: { kind: "priority" | "date"; label: string }[];
+  tags: string[];
+  tokens: { kind: "priority" | "date" | "tag"; label: string }[];
 };
 
 function formatBytes(bytes: number) {
@@ -139,6 +138,13 @@ function parseTaskText(value: string, base = new Date()): ParsedTaskText {
     cleanText = cleanText.replace(priorityMatch[0], priorityMatch[0].startsWith(" ") ? " " : "");
   }
 
+  const tagMatches = [...cleanText.matchAll(/#(\w[\w-]*)/g)];
+  const tags = tagMatches.map((m) => m[1]);
+  for (const tag of tags) {
+    tokens.push({ kind: "tag", label: `#${tag}` });
+    cleanText = cleanText.replace(`#${tag}`, "");
+  }
+
   const parsedDue = parseDuePhrase(cleanText, base);
   if (parsedDue) {
     tokens.push({ kind: "date", label: parsedDue.label });
@@ -150,6 +156,7 @@ function parseTaskText(value: string, base = new Date()): ParsedTaskText {
     priority,
     dueDate: parsedDue?.date,
     dueHasTime: parsedDue?.hasTime,
+    tags,
     tokens,
   };
 }
@@ -357,6 +364,7 @@ export function QuickCaptureBar() {
   const effectivePriority = parsedTask?.priority ?? priority;
   const effectiveDueDate = parsedTask?.dueDate ?? dueDate;
   const effectiveDueHasTime = parsedTask?.dueDate ? !!parsedTask.dueHasTime : dueHasTime;
+  const effectiveTags = parsedTask?.tags ?? [];
 
   const allTasks = (() => {
     return taskText ? [...pendingTasks, taskText] : [...pendingTasks];
@@ -396,6 +404,7 @@ export function QuickCaptureBar() {
         title: main,
         priority: effectivePriority,
         dueAt: due,
+        tags: effectiveTags.length > 0 ? effectiveTags : undefined,
         stayOnCurrentView: pathname !== "/canvas",
       });
       for (const sub of subs) addChecklistItem(item.id, sub);
@@ -728,10 +737,12 @@ export function QuickCaptureBar() {
                         "rounded-[5px] border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider",
                         token.kind === "priority"
                           ? "border-amber-400/30 bg-amber-400/15 text-amber-300"
-                          : "border-[#3a3530] bg-[#252220] text-[#c8bfb2]",
+                          : token.kind === "tag"
+                            ? "border-[#1e3a45] bg-[#1e2a30] text-[#4aa5c8]"
+                            : "border-[#3a3530] bg-[#252220] text-[#c8bfb2]",
                       )}
                     >
-                      {token.kind === "priority" ? "Priority" : "Due"} {token.label}
+                      {token.kind === "priority" ? "Priority " : token.kind === "tag" ? "" : "Due "}{token.label}
                     </span>
                   ))}
                 </div>
