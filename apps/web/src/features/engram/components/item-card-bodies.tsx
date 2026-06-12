@@ -14,9 +14,8 @@ import type { Item, Priority } from "../types";
 
 /**
  * The visual body of each Item type, rendered as plain HTML.
- *
- * These are shared by the React Flow node wrapper (`item-node.tsx`); they hold
- * no canvas/drag concerns — React Flow owns positioning and dragging now.
+ * Shared across the board view, Tasks view, Focus, and detail panels.
+ * Holds no layout/drag concerns — those live in their respective containers.
  */
 
 export function ThoughtCard({ item }: { item: Item }) {

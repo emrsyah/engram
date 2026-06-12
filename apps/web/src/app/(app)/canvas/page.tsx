@@ -1,5 +1,5 @@
-import { CanvasView } from "@/features/engram/components/canvas-view";
+import { BoardView } from "@/features/engram/components/board-view";
 
 export default function CanvasPage() {
-  return <CanvasView />;
+  return <BoardView />;
 }

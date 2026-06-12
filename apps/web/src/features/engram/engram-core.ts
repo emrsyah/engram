@@ -1,12 +1,4 @@
-import {
-  CAPTURE_ANCHOR,
-  FALLBACK_DROP,
-  itemCenter,
-  panToAnchor,
-  screenToWorld,
-  VIEWPORT_CENTER,
-} from "./canvas-viewport";
-import { ITEM_DIMENSIONS, TASK_ACCENT } from "./config";
+import { TASK_ACCENT } from "./config";
 import type { Accent, CanvasViewState, ChecklistItem, EngramData, Item, ItemType, Priority, Space } from "./types";
 
 /**
@@ -100,69 +92,49 @@ export function updateSpace(data: EngramData, spaceId: string, patch: UpdateSpac
 }
 
 export function deleteSpace(data: EngramData, spaceId: string): EngramData {
-  const remaining = data.spaces.filter((s) => s.id !== spaceId);
-  const remainingViewStates = data.viewStates.filter((vs) => vs.spaceId !== spaceId);
-  const remainingItems = data.items.filter((i) => i.spaceId !== spaceId);
-  const remainingLinks = data.links.filter(
-    (l) => !remainingItems.some((i) => i.id === l.fromItemId) && !remainingItems.some((i) => i.id === l.toItemId)
-      ? false
-      : true,
-  ).filter((l) =>
-    remainingItems.some((i) => i.id === l.fromItemId) && remainingItems.some((i) => i.id === l.toItemId),
-  );
+	const remaining = data.spaces.filter((s) => s.id !== spaceId);
+	const remainingViewStates = data.viewStates.filter((vs) => vs.spaceId !== spaceId);
+	const remainingItems = data.items.filter((i) => i.spaceId !== spaceId);
+	const remainingLinks = data.links
+		.filter(
+			(l) =>
+				!remainingItems.some((i) => i.id === l.fromItemId) &&
+				!remainingItems.some((i) => i.id === l.toItemId)
+					? false
+					: true,
+		)
+		.filter(
+			(l) =>
+				remainingItems.some((i) => i.id === l.fromItemId) &&
+				remainingItems.some((i) => i.id === l.toItemId),
+		);
 
-  const activeSpaceId = data.activeSpaceId === spaceId
-    ? (remaining[0]?.id ?? data.activeSpaceId)
-    : data.activeSpaceId;
+	const activeSpaceId =
+		data.activeSpaceId === spaceId ? (remaining[0]?.id ?? data.activeSpaceId) : data.activeSpaceId;
 
-  return {
-    ...data,
-    spaces: remaining,
-    viewStates: remainingViewStates,
-    items: remainingItems,
-    links: remainingLinks,
-    activeSpaceId,
-  };
+	return {
+		...data,
+		spaces: remaining,
+		viewStates: remainingViewStates,
+		items: remainingItems,
+		links: remainingLinks,
+		activeSpaceId,
+	};
 }
 
 function taskAccent(priority?: Priority): Accent {
   return priority ? TASK_ACCENT[priority] : "gold";
 }
 
-/**
- * Where a freshly placed item should land in a space's viewport. Cascades
- * diagonally based on how many items the space already holds so successive
- * captures don't stack on the exact same coordinate.
- */
-export function dropPosition(data: EngramData, targetSpaceId: string): { x: number; y: number } {
-  const viewState = data.viewStates.find((view) => view.spaceId === targetSpaceId);
-  const base = viewState ? screenToWorld(CAPTURE_ANCHOR, viewState) : FALLBACK_DROP;
 
-  const placedCount = data.items.filter((i) => i.spaceId === targetSpaceId && !i.inbox).length;
-  const STEP = 34;
-  const PER_ROW = 5;
-  const slot = placedCount % (PER_ROW * PER_ROW);
-  return {
-    x: base.x + (slot % PER_ROW) * STEP,
-    y: base.y + Math.floor(slot / PER_ROW) * STEP,
-  };
-}
-
-/** Build the Item a capture would create, positioned in the active viewport. */
+/** Build the Item a capture would create. */
 export function buildItem(input: CreateItemInput, data: EngramData): Item {
   const timestamp = now();
   const targetSpaceId = input.spaceId ?? data.activeSpaceId;
-  const drop = dropPosition(data, targetSpaceId);
-
-  const dims = ITEM_DIMENSIONS[input.type];
   return {
     id: createId("item"),
     spaceId: targetSpaceId,
     type: input.type,
-    x: input.x ?? drop.x,
-    y: input.y ?? drop.y,
-    width: dims.width,
-    height: dims.height,
     title: input.title,
     text: input.text,
     url: input.url,
@@ -381,14 +353,13 @@ export function moveItemToSpace(data: EngramData, itemId: string, targetSpaceId:
 }
 
 /**
- * File an Inbox item into a space: clear the inbox flag, assign it to the space,
- * and give it a fresh canvas position. Links to items in other spaces are dropped
- * (links are space-scoped), mirroring moveItemToSpace.
+ * File an Inbox item into a space: clear the inbox flag and assign it to the space.
+ * Links to items in other spaces are dropped (links are space-scoped),
+ * mirroring moveItemToSpace.
  */
 export function fileItem(data: EngramData, itemId: string, targetSpaceId: string): EngramData {
   const item = data.items.find((i) => i.id === itemId);
   if (!item) return data;
-  const pos = dropPosition(data, targetSpaceId);
   const validLinks = data.links.filter((l) => {
     if (l.fromItemId !== itemId && l.toItemId !== itemId) return true;
     const otherId = l.fromItemId === itemId ? l.toItemId : l.fromItemId;
@@ -399,30 +370,9 @@ export function fileItem(data: EngramData, itemId: string, targetSpaceId: string
     ...data,
     items: data.items.map((i) =>
       i.id === itemId
-        ? { ...i, spaceId: targetSpaceId, inbox: false, x: pos.x, y: pos.y, updatedAt: now() }
+        ? { ...i, spaceId: targetSpaceId, inbox: false, updatedAt: now() }
         : i,
     ),
     links: validLinks,
   };
-}
-
-/** Select an item, switch to its space/canvas, and center it in the viewport. */
-export function centerItem(data: EngramData, id: string): EngramData {
-  const item = data.items.find((candidate) => candidate.id === id);
-  if (!item) {
-    return data;
-  }
-
-  const timestamp = now();
-  const viewStates = data.viewStates.map((viewState) =>
-    viewState.spaceId === item.spaceId
-      ? {
-          ...viewState,
-          ...panToAnchor(itemCenter(item), VIEWPORT_CENTER, viewState.zoom),
-          updatedAt: timestamp,
-        }
-      : viewState,
-  );
-
-  return { ...data, activeSpaceId: item.spaceId, selectedItemId: id, viewStates };
 }

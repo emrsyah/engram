@@ -15,129 +15,139 @@ import {
 } from "react";
 
 import {
-  addChecklistItem as coreAddChecklistItem,
-  addItem,
-  addItemTag as coreAddItemTag,
-  addLink,
-  addSpace,
-  buildItem,
-  centerItem,
-  type CreateItemInput,
-  type CreateSpaceInput,
-  type UpdateSpaceInput,
-  deleteItem,
-  deleteItems,
-  deleteSpace as coreDeleteSpace,
-  fileItem as coreFileItem,
-  moveItemToSpace as coreMoveItemToSpace,
-  patchItem,
-  patchViewState,
-  removeChecklistItem as coreRemoveChecklistItem,
-  removeItemTag as coreRemoveItemTag,
-  reorderChecklistItems as coreReorderChecklistItems,
-  removeLink,
-  setItemTags as coreSetItemTags,
-  toggleChecklistItem as coreToggleChecklistItem,
-  toggleItemDone,
-  updateSpace as coreUpdateSpace,
+	addChecklistItem as coreAddChecklistItem,
+	addItem,
+	addItemTag as coreAddItemTag,
+	addLink,
+	addSpace,
+	buildItem,
+	type CreateItemInput,
+	type CreateSpaceInput,
+	type UpdateSpaceInput,
+	deleteItem,
+	deleteItems,
+	deleteSpace as coreDeleteSpace,
+	fileItem as coreFileItem,
+	moveItemToSpace as coreMoveItemToSpace,
+	patchItem,
+	patchViewState,
+	removeChecklistItem as coreRemoveChecklistItem,
+	removeItemTag as coreRemoveItemTag,
+	reorderChecklistItems as coreReorderChecklistItems,
+	removeLink,
+	setItemTags as coreSetItemTags,
+	toggleChecklistItem as coreToggleChecklistItem,
+	toggleItemDone,
+	updateSpace as coreUpdateSpace,
 } from "./engram-core";
 import { DEFAULT_SPACE_ID, PERSIST_DEBOUNCE_MS } from "./config";
 import { createLocalStorageAdapter } from "./persistence";
 import {
-  allTags as projectAllTags,
-  focusPinnedItems as projectFocusPinnedItems,
-  inboxItems as projectInboxItems,
-  overdueNotPinned as projectOverdueNotPinned,
-  recentItems,
-  scheduledTasks,
-  searchItems as projectSearchItems,
-  searchItemsByTag as projectSearchItemsByTag,
-  selectActiveItems,
-  selectActiveLinks,
-  selectActiveSpace,
-  selectActiveViewState,
-  tasksByPriority,
-  todayItems as projectTodayItems,
-  todayPrefix,
-  todayTasks as projectTodayTasks,
-  todayUnpinnedTasks as projectTodayUnpinnedTasks,
+	allTags as projectAllTags,
+	backlinksForItem as projectBacklinksForItem,
+	focusPinnedItems as projectFocusPinnedItems,
+	groupTasksByDue as projectGroupTasksByDue,
+	groupTasksByPriority as projectGroupTasksByPriority,
+	groupTasksBySpace as projectGroupTasksBySpace,
+	inboxItems as projectInboxItems,
+	overdueNotPinned as projectOverdueNotPinned,
+	recentItems,
+	scheduledTasks,
+	searchItems as projectSearchItems,
+	searchItemsByTag as projectSearchItemsByTag,
+	selectActiveItems,
+	selectActiveLinks,
+	selectActiveSpace,
+	selectActiveViewState,
+	tasksByPriority,
+	todayItems as projectTodayItems,
+	todayPrefix,
+	todayTasks as projectTodayTasks,
+	todayUnpinnedTasks as projectTodayUnpinnedTasks,
+	type DueBucket,
 } from "./projections";
 import { seedItems, seedLinks, seedSpaces, seedViewStates } from "./seed";
 import { DeleteToast } from "./components/delete-toast";
 import { TaskCompleteToast } from "./components/task-complete-toast";
 import type {
-  CanvasViewState,
-  ChecklistItem,
-  EngramData,
-  Item,
-  ItemLink,
-  Priority,
-  Space,
+	CanvasViewState,
+	ChecklistItem,
+	EngramData,
+	Item,
+	ItemLink,
+	Priority,
+	Space,
 } from "./types";
 
 type EngramStore = {
-  // Raw data
-  spaces: Space[];
-  items: Item[];
-  links: ItemLink[];
-  viewStates: CanvasViewState[];
-  activeSpaceId: string;
-  selectedItemId?: string;
-  // Derived / projected
-  activeSpace?: Space;
-  activeItems: Item[];
-  activeLinks: ItemLink[];
-  activeViewState: CanvasViewState;
-  recentItems: Item[];
-  scheduledTasks: Item[];
-  tasksByPriority: Record<Priority, Item[]>;
-  // Mutations
-  setActiveSpace: (spaceId: string) => void;
-  createItem: (input: CreateItemInput) => Item;
-  updateItem: (id: string, patch: Partial<Item>) => void;
-  moveItem: (id: string, x: number, y: number) => void;
-  toggleDone: (id: string) => void;
-  connectItems: (fromItemId: string, toItemId: string) => void;
-  deleteLink: (id: string) => void;
-  setViewState: (spaceId: string, patch: Partial<CanvasViewState>) => void;
-  jumpToItem: (id: string) => void;
-  searchItems: (query: string) => Item[];
-  removeItem: (id: string) => void;
-  removeItems: (ids: string[]) => void;
-  undoDelete: () => void;
-  addChecklistItem: (itemId: string, text: string) => void;
-  toggleChecklistItem: (itemId: string, ciId: string) => void;
-  removeChecklistItem: (itemId: string, ciId: string) => void;
-  reorderChecklistItems: (itemId: string, checklistItems: ChecklistItem[]) => void;
-  todayTasks: Item[];
-  todayItems: Item[];
-  focusPinnedItems: Item[];
-  todayUnpinnedTasks: Item[];
-  pinToFocus: (id: string) => void;
-  unpinFromFocus: (id: string) => void;
-  upsertDailyNote: (text: string) => void;
-  createSpace: (input: CreateSpaceInput) => void;
-  updateSpace: (spaceId: string, patch: UpdateSpaceInput) => void;
-  deleteSpace: (spaceId: string) => void;
-  setItemTags: (id: string, tags: string[]) => void;
-  addItemTag: (id: string, tag: string) => void;
-  removeItemTag: (id: string, tag: string) => void;
-  moveItemToSpace: (itemId: string, targetSpaceId: string) => void;
-  fileItem: (itemId: string, targetSpaceId: string) => void;
-  inboxItems: Item[];
-  overdueNotPinnedTasks: Item[];
-  allTags: string[];
+	// Raw data
+	spaces: Space[];
+	items: Item[];
+	links: ItemLink[];
+	viewStates: CanvasViewState[];
+	activeSpaceId: string;
+	selectedItemId?: string;
+	// Derived / projected
+	activeSpace?: Space;
+	activeItems: Item[];
+	activeLinks: ItemLink[];
+	activeViewState: CanvasViewState;
+	recentItems: Item[];
+	scheduledTasks: Item[];
+	tasksByPriority: Record<Priority, Item[]>;
+	// All-tasks grouping projections
+	groupTasksBySpace: () => Map<string, Item[]>;
+	groupTasksByPriority: () => Map<Priority | undefined, Item[]>;
+	groupTasksByDue: () => Map<DueBucket, Item[]>;
+	// Backlinks
+	backlinksForItem: (itemId: string) => Item[];
+	// Mutations
+	setActiveSpace: (spaceId: string) => void;
+	createItem: (input: CreateItemInput) => Item;
+	updateItem: (id: string, patch: Partial<Item>) => void;
+	moveItem: (id: string, x: number, y: number) => void;
+	toggleDone: (id: string) => void;
+	connectItems: (fromItemId: string, toItemId: string) => void;
+	deleteLink: (id: string) => void;
+	setViewState: (spaceId: string, patch: Partial<CanvasViewState>) => void;
+	jumpToItem: (id: string) => void;
+	searchItems: (query: string) => Item[];
+	removeItem: (id: string) => void;
+	removeItems: (ids: string[]) => void;
+	undoDelete: () => void;
+	addChecklistItem: (itemId: string, text: string) => void;
+	toggleChecklistItem: (itemId: string, ciId: string) => void;
+	removeChecklistItem: (itemId: string, ciId: string) => void;
+	reorderChecklistItems: (itemId: string, checklistItems: ChecklistItem[]) => void;
+	todayTasks: Item[];
+	todayItems: Item[];
+	focusPinnedItems: Item[];
+	todayUnpinnedTasks: Item[];
+	pinToFocus: (id: string) => void;
+	unpinFromFocus: (id: string) => void;
+	upsertDailyNote: (text: string) => void;
+	createSpace: (input: CreateSpaceInput) => void;
+	updateSpace: (spaceId: string, patch: UpdateSpaceInput) => void;
+	deleteSpace: (spaceId: string) => void;
+	setItemTags: (id: string, tags: string[]) => void;
+	addItemTag: (id: string, tag: string) => void;
+	removeItemTag: (id: string, tag: string) => void;
+	moveItemToSpace: (itemId: string, targetSpaceId: string) => void;
+	fileItem: (itemId: string, targetSpaceId: string) => void;
+	inboxItems: Item[];
+	overdueNotPinnedTasks: Item[];
+	allTags: string[];
 };
 
 const EngramContext = createContext<EngramStore | null>(null);
 
 const createInitialData = (): EngramData => ({
-  spaces: seedSpaces,
-  items: seedItems,
-  links: seedLinks,
-  viewStates: seedViewStates,
-  activeSpaceId: DEFAULT_SPACE_ID,
-  selectedItemId: undefined,
+	spaces: seedSpaces,
+	items: seedItems,
+	links: seedLinks,
+	viewStates: seedViewStates,
+	activeSpaceId: DEFAULT_SPACE_ID,
+	selectedItemId: undefined,
 });
 
 const persistence = createLocalStorageAdapter();
@@ -274,7 +284,11 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
 
   const jumpToItem = useCallback(
     (id: string) => {
-      setData((current) => centerItem(current, id));
+      setData((current) => {
+        const item = current.items.find((i) => i.id === id);
+        if (!item) return current;
+        return { ...current, activeSpaceId: item.spaceId, selectedItemId: id };
+      });
       router.push("/canvas" as Route<string>);
     },
     [router],
@@ -465,122 +479,150 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
     setData((current) => coreRemoveItemTag(current, id, tag));
   }, []);
 
-  const moveItemToSpaceFn = useCallback((itemId: string, targetSpaceId: string) => {
-    setData((current) => coreMoveItemToSpace(current, itemId, targetSpaceId));
-  }, []);
+	const moveItemToSpaceFn = useCallback((itemId: string, targetSpaceId: string) => {
+		setData((current) => coreMoveItemToSpace(current, itemId, targetSpaceId));
+	}, []);
 
-  const fileItemFn = useCallback((itemId: string, targetSpaceId: string) => {
-    setData((current) => coreFileItem(current, itemId, targetSpaceId));
-  }, []);
+	const fileItemFn = useCallback((itemId: string, targetSpaceId: string) => {
+		setData((current) => coreFileItem(current, itemId, targetSpaceId));
+	}, []);
 
-  const inboxList = useMemo(() => projectInboxItems(data.items), [data.items]);
+	const groupTasksBySpaceFn = useCallback(
+		() => projectGroupTasksBySpace(data.items),
+		[data.items],
+	);
 
-  const searchItems = useCallback(
-    (query: string) => {
-      if (query.startsWith("#")) return projectSearchItemsByTag(data.items, query);
-      return projectSearchItems(data.items, query, recent);
-    },
-    [data.items, recent],
-  );
+	const groupTasksByPriorityFn = useCallback(
+		() => projectGroupTasksByPriority(data.items),
+		[data.items],
+	);
 
-  const value = useMemo<EngramStore>(
-    () => ({
-      ...data,
-      activeSpace,
-      activeItems,
-      activeLinks,
-      activeViewState,
-      recentItems: recent,
-      scheduledTasks: scheduled,
-      tasksByPriority: byPriority,
-      todayTasks: todayTasksList,
-      todayItems: todayItemsList,
-      focusPinnedItems: focusPinnedList,
-      todayUnpinnedTasks: todayUnpinnedList,
-      pinToFocus,
-      unpinFromFocus,
-      setActiveSpace,
-      createItem,
-      updateItem,
-      moveItem,
-      toggleDone,
-      connectItems,
-      deleteLink,
-      setViewState,
-      jumpToItem,
-      searchItems,
-      removeItem,
-      removeItems,
-      undoDelete,
-      addChecklistItem: addChecklistItemFn,
-      toggleChecklistItem: toggleChecklistItemFn,
-      removeChecklistItem: removeChecklistItemFn,
-      reorderChecklistItems: reorderChecklistItemsFn,
-      upsertDailyNote,
-      createSpace: createSpaceFn,
-      updateSpace: updateSpaceFn,
-      deleteSpace: deleteSpaceFn,
-      setItemTags: setItemTagsFn,
-      addItemTag: addItemTagFn,
-      removeItemTag: removeItemTagFn,
-      moveItemToSpace: moveItemToSpaceFn,
-      fileItem: fileItemFn,
-      inboxItems: inboxList,
-      overdueNotPinnedTasks: overdueNotPinnedList,
-      allTags: allTagsList,
-    }),
-    [
-      data,
-      activeSpace,
-      activeItems,
-      activeLinks,
-      activeViewState,
-      recent,
-      scheduled,
-      byPriority,
-      todayTasksList,
-      todayItemsList,
-      focusPinnedList,
-      todayUnpinnedList,
-      overdueNotPinnedList,
-      allTagsList,
-      pinToFocus,
-      unpinFromFocus,
-      setActiveSpace,
-      createItem,
-      updateItem,
-      moveItem,
-      toggleDone,
-      connectItems,
-      deleteLink,
-      setViewState,
-      jumpToItem,
-      searchItems,
-      removeItem,
-      removeItems,
-      undoDelete,
-      addChecklistItemFn,
-      toggleChecklistItemFn,
-      removeChecklistItemFn,
-      reorderChecklistItemsFn,
-      upsertDailyNote,
-      createSpaceFn,
-      updateSpaceFn,
-      deleteSpaceFn,
-      setItemTagsFn,
-      addItemTagFn,
-      removeItemTagFn,
-      moveItemToSpaceFn,
-      fileItemFn,
-      inboxList,
-    ],
-  );
+	const groupTasksByDueFn = useCallback(
+		() => projectGroupTasksByDue(data.items),
+		[data.items],
+	);
 
-  return <EngramContext.Provider value={value}>{children}</EngramContext.Provider>;
+	const backlinksForItemFn = useCallback(
+		(itemId: string) => projectBacklinksForItem(data, itemId),
+		[data],
+	);
+
+	const inboxList = useMemo(() => projectInboxItems(data.items), [data.items]);
+
+	const searchItems = useCallback(
+		(query: string) => {
+			if (query.startsWith("#")) return projectSearchItemsByTag(data.items, query);
+			return projectSearchItems(data.items, query, recent);
+		},
+		[data.items, recent],
+	);
+
+	const value = useMemo<EngramStore>(
+		() => ({
+			...data,
+			activeSpace,
+			activeItems,
+			activeLinks,
+			activeViewState,
+			recentItems: recent,
+			scheduledTasks: scheduled,
+			tasksByPriority: byPriority,
+			groupTasksBySpace: groupTasksBySpaceFn,
+			groupTasksByPriority: groupTasksByPriorityFn,
+			groupTasksByDue: groupTasksByDueFn,
+			backlinksForItem: backlinksForItemFn,
+			todayTasks: todayTasksList,
+			todayItems: todayItemsList,
+			focusPinnedItems: focusPinnedList,
+			todayUnpinnedTasks: todayUnpinnedList,
+			pinToFocus,
+			unpinFromFocus,
+			setActiveSpace,
+			createItem,
+			updateItem,
+			moveItem,
+			toggleDone,
+			connectItems,
+			deleteLink,
+			setViewState,
+			jumpToItem,
+			searchItems,
+			removeItem,
+			removeItems,
+			undoDelete,
+			addChecklistItem: addChecklistItemFn,
+			toggleChecklistItem: toggleChecklistItemFn,
+			removeChecklistItem: removeChecklistItemFn,
+			reorderChecklistItems: reorderChecklistItemsFn,
+			upsertDailyNote,
+			createSpace: createSpaceFn,
+			updateSpace: updateSpaceFn,
+			deleteSpace: deleteSpaceFn,
+			setItemTags: setItemTagsFn,
+			addItemTag: addItemTagFn,
+			removeItemTag: removeItemTagFn,
+			moveItemToSpace: moveItemToSpaceFn,
+			fileItem: fileItemFn,
+			inboxItems: inboxList,
+			overdueNotPinnedTasks: overdueNotPinnedList,
+			allTags: allTagsList,
+		}),
+		[
+			data,
+			activeSpace,
+			activeItems,
+			activeLinks,
+			activeViewState,
+			recent,
+			scheduled,
+			byPriority,
+			groupTasksBySpaceFn,
+			groupTasksByPriorityFn,
+			groupTasksByDueFn,
+			backlinksForItemFn,
+			todayTasksList,
+			todayItemsList,
+			focusPinnedList,
+			todayUnpinnedList,
+			overdueNotPinnedList,
+			allTagsList,
+			pinToFocus,
+			unpinFromFocus,
+			setActiveSpace,
+			createItem,
+			updateItem,
+			moveItem,
+			toggleDone,
+			connectItems,
+			deleteLink,
+			setViewState,
+			jumpToItem,
+			searchItems,
+			removeItem,
+			removeItems,
+			undoDelete,
+			addChecklistItemFn,
+			toggleChecklistItemFn,
+			removeChecklistItemFn,
+			reorderChecklistItemsFn,
+			upsertDailyNote,
+			createSpaceFn,
+			updateSpaceFn,
+			deleteSpaceFn,
+			setItemTagsFn,
+			addItemTagFn,
+			removeItemTagFn,
+			moveItemToSpaceFn,
+			fileItemFn,
+			inboxList,
+		],
+	);
+
+	return <EngramContext.Provider value={value}>{children}</EngramContext.Provider>;
 }
 
 export function useEngramStore() {
-  const context = useContext(EngramContext);
-  if (!context) throw new Error("useEngramStore must be used inside EngramProvider");
-  return context;
+	const context = useContext(EngramContext);
+	if (!context) throw new Error("useEngramStore must be used inside EngramProvider");
+	return context;
 }

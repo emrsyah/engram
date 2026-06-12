@@ -30,7 +30,7 @@ export function Hotkeys() {
   } = useUIStore();
 
   const anyDialogOpen = searchOpen || shortcutsOpen || !!detailItemId;
-  const onCanvas = pathname === "/canvas";
+  const onBoard = pathname === "/canvas";
 
   // ── Capture ──────────────────────────────────────────────────────────
   useHotkeys("n", () => expandQuickCapture(), {
@@ -56,11 +56,19 @@ export function Hotkeys() {
     description: "Go to Focus",
     enabled: !anyDialogOpen,
   });
-  useHotkeys("2", () => router.push("/canvas" as Route<string>), {
-    description: "Go to Canvas",
+  useHotkeys("2", () => router.push("/inbox" as Route<string>), {
+    description: "Go to Inbox",
     enabled: !anyDialogOpen,
   });
-  useHotkeys("3", () => router.push("/timeline" as Route<string>), {
+  useHotkeys("3", () => router.push("/tasks" as Route<string>), {
+    description: "Go to Tasks",
+    enabled: !anyDialogOpen,
+  });
+  useHotkeys("4", () => router.push("/canvas" as Route<string>), {
+    description: "Go to Board",
+    enabled: !anyDialogOpen,
+  });
+  useHotkeys("5", () => router.push("/timeline" as Route<string>), {
     description: "Go to Timeline",
     enabled: !anyDialogOpen,
   });
@@ -98,7 +106,7 @@ export function Hotkeys() {
   useHotkeys(
     "delete,backspace",
     () => { removeItems(canvasSelectedIds); },
-    { description: "Delete selected node", enabled: onCanvas && !anyDialogOpen && canvasSelectedIds.length > 0 },
+    { description: "Delete selected node", enabled: onBoard && !anyDialogOpen && canvasSelectedIds.length > 0 },
   );
 
   // ── Pin selected task nodes to focus ─────────────────────────────────
@@ -115,7 +123,7 @@ export function Hotkeys() {
     {
       description: "Toggle focus pin on selected task(s)",
       preventDefault: true,
-      enabled: onCanvas && !anyDialogOpen && canvasSelectedIds.length > 0,
+      enabled: onBoard && !anyDialogOpen && canvasSelectedIds.length > 0,
     },
   );
 

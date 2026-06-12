@@ -160,14 +160,115 @@ export function overdueNotPinned(items: Item[]): Item[] {
 
 /** Builds the 7-day window starting from today for the Timeline view. */
 export function buildWeekDays(): { label: string; datePrefix: string }[] {
-  const days = [];
-  const today = new Date();
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    const label = i === 0 ? "Today" : d.toLocaleDateString("en-US", { weekday: "short" });
-    const datePrefix = d.toISOString().slice(0, 10);
-    days.push({ label, datePrefix });
-  }
-  return days;
+	const days = [];
+	const today = new Date();
+	for (let i = 0; i < 7; i++) {
+		const d = new Date(today);
+		d.setDate(today.getDate() + i);
+		const label = i === 0 ? "Today" : d.toLocaleDateString("en-US", { weekday: "short" });
+		const datePrefix = d.toISOString().slice(0, 10);
+		days.push({ label, datePrefix });
+	}
+	return days;
+}
+
+// ─── All-tasks grouping helpers (for the Tasks view) ─────────────────────────
+
+/** All tasks across every space (excl. inbox), sorted by createdAt. */
+function allTaskItems(items: Item[]): Item[] {
+	return items.filter((i) => i.type === "task" && !i.inbox);
+}
+
+/**
+ * Group all tasks by their space.
+ * Returns a map of spaceId -> Item[].
+ */
+export function groupTasksBySpace(items: Item[]): Map<string, Item[]> {
+	const tasks = allTaskItems(items);
+	const result = new Map<string, Item[]>();
+	for (const task of tasks) {
+		const bucket = result.get(task.spaceId) ?? [];
+		bucket.push(task);
+		result.set(task.spaceId, bucket);
+	}
+	return result;
+}
+
+/**
+ * Group all tasks by priority.
+ * Unprioritised tasks land under the key `undefined`.
+ */
+export function groupTasksByPriority(items: Item[]): Map<Priority | undefined, Item[]> {
+	const tasks = allTaskItems(items);
+	const result = new Map<Priority | undefined, Item[]>();
+	for (const task of tasks) {
+		const key = task.priority;
+		const bucket = result.get(key) ?? [];
+		bucket.push(task);
+		result.set(key, bucket);
+	}
+	return result;
+}
+
+export type DueBucket = "overdue" | "today" | "upcoming" | "someday";
+
+/**
+ * Group all tasks by due-date bucket.
+ *
+ * - overdue  — dueAt is in the past (before today's date prefix)
+ * - today    — dueAt starts with today's YYYY-MM-DD prefix
+ * - upcoming — dueAt is in the future (after today)
+ * - someday  — no dueAt (undated; includes items flagged someday=true)
+ */
+export function groupTasksByDue(items: Item[]): Map<DueBucket, Item[]> {
+	const tasks = allTaskItems(items);
+	const prefix = todayPrefix();
+	const result = new Map<DueBucket, Item[]>([
+		["overdue", []],
+		["today", []],
+		["upcoming", []],
+		["someday", []],
+	]);
+
+	for (const task of tasks) {
+		let bucket: DueBucket;
+		if (!task.dueAt) {
+			bucket = "someday";
+		} else if (task.dueAt.slice(0, 10) < prefix) {
+			bucket = "overdue";
+		} else if (task.dueAt.startsWith(prefix)) {
+			bucket = "today";
+		} else {
+			bucket = "upcoming";
+		}
+		result.get(bucket)!.push(task);
+	}
+
+	// Sort overdue oldest-first, others by dueAt then createdAt
+	result.get("overdue")!.sort((a, b) => a.dueAt!.localeCompare(b.dueAt!));
+	result.get("today")!.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+	result.get("upcoming")!.sort((a, b) => a.dueAt!.localeCompare(b.dueAt!));
+	result.get("someday")!.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+	return result;
+}
+
+// ─── Backlinks ────────────────────────────────────────────────────────────────
+
+/**
+ * Return items linked to the given item — in either direction — within the
+ * same space, resolved to full Item objects.
+ */
+export function backlinksForItem(data: EngramData, itemId: string): Item[] {
+	const item = data.items.find((i) => i.id === itemId);
+	if (!item) return [];
+
+	const linkedIds = new Set<string>();
+	for (const link of data.links) {
+		if (link.spaceId !== item.spaceId) continue;
+		if (link.fromItemId === itemId) linkedIds.add(link.toItemId);
+		else if (link.toItemId === itemId) linkedIds.add(link.fromItemId);
+	}
+
+	return data.items.filter((i) => linkedIds.has(i.id));
 }

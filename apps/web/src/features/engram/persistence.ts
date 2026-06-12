@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { seedViewStates } from "./seed";
 import type { EngramData } from "./types";
 
 /**
@@ -46,10 +45,11 @@ const ItemSchema = z.object({
 	id: z.string(),
 	spaceId: z.string(),
 	type: z.enum(["thought", "task", "image", "link", "file"]),
-	x: z.number(),
-	y: z.number(),
-	width: z.number(),
-	height: z.number(),
+	/** @deprecated canvas-era fields; optional for backward compat */
+	x: z.number().optional(),
+	y: z.number().optional(),
+	width: z.number().optional(),
+	height: z.number().optional(),
 	title: z.string().optional(),
 	text: z.string().optional(),
 	url: z.string().optional(),
@@ -64,9 +64,13 @@ const ItemSchema = z.object({
 	tags: z.array(z.string()).optional(),
 	inbox: z.boolean().optional(),
 	someday: z.boolean().optional(),
+	// clusterId and sortOrder accepted but stripped at load time (forward compat
+	// for any existing saves that still carry these fields).
+	clusterId: z.string().optional(),
+	sortOrder: z.number().optional(),
 	createdAt: z.string(),
 	updatedAt: z.string(),
-});
+}).transform(({ clusterId: _c, sortOrder: _s, ...rest }) => rest);
 
 const ItemLinkSchema = z.object({
 	id: z.string(),
@@ -91,9 +95,11 @@ const EngramDataSchema = z.object({
 	items: z.array(ItemSchema),
 	links: z.array(ItemLinkSchema),
 	viewStates: z.array(CanvasViewStateSchema),
+	// clusters field silently ignored if present in old saves.
+	clusters: z.array(z.unknown()).optional(),
 	activeSpaceId: z.string(),
 	selectedItemId: z.string().optional(),
-});
+}).transform(({ clusters: _clusters, ...rest }) => rest);
 
 export function createLocalStorageAdapter(): EngramPersistence {
 	return {
@@ -125,3 +131,4 @@ export function createLocalStorageAdapter(): EngramPersistence {
 		},
 	};
 }
+

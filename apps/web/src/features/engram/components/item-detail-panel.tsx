@@ -27,16 +27,34 @@ import { Icons } from "./icons";
 import { LinkifiedText } from "./linkified-text";
 import { useEngramStore } from "../store";
 import { useUIStore } from "../ui-store";
-import type { ChecklistItem, Priority } from "../types";
+import type { ChecklistItem, Item, Priority } from "../types";
 
 export function ItemDetailPanel() {
   const { detailItemId, closeDetail, openNoteEditor } = useUIStore();
-  const { items, updateItem, removeItem, addChecklistItem, toggleChecklistItem, removeChecklistItem, reorderChecklistItems, addItemTag, removeItemTag, allTags } =
-    useEngramStore();
+  const {
+    items,
+    links,
+    activeItems,
+    updateItem,
+    removeItem,
+    addChecklistItem,
+    toggleChecklistItem,
+    removeChecklistItem,
+    reorderChecklistItems,
+    addItemTag,
+    removeItemTag,
+    allTags,
+    backlinksForItem,
+    connectItems,
+    deleteLink,
+  } = useEngramStore();
   const [newText, setNewText] = useState("");
   const [newTag, setNewTag] = useState("");
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
+  const [connSearch, setConnSearch] = useState("");
+  const [connDropdownOpen, setConnDropdownOpen] = useState(false);
   const tagInputRef = useRef<HTMLInputElement>(null);
+  const connInputRef = useRef<HTMLInputElement>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const item = items.find((i) => i.id === detailItemId);
@@ -74,6 +92,45 @@ export function ItemDetailPanel() {
   const title = item?.title?.trim() || item?.url || "Untitled";
   const body = item?.text?.trim();
   const progress = checklist.length > 0 ? Math.round((doneCount / checklist.length) * 100) : 0;
+
+  // Connections derived data
+  const linkedItems = item ? backlinksForItem(item.id) : [];
+  const linkedIds = new Set(linkedItems.map((i) => i.id));
+
+  // Candidates for adding a connection: same space, not self, not already linked
+  const connCandidates = item
+    ? activeItems.filter(
+        (i) => i.id !== item.id && i.spaceId === item.spaceId && !linkedIds.has(i.id),
+      )
+    : [];
+
+  const filteredCandidates = connSearch.trim()
+    ? connCandidates.filter((i) => {
+        const label = (i.title?.trim() || i.text?.trim() || i.url || "").toLowerCase();
+        return label.includes(connSearch.toLowerCase());
+      })
+    : connCandidates;
+
+  function findLinkId(targetId: string): string | undefined {
+    if (!item) return undefined;
+    return links.find(
+      (l) =>
+        (l.fromItemId === item.id && l.toItemId === targetId) ||
+        (l.fromItemId === targetId && l.toItemId === item.id),
+    )?.id;
+  }
+
+  function handleRemoveConnection(targetId: string) {
+    const linkId = findLinkId(targetId);
+    if (linkId) deleteLink(linkId);
+  }
+
+  function handleAddConnection(target: Item) {
+    if (!item) return;
+    connectItems(item.id, target.id);
+    setConnSearch("");
+    setConnDropdownOpen(false);
+  }
 
   function handleChecklistDragEnd(event: DragEndEvent) {
     if (!item || event.active.id === event.over?.id) return;
@@ -345,6 +402,85 @@ export function ItemDetailPanel() {
                   )}
                 </>
               )}
+
+              {/* Connections section — shown for all item types */}
+              <section className="mt-5 rounded-[7px] border border-[#252118] bg-[#100e0c] p-4">
+                <p className="mb-3 font-mono text-[#5c554d] text-[10px] uppercase tracking-widest">
+                  Connections
+                </p>
+
+                {/* Existing linked items */}
+                {linkedItems.length > 0 && (
+                  <div className="mb-3 flex flex-wrap gap-1.5">
+                    {linkedItems.map((linked) => {
+                      const label = linked.title?.trim() || linked.text?.trim() || linked.url || "Untitled";
+                      return (
+                        <span
+                          key={linked.id}
+                          className="flex items-center gap-1 rounded-[5px] border border-[#3a3252] bg-[#241f3a] py-0.5 pr-1 pl-2 text-[11px] text-[#cfc7ff]"
+                        >
+                          <Icons.link className="size-2.5 shrink-0 text-[#9b88ff]" />
+                          <span className="max-w-[160px] truncate">{label}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveConnection(linked.id)}
+                            className="ml-0.5 flex size-4 items-center justify-center rounded-[3px] text-[#9087b8] hover:bg-[#322a52] hover:text-white"
+                            aria-label={`Remove link to ${label}`}
+                          >
+                            <Icons.x className="size-2.5" />
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {linkedItems.length === 0 && (
+                  <p className="mb-3 text-[#4c463e] text-xs">No connections yet.</p>
+                )}
+
+                {/* Add connection — searchable dropdown */}
+                {connCandidates.length > 0 && (
+                  <div className="relative">
+                    <input
+                      ref={connInputRef}
+                      type="text"
+                      value={connSearch}
+                      placeholder="Add connection…"
+                      onChange={(e) => {
+                        setConnSearch(e.target.value);
+                        setConnDropdownOpen(true);
+                      }}
+                      onFocus={() => setConnDropdownOpen(true)}
+                      onBlur={() => requestAnimationFrame(() => setConnDropdownOpen(false))}
+                      className="w-full rounded-[6px] border border-[#252118] bg-[#1c1916] px-3 py-1.5 text-sm text-[#f0ebe3] placeholder:text-[#3d3830] focus:border-[#403b35] focus:outline-none"
+                    />
+                    {connDropdownOpen && filteredCandidates.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-48 overflow-y-auto rounded-[6px] border border-[#252118] bg-[#1c1916] py-1 shadow-lg">
+                        {filteredCandidates.slice(0, 8).map((candidate) => {
+                          const label = candidate.title?.trim() || candidate.text?.trim() || candidate.url || "Untitled";
+                          return (
+                            <button
+                              key={candidate.id}
+                              type="button"
+                              onMouseDown={(e) => { e.preventDefault(); handleAddConnection(candidate); }}
+                              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[#c8bfb2] hover:bg-[#252118]"
+                            >
+                              <Icons.link className="size-3 shrink-0 text-[#6b6258]" />
+                              <span className="min-w-0 flex-1 truncate">{label}</span>
+                              <span className="shrink-0 font-mono text-[10px] text-[#5c554d] uppercase">{candidate.type}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {connCandidates.length === 0 && (
+                  <p className="text-[#3d3830] text-xs">All items in this space are already linked.</p>
+                )}
+              </section>
             </div>
 
             {/* Footer */}

@@ -9,7 +9,8 @@ export type NavView = {
 export const NAV_VIEWS: NavView[] = [
   { label: "Focus", href: "/focus", icon: "target" },
   { label: "Inbox", href: "/inbox", icon: "inbox" },
-  { label: "Canvas", href: "/canvas", icon: "layout" },
+  { label: "Tasks", href: "/tasks", icon: "square" },
+  { label: "Board", href: "/canvas", icon: "layout" },
   { label: "Timeline", href: "/timeline", icon: "calendar" },
 ];
 

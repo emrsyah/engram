@@ -177,7 +177,7 @@ export function TopBar() {
 					type="button"
 					onClick={() =>
 						expandQuickCapture(
-							pathname === "/timeline" || pathname === "/priorities"
+							pathname === "/timeline"
 								? "task"
 								: undefined,
 						)

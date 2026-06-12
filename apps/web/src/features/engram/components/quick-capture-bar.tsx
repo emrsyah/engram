@@ -450,7 +450,7 @@ export function QuickCaptureBar() {
     [connections, connectItems],
   );
 
-  // When the destination isn't the canvas you're looking at, don't yank the view;
+  // When the destination isn't the board you're looking at, don't yank the view;
   // surface a toast instead so the capture isn't silently invisible.
   const stayOnCurrentView = isInbox
     ? true
