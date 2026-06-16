@@ -146,6 +146,17 @@ body {
   opacity: 1 !important;
 }
 
+/* ── Mobile nav drawer backdrop — fade in on mount ─────────────────── */
+.drawer-backdrop {
+  opacity: 1;
+  transition: opacity 220ms var(--ease-out);
+}
+@starting-style {
+  .drawer-backdrop {
+    opacity: 0;
+  }
+}
+
 /* ── Stagger fade-up for list/grid items ───────────────────────────── */
 @keyframes fadeUp {
   from {

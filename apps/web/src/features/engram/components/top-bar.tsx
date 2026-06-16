@@ -6,6 +6,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { haptic } from "../haptics";
 import { NAV_VIEWS } from "../nav";
 import { useEngramStore } from "../store";
 import { useUIStore } from "../ui-store";
@@ -29,16 +30,19 @@ export function TopBar() {
 	} = useUIStore();
 
 	return (
-		<header className="relative flex h-14 shrink-0 items-center justify-between border-line border-b bg-base px-5">
+		<header className="relative flex h-14 shrink-0 items-center justify-between border-line border-b bg-base px-5 pt-[env(safe-area-inset-top)] pr-[max(1.25rem,env(safe-area-inset-right))] box-content md:box-border md:pt-0 md:pr-5">
 			<div className="flex min-w-0 items-center gap-3">
 				{/* Mobile: open nav drawer */}
 				<Button
 					type="button"
 					variant="ghost"
 					size="icon-xs"
-					onClick={openMobileNav}
+					onClick={() => {
+						haptic("selection");
+						openMobileNav();
+					}}
 					title="Open navigation"
-					className="mr-1 text-ink-faint hover:text-ink-2 md:hidden"
+					className="mr-1 size-9 text-ink-faint transition-transform hover:text-ink-2 active:scale-90 motion-reduce:active:scale-100 md:size-8 md:hidden"
 				>
 					<Icons.panel className="size-4" />
 				</Button>
@@ -116,14 +120,15 @@ export function TopBar() {
 
 				<Button
 					type="button"
-					onClick={() =>
-						expandQuickCapture(pathname === "/library" ? "thought" : "task")
-					}
-					className="h-10 rounded-[8px] bg-brand px-4 font-bold text-brand-ink transition-transform duration-100 hover:bg-brand-bright active:scale-[0.97]"
+					onClick={() => {
+						haptic("selection");
+						expandQuickCapture(pathname === "/library" ? "thought" : "task");
+					}}
+					className="h-10 rounded-[8px] bg-brand px-4 font-bold text-brand-ink transition-transform duration-100 hover:bg-brand-bright active:scale-[0.95]"
 				>
 					<Icons.plus className="size-4" />
 					Capture
-					<span className="ml-1 font-mono text-xs opacity-70">N</span>
+					<span className="ml-1 hidden font-mono text-xs opacity-70 sm:inline">N</span>
 				</Button>
 			</div>
 		</header>

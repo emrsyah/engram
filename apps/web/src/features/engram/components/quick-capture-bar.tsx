@@ -45,6 +45,7 @@ import { usePathname } from "next/navigation";
 import { toast } from "sonner";
 
 import { parseCapture } from "../capture-grammar";
+import { haptic } from "../haptics";
 import { CaptureInput, type MentionItem } from "./capture-input";
 import { Icons } from "./icons";
 import { SPACE_ICONS, type SpaceIconKey } from "../nav";
@@ -219,6 +220,7 @@ export function QuickCaptureBar() {
   const collapse = useCallback(() => { collapseQuickCapture(); reset(); }, [collapseQuickCapture, reset]);
 
   const expand = useCallback(() => {
+    haptic("selection");
     expandQuickCapture();
     requestAnimationFrame(() => inputRef.current?.focus());
   }, [expandQuickCapture]);
@@ -344,6 +346,7 @@ export function QuickCaptureBar() {
 
   const commit = () => {
     if (!canCommit) return;
+    haptic("success");
     const trimmed = text.trim();
     const captureIntent = consumeQuickCaptureIntent();
 
