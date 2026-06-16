@@ -13,9 +13,10 @@ import { Input } from "@alphonse/ui/components/input";
 import { cn } from "@alphonse/ui/lib/utils";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import type { UpdateSpaceInput } from "../engram-core";
 import { SPACE_ICONS, type SpaceIconKey } from "../nav";
 import { useEngramStore } from "../store";
-import type { Accent } from "../types";
+import type { Accent, Space } from "../types";
 import { useUIStore } from "../ui-store";
 import { Icons } from "./icons";
 
@@ -46,41 +47,54 @@ export function EditSpaceDialog() {
 	const space = spaces.find((s) => s.id === editingSpaceId);
 	const isOpen = !!editingSpaceId;
 
-	const [name, setName] = useState("");
-	const [icon, setIcon] = useState<SpaceIconKey>("sparkles");
-	const [color, setColor] = useState<Accent>("violet");
+	if (!space) return null;
+
+	return (
+		<EditSpaceDialogContent
+			key={space.id}
+			space={space}
+			isOpen={isOpen}
+			closeEditSpaceDialog={closeEditSpaceDialog}
+			updateSpace={updateSpace}
+		/>
+	);
+}
+
+function EditSpaceDialogContent({
+	space,
+	isOpen,
+	closeEditSpaceDialog,
+	updateSpace,
+}: {
+	space: Space;
+	isOpen: boolean;
+	closeEditSpaceDialog: () => void;
+	updateSpace: (id: string, patch: UpdateSpaceInput) => void;
+}) {
+	const [name, setName] = useState(() => space.name);
+	const [icon, setIcon] = useState<SpaceIconKey>(() => (space.icon in SPACE_ICONS ? space.icon : "sparkles") as SpaceIconKey);
+	const [color, setColor] = useState<Accent>(() => space.color ?? "violet");
 	const [section, setSection] = useState<Section>("name");
 
 	const inputRef = useRef<HTMLInputElement>(null);
 	const iconRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 	const colorRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
-	// Sync form state when the space changes or dialog opens
-	useEffect(() => {
-		if (space) {
-			setName(space.name);
-			setIcon((space.icon in SPACE_ICONS ? space.icon : "sparkles") as SpaceIconKey);
-			setColor(space.color ?? "violet");
-			setSection("name");
-		}
-	}, [space]);
-
 	const canSave = name.trim().length > 0;
 
 	const handleSave = useCallback(() => {
-		if (!canSave || !editingSpaceId) return;
-		updateSpace(editingSpaceId, {
+		if (!canSave) return;
+		updateSpace(space.id, {
 			name: name.trim(),
 			icon,
 			color,
 		});
 		closeEditSpaceDialog();
-	}, [canSave, editingSpaceId, name, icon, color, updateSpace, closeEditSpaceDialog]);
+	}, [canSave, space.id, name, icon, color, updateSpace, closeEditSpaceDialog]);
 
 	// Auto-focus name input when dialog opens
 	useEffect(() => {
 		if (isOpen) {
-			setSection("name");
 			requestAnimationFrame(() => inputRef.current?.focus());
 		}
 	}, [isOpen]);
@@ -169,8 +183,6 @@ export function EditSpaceDialog() {
 			else if (section === "color") colorRefs.current.get(color)?.focus();
 		});
 	}, [section, isOpen, icon, color]);
-
-	if (!space) return null;
 
 	const selectedAccent = ACCENT_OPTIONS.find((a) => a.value === color)!;
 

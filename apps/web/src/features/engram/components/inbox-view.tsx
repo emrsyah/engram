@@ -45,7 +45,8 @@ export function InboxView() {
   const [activeIndex, setActiveIndex] = useState(0);
   const activeRowRef = useRef<HTMLDivElement | null>(null);
   const sortedSpaces = useMemo(() => [...spaces].sort((a, b) => a.sortOrder - b.sortOrder), [spaces]);
-  const activeItem = inboxItems[activeIndex];
+  const safeActiveIndex = Math.min(activeIndex, Math.max(inboxItems.length - 1, 0));
+  const activeItem = inboxItems[safeActiveIndex];
 
   const allSelected = inboxItems.length > 0 && selected.size === inboxItems.length;
   const someSelected = selected.size > 0;
@@ -116,14 +117,9 @@ export function InboxView() {
   }, [activeItem, inboxItems.length, removeItems]);
 
   useEffect(() => {
-    if (activeIndex <= inboxItems.length - 1) return;
-    setActiveIndex(Math.max(inboxItems.length - 1, 0));
-  }, [activeIndex, inboxItems.length]);
-
-  useEffect(() => {
     if (!triageMode) return;
     activeRowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [activeIndex, triageMode]);
+  }, [safeActiveIndex, triageMode]);
 
   useEffect(() => {
     if (!triageMode) return;
@@ -244,7 +240,7 @@ export function InboxView() {
           <div className="mt-6 rounded-[10px] border border-[#3a3252] bg-[#1e1b2a] px-4 py-3">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
               <span className="font-semibold text-[#cfc7ff]">
-                Triage {activeIndex + 1} / {inboxItems.length}
+                Triage {safeActiveIndex + 1} / {inboxItems.length}
               </span>
               <span className="text-[#9087b8]">J/K move</span>
               <span className="text-[#9087b8]">1-9 file</span>
@@ -382,8 +378,8 @@ export function InboxView() {
                   spaces={sortedSpaces}
                   selected={selected.has(item.id)}
                   anySelected={someSelected}
-                  active={triageMode && i === activeIndex}
-                  ref={triageMode && i === activeIndex ? activeRowRef : undefined}
+                  active={triageMode && i === safeActiveIndex}
+                  ref={triageMode && i === safeActiveIndex ? activeRowRef : undefined}
                   onSelect={() => toggleSelect(item.id)}
                   onOpen={() => openDetail(item.id)}
                   onToggleDone={() => toggleDone(item.id)}

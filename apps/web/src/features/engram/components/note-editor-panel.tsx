@@ -14,6 +14,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import { useEngramStore } from "../store";
+import type { Item } from "../types";
 import { useUIStore } from "../ui-store";
 
 const EASE_OUT     = "cubic-bezier(0.23, 1, 0.32, 1)";
@@ -23,37 +24,56 @@ export function NoteEditorPanel() {
   const { noteEditorItemId, closeNoteEditor, openDetail } = useUIStore();
   const { items, updateItem, removeItem } = useEngramStore();
   const item = items.find((i) => i.id === noteEditorItemId);
+
+  if (!item) return null;
+
+  return (
+    <NoteEditorPanelContent
+      key={item.id}
+      item={item}
+      closeNoteEditor={closeNoteEditor}
+      openDetail={openDetail}
+      updateItem={updateItem}
+      removeItem={removeItem}
+    />
+  );
+}
+
+function NoteEditorPanelContent({
+  item,
+  closeNoteEditor,
+  openDetail,
+  updateItem,
+  removeItem,
+}: {
+  item: Item;
+  closeNoteEditor: () => void;
+  openDetail: (id: string) => void;
+  updateItem: (id: string, patch: Partial<Item>) => void;
+  removeItem: (id: string) => void;
+}) {
   const isOpen = !!item;
 
-  const [title, setTitle] = useState("");
-  const [body, setBody]   = useState("");
+  const [title, setTitle] = useState(() => item.title ?? "");
+  const [body, setBody]   = useState(() => item.text ?? "");
   const [wide, setWide]   = useState(false);
+  const [saving, setSaving] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
   const bodyRef  = useRef<HTMLTextAreaElement>(null);
-  const dirtyRef = useRef(false);
+  const savingTimeoutRef = useRef<number | undefined>(undefined);
 
-  // Sync from store when item changes
   useEffect(() => {
-    if (!item) return;
-    setTitle(item.title ?? "");
-    setBody(item.text ?? "");
-    dirtyRef.current = false;
-    // Focus body shortly after open
     requestAnimationFrame(() => {
       bodyRef.current?.focus();
       bodyRef.current?.setSelectionRange(item.text?.length ?? 0, item.text?.length ?? 0);
     });
-  }, [item?.id]);
+  }, [item.id, item.text]);
 
-  // Debounced autosave
   useEffect(() => {
-    if (!item || !dirtyRef.current) return;
-    const t = setTimeout(() => {
-      updateItem(item.id, { title: title.trim() || undefined, text: body });
-      dirtyRef.current = false;
-    }, 400);
-    return () => clearTimeout(t);
-  }, [title, body, item, updateItem]);
+    return () => {
+      if (savingTimeoutRef.current) window.clearTimeout(savingTimeoutRef.current);
+    };
+  }, []);
 
   // Esc closes (only when focus is inside the panel)
   useEffect(() => {
@@ -76,14 +96,20 @@ export function NoteEditorPanel() {
 
   const handleTitleChange = (nextTitle: string) => {
     setTitle(nextTitle);
-    dirtyRef.current = true;
-    if (item) updateItem(item.id, { title: nextTitle.trim() || undefined });
+    markSaving();
+    updateItem(item.id, { title: nextTitle.trim() || undefined });
   };
 
   const handleBodyChange = (nextBody: string) => {
     setBody(nextBody);
-    dirtyRef.current = true;
-    if (item) updateItem(item.id, { text: nextBody });
+    markSaving();
+    updateItem(item.id, { text: nextBody });
+  };
+
+  const markSaving = () => {
+    setSaving(true);
+    if (savingTimeoutRef.current) window.clearTimeout(savingTimeoutRef.current);
+    savingTimeoutRef.current = window.setTimeout(() => setSaving(false), 400);
   };
 
   const wordCount = body.trim() ? body.trim().split(/\s+/).length : 0;
@@ -168,7 +194,7 @@ export function NoteEditorPanel() {
                 ref={bodyRef}
                 value={body}
                 onChange={(e) => handleBodyChange(e.target.value)}
-                onKeyDown={(e) => handleEditorKey(e, body, handleBodyChange, () => { dirtyRef.current = true; })}
+                onKeyDown={(e) => handleEditorKey(e, body, handleBodyChange, markSaving)}
                 placeholder={"Start writing… markdown supported.\n\nTab indents · ⌘+B wraps in **bold** · ⌘+I in *italic*"}
                 className={cn(
                   "note-textarea h-full w-full resize-none bg-transparent px-6 py-5",
@@ -186,7 +212,7 @@ export function NoteEditorPanel() {
                   <HashIcon className="size-2.5" />
                   {wordCount} words · {charCount} chars
                 </span>
-                {dirtyRef.current && (
+                {saving && (
                   <span className="text-[#7f6e3e]">Saving…</span>
                 )}
               </div>

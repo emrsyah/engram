@@ -2,7 +2,7 @@
 
 import { Badge } from "@alphonse/ui/components/badge";
 import { cn } from "@alphonse/ui/lib/utils";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { todayPrefix } from "../projections";
 import { useEngramStore } from "../store";
@@ -113,25 +113,13 @@ function wrapSelection(
 }
 
 export function SaveStateIndicator({ state }: { state: SaveState }) {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (state !== "idle") {
-      setVisible(true);
-    } else {
-      const t = setTimeout(() => setVisible(false), 300);
-      return () => clearTimeout(t);
-    }
-  }, [state]);
-
-  if (!visible && state === "idle") return null;
+  if (state === "idle") return null;
 
   return (
     <Badge
       variant="secondary"
       className={cn(
         "h-4 gap-1 rounded-[4px] px-1.5 font-mono text-[9px] transition-opacity duration-200",
-        state === "idle" ? "opacity-0" : "opacity-100",
         state === "saving" ? "bg-[#3a3327] text-[#d6a93a]" : "bg-[#1a2e2a] text-[#43b6a6]",
       )}
     >

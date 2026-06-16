@@ -291,26 +291,23 @@ export function FocusTasksPanel({ onClose }: { onClose: () => void }) {
 	const [newTaskText, setNewTaskText] = useState("");
 	const inputRef = useRef<HTMLInputElement>(null);
 
-	// Sync order when pinned items change
-	useEffect(() => {
-		setTaskOrder((prev) => {
-			const existingIds = new Set(focusPinnedItems.map((t) => t.id));
-			const filtered = prev.filter((id) => existingIds.has(id));
-			const newIds = focusPinnedItems
-				.map((t) => t.id)
-				.filter((id) => !filtered.includes(id));
-			return [...filtered, ...newIds];
-		});
-	}, [focusPinnedItems]);
-
 	useEffect(() => {
 		if (addingTask) inputRef.current?.focus();
 	}, [addingTask]);
 
+	const orderedIds = useMemo(() => {
+		const existingIds = new Set(focusPinnedItems.map((t) => t.id));
+		const filtered = taskOrder.filter((id) => existingIds.has(id));
+		const newIds = focusPinnedItems
+			.map((t) => t.id)
+			.filter((id) => !filtered.includes(id));
+		return [...filtered, ...newIds];
+	}, [taskOrder, focusPinnedItems]);
+
 	const orderedItems = useMemo(() => {
 		const map = new Map(focusPinnedItems.map((t) => [t.id, t]));
-		return taskOrder.map((id) => map.get(id)).filter(Boolean) as Item[];
-	}, [taskOrder, focusPinnedItems]);
+		return orderedIds.map((id) => map.get(id)).filter(Boolean) as Item[];
+	}, [orderedIds, focusPinnedItems]);
 
 	const pendingItems = orderedItems.filter((t) => !t.done);
 	const doneItems = orderedItems.filter((t) => t.done);
@@ -329,11 +326,10 @@ export function FocusTasksPanel({ onClose }: { onClose: () => void }) {
 	const handleDragEnd = ({ active, over }: DragEndEvent) => {
 		setActiveId(null);
 		if (!over || active.id === over.id) return;
-		setTaskOrder((order) => {
-			const oldIndex = order.indexOf(active.id as string);
-			const newIndex = order.indexOf(over.id as string);
-			return arrayMove(order, oldIndex, newIndex);
-		});
+		const oldIndex = orderedIds.indexOf(active.id as string);
+		const newIndex = orderedIds.indexOf(over.id as string);
+		if (oldIndex < 0 || newIndex < 0) return;
+		setTaskOrder(arrayMove(orderedIds, oldIndex, newIndex));
 	};
 
 	const handleToggle = useCallback(
@@ -427,7 +423,7 @@ export function FocusTasksPanel({ onClose }: { onClose: () => void }) {
 					>
 						<div className="space-y-0.5">
 							<SortableContext
-								items={taskOrder}
+								items={orderedIds}
 								strategy={verticalListSortingStrategy}
 							>
 								{pendingItems.map((task) => (
@@ -449,7 +445,7 @@ export function FocusTasksPanel({ onClose }: { onClose: () => void }) {
 							)}
 
 							<SortableContext
-								items={taskOrder}
+								items={orderedIds}
 								strategy={verticalListSortingStrategy}
 							>
 								{doneItems.map((task) => (

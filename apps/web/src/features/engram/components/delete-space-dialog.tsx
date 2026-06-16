@@ -47,7 +47,6 @@ export function DeleteSpaceDialog() {
 	// Auto-focus delete button when dialog opens
 	useEffect(() => {
 		if (isOpen) {
-			setConfirmText("");
 			requestAnimationFrame(() => inputRef.current?.focus());
 		}
 	}, [isOpen]);

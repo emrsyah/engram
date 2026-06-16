@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // usePomodoro — the shared Pomodoro timer engine. Owns the countdown, the
@@ -19,8 +19,6 @@ export function usePomodoro(defaultWork = 25, defaultBreak = 5) {
   const [remaining, setRemaining] = useState(defaultWork * 60);
   const [running, setRunning] = useState(false);
   const [sessions, setSessions] = useState(0);
-  const phaseRef = useRef(phase);
-  phaseRef.current = phase;
 
   const workSecs = workMins * 60;
   const breakSecs = breakMins * 60;
@@ -32,15 +30,15 @@ export function usePomodoro(defaultWork = 25, defaultBreak = 5) {
         if (s > 1) return s - 1;
         clearInterval(id);
         setRunning(false);
-        const next: PomodoroPhase = phaseRef.current === "work" ? "break" : "work";
-        if (phaseRef.current === "work") setSessions((n) => n + 1);
+        const next: PomodoroPhase = phase === "work" ? "break" : "work";
+        if (phase === "work") setSessions((n) => n + 1);
         setPhase(next);
         setRemaining(next === "break" ? breakSecs : workSecs);
         return 0;
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [running, workSecs, breakSecs]);
+  }, [running, workSecs, breakSecs, phase]);
 
   const start = () => {
     if (phase === "idle") setPhase("work");

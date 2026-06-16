@@ -121,7 +121,9 @@ export function FocusView() {
 			});
 			const data = (await response.json()) as Partial<DailyBriefing> & { error?: string };
 			if (!response.ok || data.error) {
-				throw new Error(data.error ?? "Could not generate briefing.");
+				toast.error(data.error ?? "Could not generate briefing.");
+				setBriefingStatus("idle");
+				return;
 			}
 			if (
 				!data.date ||
@@ -132,14 +134,15 @@ export function FocusView() {
 				!Array.isArray(data.risks) ||
 				!Array.isArray(data.suggestedAdjustments)
 			) {
-				throw new Error("Briefing response was incomplete.");
+				toast.error("Briefing response was incomplete.");
+				setBriefingStatus("idle");
+				return;
 			}
 			saveDailyBriefing(data as DailyBriefing);
 		} catch (error) {
 			toast.error(error instanceof Error ? error.message : "Could not generate briefing.");
-		} finally {
-			setBriefingStatus("idle");
 		}
+		setBriefingStatus("idle");
 	};
 
 	return (

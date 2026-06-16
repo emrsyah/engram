@@ -206,13 +206,16 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
 
   // Hydrate from localStorage once on mount.
   useEffect(() => {
-    const result = persistence.load();
-    if (result.status === "ok") {
-      setData(result.data);
-    } else if (result.status === "corrupt") {
-      toast.error("Engram loaded seed data because saved data was invalid.");
-    }
-    hydrated.current = true;
+    const timeout = window.setTimeout(() => {
+      const result = persistence.load();
+      if (result.status === "ok") {
+        setData(result.data);
+      } else if (result.status === "corrupt") {
+        toast.error("Engram loaded seed data because saved data was invalid.");
+      }
+      hydrated.current = true;
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, []);
 
   // Debounced persist on every data change.
@@ -251,7 +254,10 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
   const staleDoneKey = staleFocusDoneIds(data.items, todayPrefix()).join(",");
   useEffect(() => {
     if (!staleDoneKey) return;
-    setData((current) => purgeStaleFocusDone(current, todayPrefix()));
+    const timeout = window.setTimeout(() => {
+      setData((current) => purgeStaleFocusDone(current, todayPrefix()));
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [staleDoneKey]);
 
   // Sweep today's completed focus tasks at the end of the day.

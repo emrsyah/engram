@@ -2,7 +2,16 @@
 
 import { Button } from "@alphonse/ui/components/button";
 import { Checkbox } from "@alphonse/ui/components/checkbox";
+import { Dialog, DialogContent, DialogTitle } from "@alphonse/ui/components/dialog";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@alphonse/ui/components/dropdown-menu";
 import { Input } from "@alphonse/ui/components/input";
+import { Tabs, TabsList, TabsTrigger } from "@alphonse/ui/components/tabs";
 import { cn } from "@alphonse/ui/lib/utils";
 import {
 	closestCenter,
@@ -21,7 +30,7 @@ import {
 	verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useMemo, useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 
 import { taskQueueOf } from "../projections";
 import { useEngramStore } from "../store";
@@ -38,6 +47,23 @@ type TaskFilter =
 type LayoutMode = "columns" | "stacked";
 type PlanningSectionId = "later" | "next" | "now";
 type SectionId = PlanningSectionId | "done";
+type TasksUiState = {
+	filter: TaskFilter;
+	layoutMode: LayoutMode;
+	newTask: string;
+	focusedTaskId?: string;
+	doneOpen: boolean;
+	blitzOpen: boolean;
+	blitzSession: number;
+};
+type TasksUiAction =
+	| { type: "filter"; filter: TaskFilter }
+	| { type: "layout"; layoutMode: LayoutMode }
+	| { type: "newTask"; newTask: string }
+	| { type: "focusTask"; taskId?: string }
+	| { type: "doneOpen"; open: boolean }
+	| { type: "openBlitz" }
+	| { type: "blitzOpen"; open: boolean };
 
 const SECTIONS: { id: SectionId; label: string; hint: string }[] = [
 	{ id: "later", label: "Backlog", hint: "Captured, not planned yet" },
@@ -45,15 +71,41 @@ const SECTIONS: { id: SectionId; label: string; hint: string }[] = [
 	{ id: "now", label: "Today", hint: "Ordered focus list" },
 ];
 
-const DONE_SECTION = { id: "done" as const, label: "Done", hint: "Completed tasks" };
 const ACTIVE_SECTIONS: PlanningSectionId[] = ["later", "next", "now"];
+const INITIAL_TASKS_UI: TasksUiState = {
+	filter: { kind: "all", value: "all" },
+	layoutMode: "columns",
+	newTask: "",
+	doneOpen: false,
+	blitzOpen: false,
+	blitzSession: 0,
+};
+
+function tasksUiReducer(state: TasksUiState, action: TasksUiAction): TasksUiState {
+	switch (action.type) {
+		case "filter":
+			return { ...state, filter: action.filter };
+		case "layout":
+			return { ...state, layoutMode: action.layoutMode };
+		case "newTask":
+			return { ...state, newTask: action.newTask };
+		case "focusTask":
+			return { ...state, focusedTaskId: action.taskId };
+		case "doneOpen":
+			return { ...state, doneOpen: action.open };
+		case "openBlitz":
+			return { ...state, blitzOpen: true, blitzSession: state.blitzSession + 1 };
+		case "blitzOpen":
+			return { ...state, blitzOpen: action.open };
+	}
+}
 
 function taskTitle(task: Item) {
 	return task.title ?? task.text ?? "Untitled task";
 }
 
 function sortTasks(tasks: Item[]) {
-	return [...tasks].sort((a, b) => {
+	return tasks.toSorted((a, b) => {
 		if (a.done !== b.done) return a.done ? 1 : -1;
 		const orderA = a.taskSortOrder ?? Number.MAX_SAFE_INTEGER;
 		const orderB = b.taskSortOrder ?? Number.MAX_SAFE_INTEGER;
@@ -84,14 +136,17 @@ function sectionFromColumnId(id: string): SectionId | undefined {
 	return id.startsWith("section-") ? (id.replace("section-", "") as SectionId) : undefined;
 }
 
+function formatBlitzSeconds(seconds: number) {
+	const mins = Math.floor(seconds / 60).toString().padStart(2, "0");
+	const secs = (seconds % 60).toString().padStart(2, "0");
+	return `${mins}:${secs}`;
+}
+
 export function TasksView() {
 	const { allTaskItems, allTags, createItem, spaces, setTaskQueue, toggleDone, updateItem } =
 		useEngramStore();
 	const { openDetail } = useUIStore();
-	const [filter, setFilter] = useState<TaskFilter>({ kind: "all", value: "all" });
-	const [layoutMode, setLayoutMode] = useState<LayoutMode>("columns");
-	const [newTask, setNewTask] = useState("");
-	const [focusedTaskId, setFocusedTaskId] = useState<string>();
+	const [ui, dispatchUi] = useReducer(tasksUiReducer, INITIAL_TASKS_UI);
 
 	const sensors = useSensors(
 		useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -101,29 +156,25 @@ export function TasksView() {
 	const defaultSpaceId = spaces[0]?.id;
 	const taskTags = allTags.filter((tag) => allTaskItems.some((task) => task.tags?.includes(tag)));
 
-	const visibleTasks = useMemo(() => {
-		const tasks =
-			filter.kind === "group"
-				? allTaskItems.filter((task) => task.spaceId === filter.value)
-				: filter.kind === "tag"
-					? allTaskItems.filter((task) => task.tags?.includes(filter.value))
-					: allTaskItems;
-		return sortTasks(tasks);
-	}, [allTaskItems, filter]);
+	const visibleTasks = sortTasks(
+		ui.filter.kind === "group"
+			? allTaskItems.filter((task) => task.spaceId === ui.filter.value)
+			: ui.filter.kind === "tag"
+				? allTaskItems.filter((task) => task.tags?.includes(ui.filter.value))
+				: allTaskItems,
+	);
 
-	const tasksBySection = useMemo(() => {
-		const map = new Map<SectionId, Item[]>(SECTIONS.map((section) => [section.id, []]));
-		map.set("done", []);
-		for (const task of visibleTasks) {
-			const key = sectionOf(task);
-			map.set(key, [...(map.get(key) ?? []), task]);
-		}
-		for (const [key, tasks] of map) map.set(key, sortTasks(tasks));
-		return map;
-	}, [visibleTasks]);
+	const tasksBySection = new Map<SectionId, Item[]>();
+	for (const section of SECTIONS) tasksBySection.set(section.id, []);
+	tasksBySection.set("done", []);
+	for (const task of visibleTasks) {
+		const key = sectionOf(task);
+		tasksBySection.get(key)?.push(task);
+	}
+	for (const [key, tasks] of tasksBySection) tasksBySection.set(key, sortTasks(tasks));
 
 	const addTask = () => {
-		const title = newTask.trim();
+		const title = ui.newTask.trim();
 		if (!title || !defaultSpaceId) return;
 		createItem({
 			type: "task",
@@ -132,12 +183,18 @@ export function TasksView() {
 			spaceId: defaultSpaceId,
 			stayOnCurrentView: true,
 		});
-		setNewTask("");
+		dispatchUi({ type: "newTask", newTask: "" });
 	};
 
-	const focusedTask = focusedTaskId
-		? allTaskItems.find((task) => task.id === focusedTaskId && !task.done)
+	const focusedTask = ui.focusedTaskId
+		? allTaskItems.find((task) => task.id === ui.focusedTaskId && !task.done)
 		: undefined;
+	const activeFilterLabel =
+		ui.filter.kind === "group"
+			? spaceName(spaces, ui.filter.value)
+			: ui.filter.kind === "tag"
+				? `#${ui.filter.value}`
+				: "All tasks";
 
 	const focusTask = (task: Item) => {
 		if (task.done) return;
@@ -148,7 +205,11 @@ export function TasksView() {
 			updateItem(item.id, { taskSortOrder: index + 1 });
 		}
 		setTaskQueue(task.id, "now", 0);
-		setFocusedTaskId(task.id);
+		dispatchUi({ type: "focusTask", taskId: task.id });
+	};
+
+	const openBlitz = () => {
+		dispatchUi({ type: "openBlitz" });
 	};
 
 	const handleDragEnd = ({ active, over }: DragEndEvent) => {
@@ -183,14 +244,6 @@ export function TasksView() {
 
 	return (
 		<section className="flex h-full bg-[#151310] text-white">
-			<TaskSecondSidebar
-				filter={filter}
-				onFilter={setFilter}
-				spaces={spaces}
-				tasks={allTaskItems}
-				tags={taskTags}
-			/>
-
 			<div className="min-w-0 flex-1 overflow-y-auto px-5 py-7 lg:px-8">
 				<div className="mx-auto max-w-[1280px]">
 					<div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
@@ -205,30 +258,58 @@ export function TasksView() {
 						</div>
 
 						<div className="flex flex-wrap items-center gap-2">
-							<div className="rounded-[8px] bg-[#23201d] p-1">
-								{(["columns", "stacked"] as LayoutMode[]).map((mode) => (
-									<button
-										key={mode}
-										type="button"
-										onClick={() => setLayoutMode(mode)}
-										className={cn(
-											"h-8 rounded-[6px] px-3 font-semibold text-sm capitalize",
-											layoutMode === mode
-												? "bg-[#312d28] text-white"
-												: "text-[#948c82] hover:text-white",
-										)}
-									>
-										{mode}
-									</button>
-								))}
-							</div>
+							<TaskFilterMenu
+								filter={ui.filter}
+								label={activeFilterLabel}
+								onFilter={(filter) => dispatchUi({ type: "filter", filter })}
+								spaces={spaces}
+								tasks={allTaskItems}
+								tags={taskTags}
+							/>
+							<Tabs value={ui.layoutMode} onValueChange={(value) => dispatchUi({ type: "layout", layoutMode: value as LayoutMode })}>
+								<TabsList className="rounded-[8px] bg-[#23201d] p-1">
+									{(["columns", "stacked"] as LayoutMode[]).map((mode) => (
+										<TabsTrigger
+											key={mode}
+											value={mode}
+											className="h-8 rounded-[6px] px-3 capitalize text-[#948c82] data-active:bg-[#312d28] data-active:text-white"
+										>
+											{mode}
+										</TabsTrigger>
+									))}
+								</TabsList>
+							</Tabs>
+							<Button
+								type="button"
+								variant="ghost"
+								onClick={() => dispatchUi({ type: "doneOpen", open: !ui.doneOpen })}
+								className="h-9 rounded-[7px] border border-[#2a2621] bg-[#1b1815] px-3 text-[#b7afa5] hover:text-white"
+							>
+								<Icons.check className="size-4" />
+								Done
+								<CountBadge count={tasksBySection.get("done")?.length ?? 0} />
+							</Button>
 						</div>
 					</div>
 
+					{ui.filter.kind !== "all" ? (
+						<div className="mt-5 flex flex-wrap items-center gap-2 text-sm">
+							<span className="text-[#736c63]">Filtered by</span>
+							<button
+								type="button"
+								onClick={() => dispatchUi({ type: "filter", filter: { kind: "all", value: "all" } })}
+								className="flex items-center gap-2 rounded-[999px] border border-[#2d2924] bg-[#201d19] px-3 py-1.5 font-semibold text-[#d7cec4] hover:border-[#3a3530]"
+							>
+								{activeFilterLabel}
+								<Icons.x className="size-3.5 text-[#82786e]" />
+							</button>
+						</div>
+					) : null}
+
 					<div className="mt-6 flex gap-2 rounded-[9px] border border-[#2a2621] bg-[#1b1815] p-2">
 						<Input
-							value={newTask}
-							onChange={(event) => setNewTask(event.target.value)}
+							value={ui.newTask}
+							onChange={(event) => dispatchUi({ type: "newTask", newTask: event.target.value })}
 							onKeyDown={(event) => {
 								if (event.key === "Enter") addTask();
 							}}
@@ -256,7 +337,7 @@ export function TasksView() {
 								type="button"
 								variant="ghost"
 								size="sm"
-								onClick={() => setFocusedTaskId(undefined)}
+								onClick={() => dispatchUi({ type: "focusTask", taskId: undefined })}
 								className="h-8 rounded-[6px] px-3 text-[#a69acb] hover:text-white"
 							>
 								Clear
@@ -268,7 +349,7 @@ export function TasksView() {
 						<div
 							className={cn(
 								"mt-6 gap-4",
-								layoutMode === "columns"
+								ui.layoutMode === "columns"
 									? "grid min-w-[780px] grid-cols-3"
 									: "grid grid-cols-1",
 							)}
@@ -283,7 +364,8 @@ export function TasksView() {
 									onQueue={setTaskQueue}
 									onOpen={openDetail}
 									onFocus={focusTask}
-									focusedTaskId={focusedTaskId}
+									focusedTaskId={ui.focusedTaskId}
+									onOpenBlitz={section.id === "now" ? openBlitz : undefined}
 								/>
 							))}
 						</div>
@@ -294,108 +376,104 @@ export function TasksView() {
 						spaces={spaces}
 						onToggleDone={toggleDone}
 						onOpen={openDetail}
+						open={ui.doneOpen}
+						onOpenChange={(open) => dispatchUi({ type: "doneOpen", open })}
 					/>
 				</div>
 			</div>
+			{ui.blitzOpen ? (
+				<BlitzDialog
+					key={ui.blitzSession}
+					open={ui.blitzOpen}
+					onOpenChange={(open) => dispatchUi({ type: "blitzOpen", open })}
+					tasks={tasksBySection.get("now") ?? []}
+					onComplete={(id) => toggleDone(id)}
+				/>
+			) : null}
 		</section>
 	);
 }
 
-function TaskSecondSidebar({
+function TaskFilterMenu({
 	filter,
+	label,
 	onFilter,
 	spaces,
 	tasks,
 	tags,
 }: {
 	filter: TaskFilter;
+	label: string;
 	onFilter: (filter: TaskFilter) => void;
 	spaces: Space[];
 	tasks: Item[];
 	tags: string[];
 }) {
 	return (
-		<aside className="hidden w-[248px] shrink-0 overflow-y-auto border-[#292622] border-r bg-[#100f0d] px-3 py-5 lg:block">
-			<SidebarButton
-				active={filter.kind === "all"}
-				label="All tasks"
-				count={tasks.length}
-				icon={<Icons.square className="size-4" />}
-				onClick={() => onFilter({ kind: "all", value: "all" })}
-			/>
-
-			<SidebarSection title="Groups">
-				{spaces.map((space) => (
-					<SidebarButton
-						key={space.id}
-						active={filter.kind === "group" && filter.value === space.id}
-						label={space.name}
-						count={tasks.filter((task) => task.spaceId === space.id).length}
-						icon={<Icons.book className="size-4" />}
-						onClick={() => onFilter({ kind: "group", value: space.id })}
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={
+					<Button
+						type="button"
+						variant="ghost"
+						className="h-9 rounded-[7px] border border-[#2a2621] bg-[#1b1815] px-3 text-[#d7cec4] hover:text-white"
 					/>
+				}
+			>
+				<Icons.search className="size-4 text-[#907ce8]" />
+				<span className="max-w-[160px] truncate">{label}</span>
+				<Icons.chevronRight className="size-4 rotate-90 text-[#736c63]" />
+			</DropdownMenuTrigger>
+			<DropdownMenuContent
+				align="end"
+				className="w-[280px] border border-[#302c27] bg-[#181613] p-1 text-[#d7cec4]"
+			>
+				<DropdownMenuItem
+					onClick={() => onFilter({ kind: "all", value: "all" })}
+					className={cn("justify-between", filter.kind === "all" && "bg-[#25211d] text-white")}
+				>
+					<span className="flex items-center gap-2">
+						<Icons.square className="size-4 text-[#907ce8]" />
+						All tasks
+					</span>
+					<CountBadge count={tasks.length} />
+				</DropdownMenuItem>
+				<DropdownMenuSeparator className="my-1 bg-[#2a2621]" />
+				<DropdownLabel>Groups</DropdownLabel>
+				{spaces.map((space) => (
+					<DropdownMenuItem
+						key={space.id}
+						onClick={() => onFilter({ kind: "group", value: space.id })}
+						className={cn(
+							"justify-between",
+							filter.kind === "group" && filter.value === space.id && "bg-[#25211d] text-white",
+						)}
+					>
+						<span className="truncate">{space.name}</span>
+						<CountBadge count={tasks.filter((task) => task.spaceId === space.id).length} />
+					</DropdownMenuItem>
 				))}
-			</SidebarSection>
-
-			<SidebarSection title="Tags">
+				<DropdownMenuSeparator className="my-1 bg-[#2a2621]" />
+				<DropdownLabel>Tags</DropdownLabel>
 				{tags.length === 0 ? (
-					<p className="px-3 py-2 text-[#5f574f] text-xs">No task tags yet</p>
+					<div className="px-2 py-2 text-[#5f574f] text-xs">No task tags yet</div>
 				) : (
 					tags.map((tag) => (
-						<SidebarButton
+						<DropdownMenuItem
 							key={tag}
-							active={filter.kind === "tag" && filter.value === tag}
-							label={`#${tag}`}
-							count={tasks.filter((task) => task.tags?.includes(tag)).length}
-							icon={<Icons.flag className="size-4" />}
 							onClick={() => onFilter({ kind: "tag", value: tag })}
-						/>
+							className={cn(
+								"justify-between",
+								filter.kind === "tag" && filter.value === tag && "bg-[#25211d] text-white",
+							)}
+						>
+							<span className="truncate">#{tag}</span>
+							<CountBadge count={tasks.filter((task) => task.tags?.includes(tag)).length} />
+						</DropdownMenuItem>
 					))
 				)}
-			</SidebarSection>
-		</aside>
-	);
-}
-
-function SidebarSection({ title, children }: { title: string; children: React.ReactNode }) {
-	return (
-		<div className="mt-6">
-			<p className="mb-2 px-3 font-bold text-[#736c63] text-[11px] uppercase tracking-[0.14em]">
-				{title}
-			</p>
-			<div className="space-y-1">{children}</div>
-		</div>
-	);
-}
-
-function SidebarButton({
-	active,
-	label,
-	count,
-	icon,
-	onClick,
-}: {
-	active: boolean;
-	label: string;
-	count: number;
-	icon: React.ReactNode;
-	onClick: () => void;
-}) {
-	return (
-		<button
-			type="button"
-			onClick={onClick}
-			className={cn(
-				"flex w-full items-center gap-3 rounded-[7px] px-3 py-2 text-left text-sm transition-colors",
-				active ? "bg-[#22201f] text-white" : "text-[#b7afa5] hover:bg-[#171614] hover:text-white",
-			)}
-		>
-			<span className="text-[#907ce8]">{icon}</span>
-			<span className="min-w-0 flex-1 truncate font-semibold">{label}</span>
-			<span className="rounded-[5px] bg-[#252220] px-1.5 py-0.5 font-mono text-[#82786e] text-[11px]">
-				{count}
-			</span>
-		</button>
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }
 
@@ -408,6 +486,7 @@ function TaskSection({
 	onOpen,
 	onFocus,
 	focusedTaskId,
+	onOpenBlitz,
 }: {
 	section: { id: SectionId; label: string; hint: string };
 	tasks: Item[];
@@ -417,6 +496,7 @@ function TaskSection({
 	onOpen: (id: string) => void;
 	onFocus: (task: Item) => void;
 	focusedTaskId?: string;
+	onOpenBlitz?: () => void;
 }) {
 	const { setNodeRef, isOver } = useDroppable({ id: columnId(section.id) });
 
@@ -424,23 +504,34 @@ function TaskSection({
 		<section
 			ref={setNodeRef}
 			className={cn(
-				"min-h-[300px] rounded-[9px] border bg-[#151412]",
+				"flex max-h-[calc(100vh-330px)] min-h-[300px] flex-col overflow-hidden rounded-[9px] border bg-[#151412]",
 				isOver ? "border-[#907ce8] bg-[#191620]" : "border-[#26221e]",
 			)}
 		>
-			<header className="border-[#26221e] border-b px-4 py-3">
+			<header className="shrink-0 border-[#26221e] border-b px-4 py-3">
 				<div className="flex items-center justify-between gap-3">
 					<div className="min-w-0">
 						<h3 className="truncate font-bold text-[#efe9df] text-lg">{section.label}</h3>
 						<p className="mt-0.5 truncate text-[#70685f] text-xs">{section.hint}</p>
 					</div>
-					<span className="rounded-[5px] bg-[#252220] px-1.5 py-0.5 font-mono text-[#82786e] text-[11px]">
-						{tasks.length}
-					</span>
+					<div className="flex items-center gap-2">
+						{onOpenBlitz ? (
+							<Button
+								type="button"
+								size="sm"
+								onClick={onOpenBlitz}
+								className="h-8 rounded-[7px] bg-[#907ce8] px-3 font-bold text-[#17131f] hover:bg-[#a08ef2]"
+							>
+								<Icons.target className="size-4" />
+								Blitz
+							</Button>
+						) : null}
+						<CountBadge count={tasks.length} />
+					</div>
 				</div>
 			</header>
 			<SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
-				<div className="space-y-2 p-3">
+				<div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
 					{tasks.length === 0 ? (
 						<div className="rounded-[7px] border border-dashed border-[#302c27] px-3 py-8 text-center text-[#5f574f] text-sm">
 							Drop tasks here
@@ -470,14 +561,16 @@ function DoneArchive({
 	spaces,
 	onToggleDone,
 	onOpen,
+	open,
+	onOpenChange,
 }: {
 	tasks: Item[];
 	spaces: Space[];
 	onToggleDone: (id: string) => void;
 	onOpen: (id: string) => void;
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
 }) {
-	if (tasks.length === 0) return null;
-
 	return (
 		<section className="mt-6 rounded-[9px] border border-[#211e1b] bg-[#11100f] opacity-75">
 			<header className="flex items-center justify-between border-[#211e1b] border-b px-4 py-2.5">
@@ -485,11 +578,16 @@ function DoneArchive({
 					<h3 className="font-bold text-[#8f877d]">Done</h3>
 					<p className="text-[#5f574f] text-xs">Completed tasks stay out of the planning lanes.</p>
 				</div>
-				<span className="rounded-[5px] bg-[#201d19] px-1.5 py-0.5 font-mono text-[#6d655c] text-[11px]">
-					{tasks.length}
-				</span>
+				<button
+					type="button"
+					onClick={() => onOpenChange(!open)}
+					className="flex items-center gap-2 rounded-[7px] bg-[#201d19] px-2.5 py-1.5 font-semibold text-[#8f877d] text-xs hover:text-[#d7cec4]"
+				>
+					{open ? "Close" : "Open"}
+					<CountBadge count={tasks.length} />
+				</button>
 			</header>
-			<div className="grid gap-2 p-3 md:grid-cols-2 xl:grid-cols-3">
+			<div className={cn("grid gap-2 p-3 md:grid-cols-2 xl:grid-cols-3", !open && "hidden")}>
 				{sortTasks(tasks).map((task) => (
 					<div
 						key={task.id}
@@ -517,6 +615,167 @@ function DoneArchive({
 			</div>
 		</section>
 	);
+}
+
+function CountBadge({ count }: { count: number }) {
+	return (
+		<span className="rounded-[5px] bg-[#252220] px-1.5 py-0.5 font-mono text-[#82786e] text-[11px]">
+			{count}
+		</span>
+	);
+}
+
+function DropdownLabel({ children }: { children: React.ReactNode }) {
+	return <div className="px-2 py-2 text-[#736c63] text-xs">{children}</div>;
+}
+
+function BlitzDialog({
+	open,
+	onOpenChange,
+	tasks,
+	onComplete,
+}: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	tasks: Item[];
+	onComplete: (id: string) => void;
+}) {
+	const [activeIndex, setActiveIndex] = useState(0);
+	const [secondsLeft, setSecondsLeft] = useState(45 * 60);
+	const [running, setRunning] = useState(false);
+	const activeTask = tasks[activeIndex];
+	const elapsed = 45 * 60 - secondsLeft;
+	const progress = elapsed / (45 * 60);
+
+	useEffect(() => {
+		if (!running) return;
+		const id = window.setInterval(() => {
+			setSecondsLeft((current) => {
+				if (current <= 1) {
+					setRunning(false);
+					return 0;
+				}
+				return current - 1;
+			});
+		}, 1000);
+		return () => window.clearInterval(id);
+	}, [running]);
+
+	const complete = () => {
+		if (!activeTask) return;
+		onComplete(activeTask.id);
+		setActiveIndex((index) => Math.min(index + 1, Math.max(tasks.length - 1, 0)));
+		setSecondsLeft(45 * 60);
+		setRunning(false);
+	};
+
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent
+				showCloseButton={false}
+				className="inset-0 top-0 left-0 max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 bg-[#07070a] p-0 text-white ring-0 sm:max-w-none"
+			>
+				<DialogTitle className="sr-only">Blitz focus</DialogTitle>
+				<div className="relative flex min-h-screen flex-col px-7 py-6">
+					<div className="pointer-events-none absolute inset-0 opacity-45 [background:radial-gradient(circle_at_22%_10%,rgba(144,124,232,0.12),transparent_24%),radial-gradient(circle_at_78%_20%,rgba(74,165,200,0.08),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_42%)]" />
+					<header className="relative z-10 flex items-center justify-between">
+						<div className="font-mono text-xs uppercase tracking-[0.28em] text-[#8d7cff]">
+							Blitz{" "}
+							<span className="ml-2 text-[#6d6878]">
+								{Math.min(activeIndex + 1, tasks.length || 1)} of {tasks.length || 1}
+							</span>
+						</div>
+						<Button
+							type="button"
+							variant="ghost"
+							onClick={() => onOpenChange(false)}
+							className="h-9 rounded-[8px] border border-white/10 bg-white/[0.03] px-3 text-[#b9b4c6] hover:text-white"
+						>
+							Exit
+							<span className="rounded-[5px] border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-[#8c8795]">
+								ESC
+							</span>
+						</Button>
+					</header>
+					<main className="relative z-10 mx-auto flex w-full max-w-[760px] flex-1 flex-col items-center justify-center py-10 text-center">
+						<div className="mb-8 rounded-[999px] bg-[#19233a] px-4 py-1.5 font-semibold text-[#6da8ff] text-sm">
+							<span className="mr-2 inline-block size-2 rounded-full bg-[#6da8ff]" />
+							Work
+						</div>
+						<h2 className="max-w-[780px] text-balance font-bold text-4xl text-[#f4f1f7] tracking-normal">
+							{activeTask ? taskTitle(activeTask) : "Pick a task for today"}
+						</h2>
+						<div className="mt-12 font-mono text-7xl text-[#f6f3fb] tracking-normal">
+							{formatBlitzSeconds(secondsLeft)}
+						</div>
+						<div className="mt-10 w-full max-w-[380px]">
+							<div className="h-1 overflow-hidden rounded-full bg-white/10">
+								<div className="h-full bg-[#8a78f0]" style={{ width: `${progress * 100}%` }} />
+							</div>
+							<div className="mt-2 flex justify-between font-mono text-[#6f6a78] text-xs">
+								<span>{formatBlitzSeconds(elapsed)} elapsed</span>
+								<span>45:00 planned</span>
+							</div>
+						</div>
+						<div className="mt-9 flex items-center gap-3">
+							<button
+								type="button"
+								onClick={() => {
+									setSecondsLeft(45 * 60);
+									setRunning(false);
+								}}
+								className="grid size-12 place-items-center rounded-full border border-white/15 bg-white/[0.04] text-[#a8a1b7]"
+							>
+								<Icons.rotate className="size-5" />
+							</button>
+							<button
+								type="button"
+								onClick={() => setRunning((value) => !value)}
+								className="grid size-[72px] place-items-center rounded-full bg-[#8875ee] text-white shadow-[0_0_32px_rgba(136,117,238,0.45)]"
+							>
+								{running ? <PauseGlyph /> : <PlayGlyph />}
+							</button>
+							<button
+								type="button"
+								onClick={complete}
+								className="grid size-12 place-items-center rounded-full border border-[#1e7f65] bg-[#06251f] text-[#45d0a5]"
+							>
+								<Icons.check className="size-5" />
+							</button>
+						</div>
+						<div className="mt-20 w-full max-w-[700px] text-left">
+							<p className="mb-3 font-bold text-[#777281] text-xs uppercase tracking-[0.14em]">Up next</p>
+							<div className="space-y-2">
+								{tasks.slice(activeIndex + 1, activeIndex + 4).map((task, index) => (
+									<div
+										key={task.id}
+										className="flex items-center gap-3 rounded-[8px] border border-white/10 bg-white/[0.03] px-4 py-3 text-[#aaa4b4]"
+									>
+										<span className="font-mono text-[#6f6a78] text-xs">{activeIndex + index + 2}</span>
+										<span className="size-2 rounded-full bg-[#6da8ff]" />
+										<span className="min-w-0 flex-1 truncate text-sm">{taskTitle(task)}</span>
+									</div>
+								))}
+							</div>
+						</div>
+					</main>
+				</div>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
+function PauseGlyph() {
+	return (
+		<span className="flex items-center gap-1">
+			<span className="h-5 w-1.5 rounded-full bg-current" />
+			<span className="h-5 w-1.5 rounded-full bg-current" />
+		</span>
+	);
+}
+
+function PlayGlyph() {
+	return <span className="ml-1 h-0 w-0 border-y-[11px] border-y-transparent border-l-[16px] border-l-current" />;
 }
 
 function SortableTaskCard({

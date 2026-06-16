@@ -1,10 +1,17 @@
 "use client";
 
 import { Button } from "@alphonse/ui/components/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@alphonse/ui/components/dropdown-menu";
 import { Input } from "@alphonse/ui/components/input";
 import { Tabs, TabsList, TabsTrigger } from "@alphonse/ui/components/tabs";
 import { cn } from "@alphonse/ui/lib/utils";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import type { LibraryType } from "../projections";
 import { useEngramStore } from "../store";
@@ -65,23 +72,23 @@ export function LibraryView() {
 	const defaultSpaceId = spaces[0]?.id;
 	const libraryTags = allTags.filter((tag) => libraryItems.some((item) => item.tags?.includes(tag)));
 
-	const visibleItems = useMemo(() => {
-		switch (filter.kind) {
-			case "type":
-				return libraryItems.filter((item) => item.type === filter.value);
-			case "group":
-				return libraryItems.filter((item) => item.spaceId === filter.value);
-			case "tag":
-				return libraryItems.filter((item) => item.tags?.includes(filter.value));
-			default:
-				return libraryItems;
-		}
-	}, [filter, libraryItems]);
-
-	const groupedItems = useMemo(
-		() => buildLibraryGroups(visibleItems, groupBy, spaces),
-		[visibleItems, groupBy, spaces],
-	);
+	const visibleItems =
+		filter.kind === "type"
+			? libraryItems.filter((item) => item.type === filter.value)
+			: filter.kind === "group"
+				? libraryItems.filter((item) => item.spaceId === filter.value)
+				: filter.kind === "tag"
+					? libraryItems.filter((item) => item.tags?.includes(filter.value))
+					: libraryItems;
+	const groupedItems = buildLibraryGroups(visibleItems, groupBy, spaces);
+	const activeFilterLabel =
+		filter.kind === "type"
+			? (LIBRARY_TYPES.find((type) => type.id === filter.value)?.label ?? "Type")
+			: filter.kind === "group"
+				? spaceName(spaces, filter.value)
+				: filter.kind === "tag"
+					? `#${filter.value}`
+					: "All library";
 
 	const addLibraryItem = () => {
 		const value = text.trim();
@@ -107,14 +114,6 @@ export function LibraryView() {
 
 	return (
 		<section className="flex h-full bg-[#151310] text-white">
-			<LibrarySecondSidebar
-				filter={filter}
-				onFilter={setFilter}
-				items={libraryItems}
-				spaces={spaces}
-				tags={libraryTags}
-			/>
-
 			<div className="min-w-0 flex-1 overflow-y-auto px-6 py-8 lg:px-10">
 				<div className="mx-auto max-w-[920px]">
 					<div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
@@ -128,20 +127,44 @@ export function LibraryView() {
 							</p>
 						</div>
 
-						<Tabs value={groupBy} onValueChange={(value) => setGroupBy(value as LibraryGroupBy)}>
-							<TabsList className="rounded-[8px] bg-[#23201d] p-1">
-								{(["type", "group", "tag"] as LibraryGroupBy[]).map((value) => (
-									<TabsTrigger
-										key={value}
-										value={value}
-										className="h-8 rounded-[6px] px-3 capitalize text-[#948c82] data-active:bg-[#312d28] data-active:text-white"
-									>
-										{value}
-									</TabsTrigger>
-								))}
-							</TabsList>
-						</Tabs>
+						<div className="flex flex-wrap items-center gap-2">
+							<LibraryFilterMenu
+								filter={filter}
+								label={activeFilterLabel}
+								onFilter={setFilter}
+								items={libraryItems}
+								spaces={spaces}
+								tags={libraryTags}
+							/>
+							<Tabs value={groupBy} onValueChange={(value) => setGroupBy(value as LibraryGroupBy)}>
+								<TabsList className="rounded-[8px] bg-[#23201d] p-1">
+									{(["type", "group", "tag"] as LibraryGroupBy[]).map((value) => (
+										<TabsTrigger
+											key={value}
+											value={value}
+											className="h-8 rounded-[6px] px-3 capitalize text-[#948c82] data-active:bg-[#312d28] data-active:text-white"
+										>
+											{value}
+										</TabsTrigger>
+									))}
+								</TabsList>
+							</Tabs>
+						</div>
 					</div>
+
+					{filter.kind !== "all" ? (
+						<div className="mt-5 flex flex-wrap items-center gap-2 text-sm">
+							<span className="text-[#736c63]">Filtered by</span>
+							<button
+								type="button"
+								onClick={() => setFilter({ kind: "all", value: "all" })}
+								className="flex items-center gap-2 rounded-[999px] border border-[#2d2924] bg-[#201d19] px-3 py-1.5 font-semibold text-[#d7cec4] hover:border-[#3a3530]"
+							>
+								{activeFilterLabel}
+								<Icons.x className="size-3.5 text-[#82786e]" />
+							</button>
+						</div>
+					) : null}
 
 					<div className="mt-7 flex gap-2 rounded-[9px] border border-[#2a2621] bg-[#1b1815] p-2">
 						<Input
@@ -187,140 +210,155 @@ export function LibraryView() {
 	);
 }
 
-function LibrarySecondSidebar({
+function LibraryFilterMenu({
 	filter,
+	label,
 	onFilter,
 	items,
 	spaces,
 	tags,
 }: {
 	filter: LibraryFilter;
+	label: string;
 	onFilter: (filter: LibraryFilter) => void;
 	items: Item[];
 	spaces: Space[];
 	tags: string[];
 }) {
 	return (
-		<aside className="hidden w-[248px] shrink-0 overflow-y-auto border-[#292622] border-r bg-[#100f0d] px-3 py-5 lg:block">
-			<SidebarButton
-				active={filter.kind === "all"}
-				label="All library"
-				count={items.length}
-				icon={<Icons.book className="size-4" />}
-				onClick={() => onFilter({ kind: "all", value: "all" })}
-			/>
-
-			<SidebarSection title="Types">
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={
+					<Button
+						type="button"
+						variant="ghost"
+						className="h-9 rounded-[7px] border border-[#2a2621] bg-[#1b1815] px-3 text-[#d7cec4] hover:text-white"
+					/>
+				}
+			>
+				<Icons.search className="size-4 text-[#907ce8]" />
+				<span className="max-w-[160px] truncate">{label}</span>
+				<Icons.chevronRight className="size-4 rotate-90 text-[#736c63]" />
+			</DropdownMenuTrigger>
+			<DropdownMenuContent
+				align="end"
+				className="w-[280px] border border-[#302c27] bg-[#181613] p-1 text-[#d7cec4]"
+			>
+				<DropdownMenuItem
+					onClick={() => onFilter({ kind: "all", value: "all" })}
+					className={cn("justify-between", filter.kind === "all" && "bg-[#25211d] text-white")}
+				>
+					<span className="flex items-center gap-2">
+						<Icons.book className="size-4 text-[#907ce8]" />
+						All library
+					</span>
+					<CountBadge count={items.length} />
+				</DropdownMenuItem>
+				<DropdownMenuSeparator className="my-1 bg-[#2a2621]" />
+				<DropdownLabel>Types</DropdownLabel>
 				{LIBRARY_TYPES.map((type) => (
-					<SidebarButton
+					<DropdownMenuItem
 						key={type.id}
-						active={filter.kind === "type" && filter.value === type.id}
-						label={type.label}
-						count={items.filter((item) => item.type === type.id).length}
-						icon={type.id === "link" ? <Icons.link className="size-4" /> : <Icons.sparkles className="size-4" />}
 						onClick={() => onFilter({ kind: "type", value: type.id })}
-					/>
+						className={cn(
+							"justify-between",
+							filter.kind === "type" && filter.value === type.id && "bg-[#25211d] text-white",
+						)}
+					>
+						<span className="flex items-center gap-2">
+							{type.id === "link" ? <Icons.link className="size-4" /> : <Icons.sparkles className="size-4" />}
+							{type.label}
+						</span>
+						<CountBadge count={items.filter((item) => item.type === type.id).length} />
+					</DropdownMenuItem>
 				))}
-			</SidebarSection>
-
-			<SidebarSection title="Groups">
+				<DropdownMenuSeparator className="my-1 bg-[#2a2621]" />
+				<DropdownLabel>Groups</DropdownLabel>
 				{spaces.map((space) => (
-					<SidebarButton
+					<DropdownMenuItem
 						key={space.id}
-						active={filter.kind === "group" && filter.value === space.id}
-						label={space.name}
-						count={items.filter((item) => item.spaceId === space.id).length}
-						icon={<Icons.book className="size-4" />}
 						onClick={() => onFilter({ kind: "group", value: space.id })}
-					/>
+						className={cn(
+							"justify-between",
+							filter.kind === "group" && filter.value === space.id && "bg-[#25211d] text-white",
+						)}
+					>
+						<span className="truncate">{space.name}</span>
+						<CountBadge count={items.filter((item) => item.spaceId === space.id).length} />
+					</DropdownMenuItem>
 				))}
-			</SidebarSection>
-
-			<SidebarSection title="Tags">
+				<DropdownMenuSeparator className="my-1 bg-[#2a2621]" />
+				<DropdownLabel>Tags</DropdownLabel>
 				{tags.length === 0 ? (
-					<p className="px-3 py-2 text-[#5f574f] text-xs">No library tags yet</p>
+					<div className="px-2 py-2 text-[#5f574f] text-xs">No library tags yet</div>
 				) : (
 					tags.map((tag) => (
-						<SidebarButton
+						<DropdownMenuItem
 							key={tag}
-							active={filter.kind === "tag" && filter.value === tag}
-							label={`#${tag}`}
-							count={items.filter((item) => item.tags?.includes(tag)).length}
-							icon={<Icons.flag className="size-4" />}
 							onClick={() => onFilter({ kind: "tag", value: tag })}
-						/>
+							className={cn(
+								"justify-between",
+								filter.kind === "tag" && filter.value === tag && "bg-[#25211d] text-white",
+							)}
+						>
+							<span className="truncate">#{tag}</span>
+							<CountBadge count={items.filter((item) => item.tags?.includes(tag)).length} />
+						</DropdownMenuItem>
 					))
 				)}
-			</SidebarSection>
-		</aside>
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }
 
-function SidebarSection({ title, children }: { title: string; children: React.ReactNode }) {
+function CountBadge({ count }: { count: number }) {
 	return (
-		<div className="mt-6">
-			<p className="mb-2 px-3 font-bold text-[#736c63] text-[11px] uppercase tracking-[0.14em]">
-				{title}
-			</p>
-			<div className="space-y-1">{children}</div>
-		</div>
+		<span className="rounded-[5px] bg-[#252220] px-1.5 py-0.5 font-mono text-[#82786e] text-[11px]">
+			{count}
+		</span>
 	);
 }
 
-function SidebarButton({
-	active,
-	label,
-	count,
-	icon,
-	onClick,
-}: {
-	active: boolean;
-	label: string;
-	count: number;
-	icon: React.ReactNode;
-	onClick: () => void;
-}) {
-	return (
-		<button
-			type="button"
-			onClick={onClick}
-			className={cn(
-				"flex w-full items-center gap-3 rounded-[7px] px-3 py-2 text-left text-sm transition-colors",
-				active ? "bg-[#22201f] text-white" : "text-[#b7afa5] hover:bg-[#171614] hover:text-white",
-			)}
-		>
-			<span className="text-[#907ce8]">{icon}</span>
-			<span className="min-w-0 flex-1 truncate font-semibold">{label}</span>
-			<span className="rounded-[5px] bg-[#252220] px-1.5 py-0.5 font-mono text-[#82786e] text-[11px]">
-				{count}
-			</span>
-		</button>
-	);
+function DropdownLabel({ children }: { children: React.ReactNode }) {
+	return <div className="px-2 py-2 text-[#736c63] text-xs">{children}</div>;
 }
 
 function buildLibraryGroups(items: Item[], groupBy: LibraryGroupBy, spaces: Space[]) {
 	if (groupBy === "type") {
-		return LIBRARY_TYPES.map((type) => ({
-			id: type.id,
-			title: type.label,
-			items: items.filter((item) => item.type === type.id),
-		})).filter((group) => group.items.length > 0);
+		const groups = new Map<LibraryType, Item[]>();
+		for (const type of LIBRARY_TYPES) groups.set(type.id, []);
+		for (const item of items) {
+			if (item.type === "thought" || item.type === "link") groups.get(item.type)?.push(item);
+		}
+		return LIBRARY_TYPES.flatMap((type) => {
+			const groupItems = groups.get(type.id) ?? [];
+			return groupItems.length ? [{ id: type.id, title: type.label, items: groupItems }] : [];
+		});
 	}
 	if (groupBy === "group") {
-		return spaces
-			.map((space) => ({
-				id: space.id,
-				title: space.name,
-				items: items.filter((item) => item.spaceId === space.id),
-			}))
-			.filter((group) => group.items.length > 0);
+		const groups = new Map<string, Item[]>();
+		for (const space of spaces) groups.set(space.id, []);
+		for (const item of items) groups.get(item.spaceId)?.push(item);
+		return spaces.flatMap((space) => {
+			const groupItems = groups.get(space.id) ?? [];
+			return groupItems.length ? [{ id: space.id, title: space.name, items: groupItems }] : [];
+		});
 	}
-	const tags = [...new Set(items.flatMap((item) => item.tags?.length ? item.tags : ["untagged"]))].sort();
-	return tags.map((tag) => ({
-		id: tag,
-		title: tag === "untagged" ? "Untagged" : `#${tag}`,
-		items: items.filter((item) => (item.tags?.length ? item.tags : ["untagged"]).includes(tag)),
-	}));
+	const groups = new Map<string, Item[]>();
+	for (const item of items) {
+		const itemTags = item.tags?.length ? item.tags : ["untagged"];
+		for (const tag of itemTags) {
+			if (!groups.has(tag)) groups.set(tag, []);
+			groups.get(tag)?.push(item);
+		}
+	}
+	return [...groups.entries()]
+		.toSorted(([a], [b]) => a.localeCompare(b))
+		.map(([tag, groupItems]) => ({
+			id: tag,
+			title: tag === "untagged" ? "Untagged" : `#${tag}`,
+			items: groupItems,
+		}));
 }
 
 function LibraryGroup({

@@ -226,24 +226,35 @@ export function QuickCaptureBar() {
   // Highlight pulse when expanded externally (hotkey, top-bar button)
   useEffect(() => {
     if (quickCaptureHighlight === 0) return;
-    setMode(quickCaptureMode ?? contextualMode);
-    setHighlight(true);
-    requestAnimationFrame(() => inputRef.current?.focus());
-    const t = setTimeout(() => setHighlight(false), 700);
-    return () => clearTimeout(t);
+    const start = window.setTimeout(() => {
+      setMode(quickCaptureMode ?? contextualMode);
+      setHighlight(true);
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }, 0);
+    const end = window.setTimeout(() => setHighlight(false), 700);
+    return () => {
+      window.clearTimeout(start);
+      window.clearTimeout(end);
+    };
   }, [contextualMode, quickCaptureHighlight, quickCaptureMode]);
 
   // Reset thought notes mode when leaving Thought
   useEffect(() => {
-    if (mode !== "thought") setThoughtNotesMode(false);
-    if (mode !== "task") { setPendingTasks([]); setBatchTags([]); setBatchSomeday(false); }
+    const timeout = window.setTimeout(() => {
+      if (mode !== "thought") setThoughtNotesMode(false);
+      if (mode !== "task") { setPendingTasks([]); setBatchTags([]); setBatchSomeday(false); }
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [mode]);
 
   // Auto-detect URL paste -> link mode (only when not in notes mode)
   useEffect(() => {
-    if (mode === "thought" && !thoughtNotesMode && text.length > 6 && isValidUrl(text.trim())) {
-      setMode("link");
-    }
+    const timeout = window.setTimeout(() => {
+      if (mode === "thought" && !thoughtNotesMode && text.length > 6 && isValidUrl(text.trim())) {
+        setMode("link");
+      }
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [text, mode, thoughtNotesMode]);
 
   // Auto-grow textarea

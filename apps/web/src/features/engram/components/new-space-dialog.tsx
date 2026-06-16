@@ -73,7 +73,6 @@ export function NewSpaceDialog() {
 	// Auto-focus name input when dialog opens
 	useEffect(() => {
 		if (newSpaceDialogOpen) {
-			setSection("name");
 			requestAnimationFrame(() => inputRef.current?.focus());
 		}
 	}, [newSpaceDialogOpen]);
