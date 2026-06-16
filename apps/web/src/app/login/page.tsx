@@ -76,9 +76,11 @@ export default function LoginPage() {
       <div className="fade-up w-full max-w-sm">
         {/* Brand mark */}
         <div className="mb-10 flex flex-col items-center text-center">
-          <div className="mb-6 flex size-11 items-center justify-center rounded-[12px] bg-brand-surface">
-            <span className="font-serif text-xl text-brand-soft">E</span>
-          </div>
+          <img
+            src="/favicon.ico"
+            alt="Engram"
+            className="mb-6 size-20 rounded-[12px]"
+          />
           <h1 className="font-serif text-3xl font-medium tracking-tight text-ink-bright">
             Welcome to Engram
           </h1>
