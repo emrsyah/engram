@@ -60,14 +60,10 @@ type TasksPrefs = {
 type TasksUiState = {
 	newTask: string;
 	focusedTaskId?: string;
-	blitzOpen: boolean;
-	blitzSession: number;
 };
 type TasksUiAction =
 	| { type: "newTask"; newTask: string }
-	| { type: "focusTask"; taskId?: string }
-	| { type: "openBlitz" }
-	| { type: "blitzOpen"; open: boolean };
+	| { type: "focusTask"; taskId?: string };
 
 const SECTIONS: { id: SectionId; label: string; hint: string }[] = [
 	{ id: "later", label: "Backlog", hint: "Captured, not planned yet" },
@@ -87,8 +83,6 @@ const DEFAULT_TASKS_PREFS: TasksPrefs = {
 
 const INITIAL_TASKS_UI: TasksUiState = {
 	newTask: "",
-	blitzOpen: false,
-	blitzSession: 0,
 };
 
 function tasksUiReducer(state: TasksUiState, action: TasksUiAction): TasksUiState {
@@ -97,10 +91,6 @@ function tasksUiReducer(state: TasksUiState, action: TasksUiAction): TasksUiStat
 			return { ...state, newTask: action.newTask };
 		case "focusTask":
 			return { ...state, focusedTaskId: action.taskId };
-		case "openBlitz":
-			return { ...state, blitzOpen: true, blitzSession: state.blitzSession + 1 };
-		case "blitzOpen":
-			return { ...state, blitzOpen: action.open };
 	}
 }
 
@@ -108,7 +98,7 @@ function taskTitle(task: Item) {
 	return task.title ?? task.text ?? "Untitled task";
 }
 
-function sortTasks(tasks: Item[]) {
+export function sortTasks(tasks: Item[]) {
 	return tasks.toSorted((a, b) => {
 		if (a.done !== b.done) return a.done ? 1 : -1;
 		const orderA = a.taskSortOrder ?? Number.MAX_SAFE_INTEGER;
@@ -138,7 +128,7 @@ function dateBucket(dueAt?: string): PlanningSectionId | undefined {
  *  2. Otherwise the due date decides (today → Today, later → This week).
  *  3. Dateless tasks fall to Backlog.
  */
-function sectionOf(task: Item): SectionId {
+export function sectionOf(task: Item): SectionId {
 	if (task.done) return "done";
 	if (task.taskQueue === "now") return "now";
 	if (task.taskQueue === "next") return "next";
@@ -170,7 +160,7 @@ function formatBlitzSeconds(seconds: number) {
 export function TasksView() {
 	const { allTaskItems, allTags, createItem, spaces, setTaskQueue, toggleDone, updateItem } =
 		useEngramStore();
-	const { openDetail } = useUIStore();
+	const { openDetail, openBlitz } = useUIStore();
 	const [ui, dispatchUi] = useReducer(tasksUiReducer, INITIAL_TASKS_UI);
 	const [prefs, setPrefs] = usePersistentState<TasksPrefs>(TASKS_PREFS_KEY, DEFAULT_TASKS_PREFS);
 
@@ -238,10 +228,6 @@ export function TasksView() {
 		}
 		setTaskQueue(task.id, "now", 0);
 		dispatchUi({ type: "focusTask", taskId: task.id });
-	};
-
-	const openBlitz = () => {
-		dispatchUi({ type: "openBlitz" });
 	};
 
 	const handleDragEnd = ({ active, over }: DragEndEvent) => {
@@ -422,15 +408,6 @@ export function TasksView() {
 					/>
 				</div>
 			</div>
-			{ui.blitzOpen ? (
-				<BlitzDialog
-					key={ui.blitzSession}
-					open={ui.blitzOpen}
-					onOpenChange={(open) => dispatchUi({ type: "blitzOpen", open })}
-					tasks={tasksBySection.get("now") ?? []}
-					onComplete={(id) => toggleDone(id)}
-				/>
-			) : null}
 		</section>
 	);
 }
@@ -699,48 +676,41 @@ function DropdownLabel({ children }: { children: React.ReactNode }) {
 	return <div className="px-2 py-2 text-ink-dim text-xs">{children}</div>;
 }
 
-function BlitzDialog({
+export function BlitzDialog({
 	open,
-	onOpenChange,
+	onClose,
 	tasks,
+	secondsLeft,
+	running,
+	activeIndex,
+	duration,
+	onToggleRun,
+	onReset,
 	onComplete,
 }: {
 	open: boolean;
-	onOpenChange: (open: boolean) => void;
+	onClose: () => void;
 	tasks: Item[];
+	secondsLeft: number;
+	running: boolean;
+	activeIndex: number;
+	duration: number;
+	onToggleRun: () => void;
+	onReset: () => void;
 	onComplete: (id: string) => void;
 }) {
-	const [activeIndex, setActiveIndex] = useState(0);
-	const [secondsLeft, setSecondsLeft] = useState(45 * 60);
-	const [running, setRunning] = useState(false);
-	const activeTask = tasks[activeIndex];
-	const elapsed = 45 * 60 - secondsLeft;
-	const progress = elapsed / (45 * 60);
-
-	useEffect(() => {
-		if (!running) return;
-		const id = window.setInterval(() => {
-			setSecondsLeft((current) => {
-				if (current <= 1) {
-					setRunning(false);
-					return 0;
-				}
-				return current - 1;
-			});
-		}, 1000);
-		return () => window.clearInterval(id);
-	}, [running]);
+	const safeIndex = Math.min(activeIndex, Math.max(tasks.length - 1, 0));
+	const activeTask = tasks[safeIndex];
+	const elapsed = duration - secondsLeft;
+	const progress = elapsed / duration;
 
 	const complete = () => {
 		if (!activeTask) return;
 		onComplete(activeTask.id);
-		setActiveIndex((index) => Math.min(index + 1, Math.max(tasks.length - 1, 0)));
-		setSecondsLeft(45 * 60);
-		setRunning(false);
 	};
 
 	return (
-		<Dialog open={open} onOpenChange={onOpenChange}>
+		<Dialog open={open} onOpenChange={(value) => (value ? undefined : onClose())}>
 			<DialogContent
 				showCloseButton={false}
 				className="inset-0 top-0 left-0 max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 bg-void p-0 text-white ring-0 sm:max-w-none"
@@ -752,13 +722,13 @@ function BlitzDialog({
 						<div className="font-mono text-xs uppercase tracking-[0.28em] text-brand">
 							Blitz{" "}
 							<span className="ml-2 text-ink-dim">
-								{Math.min(activeIndex + 1, tasks.length || 1)} of {tasks.length || 1}
+								{Math.min(safeIndex + 1, tasks.length || 1)} of {tasks.length || 1}
 							</span>
 						</div>
 						<Button
 							type="button"
 							variant="ghost"
-							onClick={() => onOpenChange(false)}
+							onClick={onClose}
 							className="h-9 rounded-[8px] border border-white/10 bg-white/[0.03] px-3 text-ink-3 hover:text-white"
 						>
 							Exit
@@ -790,17 +760,14 @@ function BlitzDialog({
 						<div className="mt-9 flex items-center gap-3">
 							<button
 								type="button"
-								onClick={() => {
-									setSecondsLeft(45 * 60);
-									setRunning(false);
-								}}
+								onClick={onReset}
 								className="grid size-12 place-items-center rounded-full border border-white/15 bg-white/[0.04] text-ink-3"
 							>
 								<Icons.rotate className="size-5" />
 							</button>
 							<button
 								type="button"
-								onClick={() => setRunning((value) => !value)}
+								onClick={onToggleRun}
 								className="grid size-[72px] place-items-center rounded-full bg-brand text-white shadow-[0_0_32px_rgba(136,117,238,0.45)]"
 							>
 								{running ? <PauseGlyph /> : <PlayGlyph />}
@@ -816,12 +783,12 @@ function BlitzDialog({
 						<div className="mt-20 w-full max-w-[700px] text-left">
 							<p className="mb-3 font-bold text-ink-dim text-xs uppercase tracking-[0.14em]">Up next</p>
 							<div className="space-y-2">
-								{tasks.slice(activeIndex + 1, activeIndex + 4).map((task, index) => (
+								{tasks.slice(safeIndex + 1, safeIndex + 4).map((task, index) => (
 									<div
 										key={task.id}
 										className="flex items-center gap-3 rounded-[8px] border border-white/10 bg-white/[0.03] px-4 py-3 text-ink-3"
 									>
-										<span className="font-mono text-ink-dim text-xs">{activeIndex + index + 2}</span>
+										<span className="font-mono text-ink-dim text-xs">{safeIndex + index + 2}</span>
 										<span className="size-2 rounded-full bg-blue" />
 										<span className="min-w-0 flex-1 truncate text-sm">{taskTitle(task)}</span>
 									</div>

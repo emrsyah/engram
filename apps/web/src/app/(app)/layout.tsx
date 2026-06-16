@@ -1,5 +1,6 @@
 import { AuthGuard } from "@/components/auth-guard";
 import { AppSidebar } from "@/features/engram/components/app-sidebar";
+import { BlitzContainer } from "@/features/engram/components/blitz-container";
 
 import { Hotkeys } from "@/features/engram/components/hotkeys";
 import { ItemDetailPanel } from "@/features/engram/components/item-detail-panel";
@@ -33,6 +34,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <NewSpaceDialog />
               <EditSpaceDialog />
               <DeleteSpaceDialog />
+              <BlitzContainer />
             </main>
           </div>
         </UIProvider>

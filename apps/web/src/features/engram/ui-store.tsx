@@ -1,14 +1,29 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 
 type QuickCaptureMode = "thought" | "task" | "link" | "attach";
 type QuickCaptureIntent = "focus-task";
+
+/** Blitz session length, in seconds (45 min). */
+export const BLITZ_DURATION = 45 * 60;
 
 type UIStore = {
   timerOpen: boolean;
   scratchpadOpen: boolean;
   focusTasksOpen: boolean;
+  // Blitz focus mode — lives here (above the page) so the timer keeps running
+  // while navigating between views.
+  blitzOpen: boolean;
+  blitzRunning: boolean;
+  blitzSecondsLeft: number;
+  blitzActiveIndex: number;
+  blitzDuration: number;
+  openBlitz: () => void;
+  closeBlitz: () => void;
+  toggleBlitzRunning: () => void;
+  resetBlitz: () => void;
+  advanceBlitz: () => void;
   newSpaceDialogOpen: boolean;
   editingSpaceId?: string;
   deletingSpaceId?: string;
@@ -78,6 +93,49 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const [deletingSpaceId, setDeletingSpaceId] = useState<string>();
   const toggleTimer = useCallback(() => setTimerOpen((v) => !v), []);
   const toggleScratchpad = useCallback(() => setScratchpadOpen((v) => !v), []);
+
+  const [blitzOpen, setBlitzOpen] = useState(false);
+  const [blitzRunning, setBlitzRunning] = useState(false);
+  const [blitzSecondsLeft, setBlitzSecondsLeft] = useState(BLITZ_DURATION);
+  const [blitzActiveIndex, setBlitzActiveIndex] = useState(0);
+
+  const openBlitz = useCallback(() => {
+    setBlitzActiveIndex(0);
+    setBlitzSecondsLeft(BLITZ_DURATION);
+    setBlitzRunning(false);
+    setBlitzOpen(true);
+  }, []);
+  const closeBlitz = useCallback(() => {
+    setBlitzOpen(false);
+    setBlitzRunning(false);
+  }, []);
+  const toggleBlitzRunning = useCallback(() => setBlitzRunning((v) => !v), []);
+  const resetBlitz = useCallback(() => {
+    setBlitzSecondsLeft(BLITZ_DURATION);
+    setBlitzRunning(false);
+  }, []);
+  const advanceBlitz = useCallback(() => {
+    setBlitzActiveIndex((i) => i + 1);
+    setBlitzSecondsLeft(BLITZ_DURATION);
+    setBlitzRunning(false);
+  }, []);
+
+  // The single source of truth for the countdown. Runs in the provider (which
+  // sits above the router outlet), so it ticks regardless of the active page.
+  useEffect(() => {
+    if (!blitzRunning) return;
+    const id = window.setInterval(() => {
+      setBlitzSecondsLeft((current) => {
+        if (current <= 1) {
+          setBlitzRunning(false);
+          return 0;
+        }
+        return current - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [blitzRunning]);
+
   const toggleFocusTasks = useCallback(() => setFocusTasksOpen((v) => !v), []);
   const openNewSpaceDialog = useCallback(() => setNewSpaceDialogOpen(true), []);
   const closeNewSpaceDialog = useCallback(() => setNewSpaceDialogOpen(false), []);
@@ -122,6 +180,16 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         timerOpen,
         scratchpadOpen,
         focusTasksOpen,
+        blitzOpen,
+        blitzRunning,
+        blitzSecondsLeft,
+        blitzActiveIndex,
+        blitzDuration: BLITZ_DURATION,
+        openBlitz,
+        closeBlitz,
+        toggleBlitzRunning,
+        resetBlitz,
+        advanceBlitz,
         newSpaceDialogOpen,
         editingSpaceId,
         deletingSpaceId,
