@@ -25,11 +25,24 @@ export function TopBar() {
 		sidebarCollapsed,
 		toggleSidebar,
 		openShortcuts,
+		openMobileNav,
 	} = useUIStore();
 
 	return (
 		<header className="relative flex h-14 shrink-0 items-center justify-between border-line border-b bg-base px-5">
 			<div className="flex min-w-0 items-center gap-3">
+				{/* Mobile: open nav drawer */}
+				<Button
+					type="button"
+					variant="ghost"
+					size="icon-xs"
+					onClick={openMobileNav}
+					title="Open navigation"
+					className="mr-1 text-ink-faint hover:text-ink-2 md:hidden"
+				>
+					<Icons.panel className="size-4" />
+				</Button>
+				{/* Desktop: expand collapsed sidebar */}
 				{sidebarCollapsed && (
 					<Button
 						type="button"
@@ -37,7 +50,7 @@ export function TopBar() {
 						size="icon-xs"
 						onClick={toggleSidebar}
 						title="Open sidebar  ["
-						className="mr-1 text-ink-faint hover:text-ink-2"
+						className="mr-1 hidden text-ink-faint hover:text-ink-2 md:inline-flex"
 					>
 						<Icons.chevronRight className="size-4" />
 					</Button>

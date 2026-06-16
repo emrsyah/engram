@@ -98,6 +98,7 @@ type UIStore = {
   searchOpen: boolean;
   shortcutsOpen: boolean;
   sidebarCollapsed: boolean;
+  mobileNavOpen: boolean;
   linkSourceId?: string;
   detailItemId?: string;
   noteEditorItemId?: string;
@@ -113,6 +114,8 @@ type UIStore = {
   openShortcuts: () => void;
   closeShortcuts: () => void;
   toggleSidebar: () => void;
+  openMobileNav: () => void;
+  closeMobileNav: () => void;
   setLinkSource: (id?: string) => void;
   openDetail: (id: string) => void;
   closeDetail: () => void;
@@ -132,6 +135,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [linkSourceId, setLinkSourceId] = useState<string>();
   const [detailItemId, setDetailItemId] = useState<string>();
   const [noteEditorItemId, setNoteEditorItemId] = useState<string>();
@@ -289,6 +293,8 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const openShortcuts  = useCallback(() => setShortcutsOpen(true), []);
   const closeShortcuts = useCallback(() => setShortcutsOpen(false), []);
   const toggleSidebar  = useCallback(() => setSidebarCollapsed((v) => !v), []);
+  const openMobileNav  = useCallback(() => setMobileNavOpen(true), []);
+  const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
   const setLinkSource  = useCallback((id?: string) => setLinkSourceId(id), []);
   const openDetail     = useCallback((id: string) => setDetailItemId(id), []);
   const closeDetail    = useCallback(() => setDetailItemId(undefined), []);
@@ -345,6 +351,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         searchOpen,
         shortcutsOpen,
         sidebarCollapsed,
+        mobileNavOpen,
         linkSourceId,
         detailItemId,
         noteEditorItemId,
@@ -361,6 +368,8 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         openShortcuts,
         closeShortcuts,
         toggleSidebar,
+        openMobileNav,
+        closeMobileNav,
         setLinkSource,
         openDetail,
         closeDetail,

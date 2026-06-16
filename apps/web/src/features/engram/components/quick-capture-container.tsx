@@ -8,8 +8,10 @@ export function QuickCaptureContainer() {
 
   return (
     <div
-      className="pointer-events-none fixed bottom-6 right-0 z-50 flex justify-center px-4 transition-[left] duration-200"
-      style={{ left: sidebarCollapsed ? 0 : 252 }}
+      className="pointer-events-none fixed right-0 bottom-6 left-0 z-30 flex justify-center px-4 transition-[left] duration-200 md:left-[var(--qc-left)]"
+      style={
+        { "--qc-left": sidebarCollapsed ? "0px" : "252px" } as Record<string, string>
+      }
     >
       <div className="pointer-events-auto">
         <QuickCaptureBar />

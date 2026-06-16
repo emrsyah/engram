@@ -26,7 +26,8 @@ const navItemClass = "h-[40px] w-full justify-start gap-3 rounded-[7px] px-3 py-
 export function AppSidebar() {
 	const pathname = usePathname();
 	const router = useRouter();
-	const { sidebarCollapsed, toggleSidebar } = useUIStore();
+	const { sidebarCollapsed, toggleSidebar, mobileNavOpen, closeMobileNav } =
+		useUIStore();
 
 	const [confirmLogout, setConfirmLogout] = useState(false);
 	const [signingOut, setSigningOut] = useState(false);
@@ -46,14 +47,28 @@ export function AppSidebar() {
 	};
 
 	return (
-		<aside
-			className={cn(
-				"hidden shrink-0 border-line border-r bg-void text-ink-2 md:flex md:flex-col",
-				"overflow-hidden transition-[width] duration-200",
-				sidebarCollapsed ? "w-0 border-r-0" : "w-[220px]",
+		<>
+			{/* Mobile backdrop — tap to dismiss the drawer */}
+			{mobileNavOpen && (
+				<button
+					type="button"
+					aria-label="Close navigation"
+					onClick={closeMobileNav}
+					className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
+				/>
 			)}
-		>
-			<div className="flex h-16 w-[220px] items-center justify-between px-5">
+			<aside
+				className={cn(
+					"flex shrink-0 flex-col border-line border-r bg-void text-ink-2",
+					// Mobile: fixed slide-in drawer
+					"fixed inset-y-0 left-0 z-50 w-[260px] max-w-[80vw] transition-transform duration-200",
+					mobileNavOpen ? "translate-x-0" : "-translate-x-full",
+					// Desktop: in-flow, collapsible width
+					"md:static md:z-auto md:max-w-none md:translate-x-0 md:overflow-hidden md:transition-[width]",
+					sidebarCollapsed ? "md:w-0 md:border-r-0" : "md:w-[220px]",
+				)}
+			>
+			<div className="flex h-16 w-full items-center justify-between px-5 md:w-[220px]">
 				<div className="flex items-center gap-3 font-bold text-lg text-white">
 					<img
 						src="/favicon.ico"
@@ -63,14 +78,25 @@ export function AppSidebar() {
 					/>
 					Engram
 				</div>
+				{/* Desktop: collapse sidebar */}
 				<Button
 					variant="ghost"
 					size="icon-xs"
-					className="text-ink-faint hover:text-ink-2"
+					className="hidden text-ink-faint hover:text-ink-2 md:inline-flex"
 					onClick={toggleSidebar}
 					title="Toggle sidebar  ["
 				>
 					<Icons.chevronLeft className="size-4" />
+				</Button>
+				{/* Mobile: close drawer */}
+				<Button
+					variant="ghost"
+					size="icon-xs"
+					className="text-ink-faint hover:text-ink-2 md:hidden"
+					onClick={closeMobileNav}
+					title="Close navigation"
+				>
+					<Icons.x className="size-4" />
 				</Button>
 			</div>
 
@@ -82,6 +108,7 @@ export function AppSidebar() {
 						<Link
 							key={href}
 							href={href as Route<string>}
+							onClick={closeMobileNav}
 							className={cn(
 								buttonVariants({ variant: "ghost" }),
 								navItemClass,
@@ -153,6 +180,7 @@ export function AppSidebar() {
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
-		</aside>
+			</aside>
+		</>
 	);
 }
