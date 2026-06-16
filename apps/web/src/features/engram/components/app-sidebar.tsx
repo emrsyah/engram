@@ -1,10 +1,21 @@
 "use client";
 
 import { Button, buttonVariants } from "@alphonse/ui/components/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@alphonse/ui/components/dialog";
 import { cn } from "@alphonse/ui/lib/utils";
 import type { Route } from "next";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
+
+import { authClient } from "@/lib/auth-client";
 
 import { NAV_VIEWS } from "../nav";
 import { useUIStore } from "../ui-store";
@@ -14,7 +25,25 @@ const navItemClass = "h-[40px] w-full justify-start gap-3 rounded-[7px] px-3 py-
 
 export function AppSidebar() {
 	const pathname = usePathname();
+	const router = useRouter();
 	const { sidebarCollapsed, toggleSidebar } = useUIStore();
+
+	const [confirmLogout, setConfirmLogout] = useState(false);
+	const [signingOut, setSigningOut] = useState(false);
+
+	const handleLogout = async () => {
+		setSigningOut(true);
+		await authClient.signOut({
+			fetchOptions: {
+				onSuccess: () => {
+					router.replace("/login");
+				},
+				onError: () => {
+					setSigningOut(false);
+				},
+			},
+		});
+	};
 
 	return (
 		<aside
@@ -68,11 +97,62 @@ export function AppSidebar() {
 				})}
 			</nav>
 
-			<div className="mt-auto flex items-center justify-between px-5 py-5 text-ink-dim">
-				<Icons.search className="size-4" />
-				<Icons.settings className="size-4" />
-				<Icons.info className="size-4" />
+			<div className="mt-auto px-3 pb-4">
+				<button
+					type="button"
+					onClick={() => setConfirmLogout(true)}
+					className={cn(
+						buttonVariants({ variant: "ghost" }),
+						navItemClass,
+						"text-ink-muted hover:bg-fill hover:text-coral",
+					)}
+				>
+					<Icons.logout className="size-4" />
+					Log out
+				</button>
 			</div>
+
+			<Dialog open={confirmLogout} onOpenChange={setConfirmLogout}>
+				<DialogContent
+					showCloseButton={false}
+					className="rounded-[12px] border-line-soft bg-panel sm:max-w-[400px] p-0 gap-0 overflow-hidden"
+				>
+					<DialogHeader className="border-line-soft border-b px-5 py-4">
+						<DialogTitle className="font-bold text-white text-base">
+							Log out of Engram?
+						</DialogTitle>
+						<DialogDescription className="text-ink-muted text-sm">
+							You’ll need to sign in with Google again to get back in.
+						</DialogDescription>
+					</DialogHeader>
+
+					<DialogFooter className="border-line-soft border-t px-5 py-3">
+						<Button
+							variant="ghost"
+							onClick={() => setConfirmLogout(false)}
+							disabled={signingOut}
+							className={cn(
+								"rounded-[8px] text-ink-muted hover:text-white",
+								"transition-[color,background-color,transform] duration-150",
+								"active:scale-[0.97] motion-reduce:active:scale-100",
+							)}
+						>
+							Cancel
+						</Button>
+						<Button
+							onClick={handleLogout}
+							disabled={signingOut}
+							className={cn(
+								"rounded-[8px] bg-coral font-semibold text-white hover:bg-coral disabled:opacity-30",
+								"transition-[background-color,opacity,transform] duration-150",
+								"active:scale-[0.97] motion-reduce:active:scale-100",
+							)}
+						>
+							{signingOut ? "Logging out…" : "Log out"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</aside>
 	);
 }

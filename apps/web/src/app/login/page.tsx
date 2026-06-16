@@ -1,7 +1,8 @@
 "use client";
 
 import { Button } from "@alphonse/ui/components/button";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { authClient } from "@/lib/auth-client";
@@ -30,14 +31,36 @@ function GoogleIcon() {
 }
 
 export default function LoginPage() {
+  const router = useRouter();
+  const { data: session } = authClient.useSession();
   const [isLoading, setIsLoading] = useState(false);
+
+  // Already signed in: don't show the login screen.
+  useEffect(() => {
+    if (session) {
+      router.replace("/");
+    }
+  }, [session, router]);
+
+  // A blocked (non-allowlisted) sign-in fails during the OAuth callback and
+  // redirects back here with an `error` query param — surface it.
+  useEffect(() => {
+    const error = new URLSearchParams(window.location.search).get("error");
+    if (error) {
+      toast.error("This email is not allowed to access Engram.");
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
+    // Absolute URLs: the OAuth flow finishes on the auth server origin, so a
+    // relative callback would resolve there instead of the web app.
     await authClient.signIn.social(
       {
         provider: "google",
-        callbackURL: "/",
+        callbackURL: `${window.location.origin}/tasks`,
+        errorCallbackURL: `${window.location.origin}/login`,
       },
       {
         onError: (error) => {

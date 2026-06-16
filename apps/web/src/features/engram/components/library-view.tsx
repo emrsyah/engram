@@ -17,6 +17,7 @@ import type { LibraryType } from "../projections";
 import { useEngramStore } from "../store";
 import type { Item, Space } from "../types";
 import { useUIStore } from "../ui-store";
+import { usePersistentState } from "../use-persistent-state";
 import { Icons } from "./icons";
 
 type LibraryFilter =
@@ -25,11 +26,51 @@ type LibraryFilter =
 	| { kind: "group"; value: string }
 	| { kind: "tag"; value: string };
 
-type LibraryGroupBy = "type" | "group" | "tag";
+type LibraryGroupBy = "none" | "type" | "group" | "tag";
+type LibraryViewMode = "list" | "moodboard" | "card";
+type LibraryOrderField = "date" | "title" | "type";
+type LibraryOrderDir = "asc" | "desc";
+
+/** Durable view preferences — persisted across navigation and reload. */
+type LibraryPrefs = {
+	filter: LibraryFilter;
+	groupBy: LibraryGroupBy;
+	viewMode: LibraryViewMode;
+	orderField: LibraryOrderField;
+	orderDir: LibraryOrderDir;
+};
+
+const LIBRARY_PREFS_KEY = "engram.library.prefs.v1";
+const DEFAULT_LIBRARY_PREFS: LibraryPrefs = {
+	filter: { kind: "all", value: "all" },
+	groupBy: "none",
+	viewMode: "card",
+	orderField: "date",
+	orderDir: "desc",
+};
 
 const LIBRARY_TYPES: { id: LibraryType; label: string }[] = [
 	{ id: "thought", label: "Ideas" },
 	{ id: "link", label: "Links" },
+];
+
+const VIEW_MODES: { id: LibraryViewMode; label: string; icon: keyof typeof Icons }[] = [
+	{ id: "list", label: "List", icon: "list" },
+	{ id: "moodboard", label: "Moodboard", icon: "image" },
+	{ id: "card", label: "Cards", icon: "layout" },
+];
+
+const ORDER_FIELDS: { id: LibraryOrderField; label: string }[] = [
+	{ id: "date", label: "Date added" },
+	{ id: "title", label: "Title" },
+	{ id: "type", label: "Type" },
+];
+
+const GROUP_BY_OPTIONS: { id: LibraryGroupBy; label: string }[] = [
+	{ id: "none", label: "None" },
+	{ id: "type", label: "Type" },
+	{ id: "group", label: "Group" },
+	{ id: "tag", label: "Tag" },
 ];
 
 function itemTitle(item: Item) {
@@ -62,16 +103,45 @@ function extractDomain(url: string) {
 	}
 }
 
+/** A favicon preview pulled from the link's domain — best-effort, no backend. */
+function faviconUrl(url: string) {
+	try {
+		const domain = new URL(url).hostname;
+		return `https://icons.duckduckgo.com/ip3/${domain}.ico`;
+	} catch {
+		return undefined;
+	}
+}
+
+function sortItems(items: Item[], field: LibraryOrderField, dir: LibraryOrderDir) {
+	const factor = dir === "asc" ? 1 : -1;
+	return items.toSorted((a, b) => {
+		let cmp = 0;
+		if (field === "title") cmp = itemTitle(a).localeCompare(itemTitle(b));
+		else if (field === "type") cmp = a.type.localeCompare(b.type);
+		else cmp = a.createdAt.localeCompare(b.createdAt);
+		if (cmp === 0) cmp = a.createdAt.localeCompare(b.createdAt);
+		return cmp * factor;
+	});
+}
+
 export function LibraryView() {
 	const { allTags, createItem, libraryItems, spaces } = useEngramStore();
 	const { openDetail } = useUIStore();
-	const [filter, setFilter] = useState<LibraryFilter>({ kind: "all", value: "all" });
-	const [groupBy, setGroupBy] = useState<LibraryGroupBy>("type");
-	const [text, setText] = useState("");
+	const [prefs, setPrefs] = usePersistentState<LibraryPrefs>(LIBRARY_PREFS_KEY, DEFAULT_LIBRARY_PREFS);
+	const [text, setText] = usePersistentState<string>("engram.library.draft.v1", "");
+
+	const setFilter = (filter: LibraryFilter) => setPrefs((p) => ({ ...p, filter }));
+	const setGroupBy = (groupBy: LibraryGroupBy) => setPrefs((p) => ({ ...p, groupBy }));
+	const setViewMode = (viewMode: LibraryViewMode) => setPrefs((p) => ({ ...p, viewMode }));
+	const setOrderField = (orderField: LibraryOrderField) => setPrefs((p) => ({ ...p, orderField }));
+	const toggleOrderDir = () =>
+		setPrefs((p) => ({ ...p, orderDir: p.orderDir === "asc" ? "desc" : "asc" }));
 
 	const defaultSpaceId = spaces[0]?.id;
 	const libraryTags = allTags.filter((tag) => libraryItems.some((item) => item.tags?.includes(tag)));
 
+	const filter = prefs.filter;
 	const visibleItems =
 		filter.kind === "type"
 			? libraryItems.filter((item) => item.type === filter.value)
@@ -80,7 +150,8 @@ export function LibraryView() {
 				: filter.kind === "tag"
 					? libraryItems.filter((item) => item.tags?.includes(filter.value))
 					: libraryItems;
-	const groupedItems = buildLibraryGroups(visibleItems, groupBy, spaces);
+	const sortedItems = sortItems(visibleItems, prefs.orderField, prefs.orderDir);
+	const groupedItems = buildLibraryGroups(sortedItems, prefs.groupBy, spaces);
 	const activeFilterLabel =
 		filter.kind === "type"
 			? (LIBRARY_TYPES.find((type) => type.id === filter.value)?.label ?? "Type")
@@ -89,6 +160,7 @@ export function LibraryView() {
 				: filter.kind === "tag"
 					? `#${filter.value}`
 					: "All library";
+	const activeOrderLabel = ORDER_FIELDS.find((o) => o.id === prefs.orderField)?.label ?? "Date added";
 
 	const addLibraryItem = () => {
 		const value = text.trim();
@@ -114,16 +186,16 @@ export function LibraryView() {
 
 	return (
 		<section className="flex h-full bg-base text-white">
-			<div className="min-w-0 flex-1 overflow-y-auto px-6 py-8 lg:px-10">
-				<div className="mx-auto max-w-[920px]">
-					<div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+			<div className="min-w-0 flex-1 overflow-y-auto px-5 py-7 lg:px-8">
+				<div className="mx-auto max-w-[1280px]">
+					<div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
 						<div>
 							<h2 className="flex items-center gap-3 font-serif font-medium text-3xl tracking-tight">
 								<Icons.book className="size-7 text-brand-glow" />
 								Library
 							</h2>
 							<p className="mt-2 max-w-2xl text-ink-3 text-sm">
-								Capture ideas and links, then filter them by type, group, or tag.
+								Capture ideas and links, then filter, order, and browse them your way.
 							</p>
 						</div>
 
@@ -136,17 +208,29 @@ export function LibraryView() {
 								spaces={spaces}
 								tags={libraryTags}
 							/>
-							<Tabs value={groupBy} onValueChange={(value) => setGroupBy(value as LibraryGroupBy)}>
-								<TabsList className="rounded-[8px] bg-fill p-1">
-									{(["type", "group", "tag"] as LibraryGroupBy[]).map((value) => (
-										<TabsTrigger
-											key={value}
-											value={value}
-											className="h-8 rounded-[6px] px-3 capitalize text-ink-muted data-active:bg-raise data-active:text-white"
-										>
-											{value}
-										</TabsTrigger>
-									))}
+							<GroupByMenu groupBy={prefs.groupBy} onGroupBy={setGroupBy} />
+							<OrderByMenu
+								label={activeOrderLabel}
+								orderField={prefs.orderField}
+								orderDir={prefs.orderDir}
+								onOrderField={setOrderField}
+								onToggleDir={toggleOrderDir}
+							/>
+							<Tabs value={prefs.viewMode} onValueChange={(value) => setViewMode(value as LibraryViewMode)}>
+								<TabsList className="h-9 gap-1 rounded-[8px] border border-line-2 bg-sunken p-1">
+									{VIEW_MODES.map((mode) => {
+										const Icon = Icons[mode.icon];
+										return (
+											<TabsTrigger
+												key={mode.id}
+												value={mode.id}
+												className="h-7 gap-1.5 rounded-[6px] px-2.5 font-medium text-ink-muted data-active:bg-brand-surface data-active:text-brand-soft"
+											>
+												<Icon className="size-3.5" />
+												<span className="hidden sm:inline">{mode.label}</span>
+											</TabsTrigger>
+										);
+									})}
 								</TabsList>
 							</Tabs>
 						</div>
@@ -166,7 +250,7 @@ export function LibraryView() {
 						</div>
 					) : null}
 
-					<div className="mt-7 flex gap-2 rounded-[12px] border border-line bg-panel p-2">
+					<div className="mt-6 flex gap-2 rounded-[12px] border border-line bg-panel p-2">
 						<Input
 							value={text}
 							onChange={(event) => setText(event.target.value)}
@@ -186,7 +270,7 @@ export function LibraryView() {
 						</Button>
 					</div>
 
-					<div className="mt-7 space-y-4">
+					<div className="mt-6 space-y-4">
 						{visibleItems.length === 0 ? (
 							<div className="rounded-[12px] border border-dashed border-raise px-6 py-14 text-center">
 								<Icons.book className="mx-auto size-8 text-line-max" />
@@ -199,6 +283,7 @@ export function LibraryView() {
 									title={group.title}
 									items={group.items}
 									spaces={spaces}
+									viewMode={prefs.viewMode}
 									onOpen={openDetail}
 								/>
 							))
@@ -232,7 +317,7 @@ function LibraryFilterMenu({
 					<Button
 						type="button"
 						variant="ghost"
-						className="h-9 rounded-[7px] border border-line bg-panel px-3 text-ink-2 hover:text-white"
+						className="h-9 gap-2 rounded-[8px] border border-line-2 bg-sunken px-3 text-ink-2 hover:text-white"
 					/>
 				}
 			>
@@ -311,6 +396,102 @@ function LibraryFilterMenu({
 	);
 }
 
+function GroupByMenu({
+	groupBy,
+	onGroupBy,
+}: {
+	groupBy: LibraryGroupBy;
+	onGroupBy: (groupBy: LibraryGroupBy) => void;
+}) {
+	const label = GROUP_BY_OPTIONS.find((o) => o.id === groupBy)?.label ?? "None";
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={
+					<Button
+						type="button"
+						variant="ghost"
+						className="h-9 gap-2 rounded-[8px] border border-line-2 bg-sunken px-3 text-ink-2 hover:text-white"
+					/>
+				}
+			>
+				<Icons.layout className="size-4 text-brand" />
+				<span className="text-ink-dim">Group</span>
+				<span className="font-semibold">{label}</span>
+				<Icons.chevronRight className="size-4 rotate-90 text-ink-faint" />
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="end" className="w-[200px] border border-line-2 bg-panel p-1 text-ink-2">
+				{GROUP_BY_OPTIONS.map((option) => (
+					<DropdownMenuItem
+						key={option.id}
+						onClick={() => onGroupBy(option.id)}
+						className={cn("justify-between", groupBy === option.id && "bg-fill text-white")}
+					>
+						{option.label}
+						{groupBy === option.id ? <Icons.check className="size-4 text-brand" /> : null}
+					</DropdownMenuItem>
+				))}
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+function OrderByMenu({
+	label,
+	orderField,
+	orderDir,
+	onOrderField,
+	onToggleDir,
+}: {
+	label: string;
+	orderField: LibraryOrderField;
+	orderDir: LibraryOrderDir;
+	onOrderField: (field: LibraryOrderField) => void;
+	onToggleDir: () => void;
+}) {
+	return (
+		<div className="inline-flex items-center rounded-[8px] border border-line-2 bg-sunken">
+			<DropdownMenu>
+				<DropdownMenuTrigger
+					render={
+						<Button
+							type="button"
+							variant="ghost"
+							className="h-9 gap-2 rounded-[8px] rounded-r-none px-3 text-ink-2 hover:text-white"
+						/>
+					}
+				>
+					<Icons.clock className="size-4 text-brand" />
+					<span className="text-ink-dim">Sort</span>
+					<span className="font-semibold">{label}</span>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end" className="w-[200px] border border-line-2 bg-panel p-1 text-ink-2">
+					{ORDER_FIELDS.map((option) => (
+						<DropdownMenuItem
+							key={option.id}
+							onClick={() => onOrderField(option.id)}
+							className={cn("justify-between", orderField === option.id && "bg-fill text-white")}
+						>
+							{option.label}
+							{orderField === option.id ? <Icons.check className="size-4 text-brand" /> : null}
+						</DropdownMenuItem>
+					))}
+				</DropdownMenuContent>
+			</DropdownMenu>
+			<button
+				type="button"
+				onClick={onToggleDir}
+				aria-label={orderDir === "asc" ? "Sort ascending" : "Sort descending"}
+				className="grid h-9 w-8 place-items-center border-line-2 border-l text-ink-muted hover:text-white"
+			>
+				<Icons.chevronRight
+					className={cn("size-4 transition-transform", orderDir === "asc" ? "-rotate-90" : "rotate-90")}
+				/>
+			</button>
+		</div>
+	);
+}
+
 function CountBadge({ count }: { count: number }) {
 	return (
 		<span className="rounded-[5px] bg-fill px-1.5 py-0.5 font-mono text-ink-dim text-[11px]">
@@ -324,6 +505,9 @@ function DropdownLabel({ children }: { children: React.ReactNode }) {
 }
 
 function buildLibraryGroups(items: Item[], groupBy: LibraryGroupBy, spaces: Space[]) {
+	if (groupBy === "none") {
+		return items.length ? [{ id: "all", title: "", items }] : [];
+	}
 	if (groupBy === "type") {
 		const groups = new Map<LibraryType, Item[]>();
 		for (const type of LIBRARY_TYPES) groups.set(type.id, []);
@@ -365,13 +549,63 @@ function LibraryGroup({
 	title,
 	items,
 	spaces,
+	viewMode,
 	onOpen,
 }: {
 	title: string;
 	items: Item[];
 	spaces: Space[];
+	viewMode: LibraryViewMode;
 	onOpen: (id: string) => void;
 }) {
+	const body = (
+		<>
+			{viewMode === "list" ? (
+				<div className="divide-y divide-fill">
+					{items.map((item) => (
+						<LibraryListRow
+							key={item.id}
+							item={item}
+							groupName={spaceName(spaces, item.spaceId)}
+							onOpen={() => onOpen(item.id)}
+						/>
+					))}
+				</div>
+			) : viewMode === "moodboard" ? (
+				<div className="columns-1 gap-3 p-3 sm:columns-2 lg:columns-3 [&>*]:mb-3">
+					{items.map((item) => (
+						<LibraryCard
+							key={item.id}
+							item={item}
+							groupName={spaceName(spaces, item.spaceId)}
+							onOpen={() => onOpen(item.id)}
+							masonry
+						/>
+					))}
+				</div>
+			) : (
+				<div className="grid gap-3 p-3 sm:grid-cols-2 lg:grid-cols-3">
+					{items.map((item) => (
+						<LibraryCard
+							key={item.id}
+							item={item}
+							groupName={spaceName(spaces, item.spaceId)}
+							onOpen={() => onOpen(item.id)}
+						/>
+					))}
+				</div>
+			)}
+		</>
+	);
+
+	if (!title) {
+		return (
+			<div className="overflow-hidden rounded-[12px] border border-fill bg-panel">
+				{viewMode === "list" ? <div className="px-1">{body}</div> : body}
+			</div>
+		);
+	}
+
 	return (
 		<div className="overflow-hidden rounded-[12px] border border-fill bg-panel">
 			<div className="flex items-center justify-between border-fill border-b px-4 py-3">
@@ -380,28 +614,103 @@ function LibraryGroup({
 					{items.length}
 				</span>
 			</div>
-			<div className="grid gap-3 p-3 md:grid-cols-2">
-				{items.map((item) => (
-					<LibraryCard
-						key={item.id}
-						item={item}
-						groupName={spaceName(spaces, item.spaceId)}
-						onOpen={() => onOpen(item.id)}
-					/>
-				))}
-			</div>
+			{viewMode === "list" ? <div className="px-1">{body}</div> : body}
 		</div>
 	);
 }
 
-function LibraryCard({ item, groupName, onOpen }: { item: Item; groupName: string; onOpen: () => void }) {
+/** Favicon thumbnail for a link, with a graceful icon fallback if it fails to load. */
+function LinkFavicon({ url, className }: { url: string; className?: string }) {
+	const [failed, setFailed] = useState(false);
+	const src = faviconUrl(url);
+	if (failed || !src) return <Icons.link className={cn("text-blue", className)} />;
+	return (
+		// biome-ignore lint/performance/noImgElement: tiny third-party favicons, not worth next/image
+		<img
+			src={src}
+			alt=""
+			loading="lazy"
+			onError={() => setFailed(true)}
+			className={cn("object-contain", className)}
+		/>
+	);
+}
+
+function LibraryListRow({
+	item,
+	groupName,
+	onOpen,
+}: {
+	item: Item;
+	groupName: string;
+	onOpen: () => void;
+}) {
 	const body = itemBody(item);
 	return (
 		<button
 			type="button"
 			onClick={onOpen}
-			className="min-w-0 rounded-[8px] border border-line bg-base p-4 text-left transition-colors hover:border-line-strong hover:bg-surface"
+			className="flex w-full items-start gap-4 px-3 py-3.5 text-left transition-colors hover:bg-surface"
 		>
+			<span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-[8px] bg-fill">
+				{item.type === "link" ? (
+					<LinkFavicon url={item.url ?? ""} className="size-4" />
+				) : (
+					<Icons.sparkles className="size-4 text-brand" />
+				)}
+			</span>
+			<div className="min-w-0 flex-1">
+				<h4 className="truncate font-bold text-ink">{itemTitle(item)}</h4>
+				{body ? (
+					<p className="mt-1 line-clamp-2 break-words text-ink-muted text-sm leading-5">{body}</p>
+				) : null}
+				<div className="mt-2 flex flex-wrap items-center gap-1.5">
+					<span className="rounded-[5px] bg-fill px-1.5 py-0.5 text-ink-dim text-[11px]">{groupName}</span>
+					{item.tags?.map((tag) => (
+						<span key={tag} className="rounded-[5px] bg-brand-surface px-1.5 py-0.5 text-brand-soft text-[11px]">
+							#{tag}
+						</span>
+					))}
+				</div>
+			</div>
+		</button>
+	);
+}
+
+function LibraryCard({
+	item,
+	groupName,
+	onOpen,
+	masonry,
+}: {
+	item: Item;
+	groupName: string;
+	onOpen: () => void;
+	masonry?: boolean;
+}) {
+	const body = itemBody(item);
+	const isLink = item.type === "link" && item.url;
+	return (
+		<button
+			type="button"
+			onClick={onOpen}
+			className={cn(
+				"block w-full min-w-0 break-inside-avoid overflow-hidden rounded-[8px] border border-line bg-base text-left transition-colors hover:border-line-strong hover:bg-surface",
+				masonry && "align-top",
+			)}
+		>
+			{isLink ? (
+				<div className="flex items-center gap-2.5 border-line border-b bg-fill/50 px-4 py-3">
+					<span className="grid size-7 shrink-0 place-items-center rounded-[6px] bg-base">
+						<LinkFavicon url={item.url ?? ""} className="size-4" />
+					</span>
+					<span className="min-w-0 flex-1 truncate font-medium text-ink-2 text-xs">
+						{extractDomain(item.url ?? "")}
+					</span>
+					<Icons.link className="size-3.5 shrink-0 text-ink-dim" />
+				</div>
+			) : null}
+			<div className={cn("p-4", isLink && "pt-3.5")}>
 			<div className="mb-3 flex items-center gap-2">
 				{item.type === "link" ? (
 					<Icons.link className="size-4 text-blue" />
@@ -412,9 +721,16 @@ function LibraryCard({ item, groupName, onOpen }: { item: Item; groupName: strin
 					{groupName}
 				</span>
 			</div>
-			<h4 className="line-clamp-2 font-bold text-ink">{itemTitle(item)}</h4>
+			<h4 className={cn("font-bold text-ink", masonry ? "" : "line-clamp-2")}>{itemTitle(item)}</h4>
 			{body ? (
-				<p className="mt-2 line-clamp-3 break-words text-ink-muted text-sm leading-5">{body}</p>
+				<p
+					className={cn(
+						"mt-2 break-words text-ink-muted text-sm leading-5",
+						masonry ? "" : "line-clamp-3",
+					)}
+				>
+					{body}
+				</p>
 			) : null}
 			{item.tags?.length ? (
 				<div className="mt-3 flex flex-wrap gap-1.5">
@@ -425,6 +741,7 @@ function LibraryCard({ item, groupName, onOpen }: { item: Item; groupName: strin
 					))}
 				</div>
 			) : null}
+			</div>
 		</button>
 	);
 }

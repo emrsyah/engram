@@ -28,6 +28,7 @@ import {
   DashboardSquare01Icon,
   Link01Icon,
   ListViewIcon,
+  Logout01Icon,
   LoaderPinwheelIcon,
   Maximize01Icon,
   Minimize01Icon,
@@ -96,6 +97,7 @@ export const KeyboardIconComp = hi(KeyboardIcon);
 export const LayoutDashboard = hi(DashboardSquare01Icon);
 export const LinkIcon = hi(Link01Icon);
 export const ListIcon = hi(ListViewIcon);
+export const LogoutIcon = hi(Logout01Icon);
 export const Loader = hi(LoaderPinwheelIcon);
 export const MaximizeIcon = hi(Maximize01Icon);
 export const MinimizeIcon = hi(Minimize01Icon);
@@ -140,7 +142,9 @@ export const Icons = {
   info: InfoIcon,
   keyboard: KeyboardIconComp,
   layout: LayoutDashboard,
+  list: ListIcon,
   link: LinkIcon,
+  logout: LogoutIcon,
   minus: MinusIcon,
   moreHorizontal: MoreHorizontal,
   pencil: PencilIcon,

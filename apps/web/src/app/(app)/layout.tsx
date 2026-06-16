@@ -1,3 +1,4 @@
+import { AuthGuard } from "@/components/auth-guard";
 import { AppSidebar } from "@/features/engram/components/app-sidebar";
 
 import { Hotkeys } from "@/features/engram/components/hotkeys";
@@ -15,25 +16,27 @@ import { UIProvider } from "@/features/engram/ui-store";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <EngramProvider>
-      <UIProvider>
-        <Hotkeys />
-        <div className="engram-shell">
-          <AppSidebar />
-          <main className="engram-main">
-            <TopBar />
-            <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
-            <SearchDialog />
-            <ShortcutsDialog />
-            <QuickCaptureContainer />
-            <ItemDetailPanel />
-            <NoteEditorPanel />
-            <NewSpaceDialog />
-            <EditSpaceDialog />
-            <DeleteSpaceDialog />
-          </main>
-        </div>
-      </UIProvider>
-    </EngramProvider>
+    <AuthGuard>
+      <EngramProvider>
+        <UIProvider>
+          <Hotkeys />
+          <div className="engram-shell">
+            <AppSidebar />
+            <main className="engram-main">
+              <TopBar />
+              <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+              <SearchDialog />
+              <ShortcutsDialog />
+              <QuickCaptureContainer />
+              <ItemDetailPanel />
+              <NoteEditorPanel />
+              <NewSpaceDialog />
+              <EditSpaceDialog />
+              <DeleteSpaceDialog />
+            </main>
+          </div>
+        </UIProvider>
+      </EngramProvider>
+    </AuthGuard>
   );
 }
