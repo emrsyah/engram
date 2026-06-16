@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useState } from "react";
 
 type QuickCaptureMode = "thought" | "task" | "link" | "attach";
+type QuickCaptureIntent = "focus-task";
 
 type UIStore = {
   timerOpen: boolean;
@@ -23,6 +24,7 @@ type UIStore = {
   quickCaptureExpanded: boolean;
   quickCaptureHighlight: number;
   quickCaptureMode?: QuickCaptureMode;
+  quickCaptureIntent?: QuickCaptureIntent;
   searchOpen: boolean;
   shortcutsOpen: boolean;
   sidebarCollapsed: boolean;
@@ -33,8 +35,9 @@ type UIStore = {
   canvasSelectedIds: string[];
   minimapVisible: boolean;
   toggleMinimap: () => void;
-  expandQuickCapture: (mode?: QuickCaptureMode) => void;
+  expandQuickCapture: (mode?: QuickCaptureMode, intent?: QuickCaptureIntent) => void;
   collapseQuickCapture: () => void;
+  consumeQuickCaptureIntent: () => QuickCaptureIntent | undefined;
   openSearch: () => void;
   closeSearch: () => void;
   openShortcuts: () => void;
@@ -55,6 +58,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const [quickCaptureExpanded, setQuickCaptureExpanded] = useState(false);
   const [quickCaptureHighlight, setQuickCaptureHighlight] = useState(0);
   const [quickCaptureMode, setQuickCaptureMode] = useState<QuickCaptureMode>();
+  const [quickCaptureIntent, setQuickCaptureIntent] = useState<QuickCaptureIntent>();
   const [searchOpen, setSearchOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -82,12 +86,21 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const openDeleteSpaceDialog = useCallback((id: string) => setDeletingSpaceId(id), []);
   const closeDeleteSpaceDialog = useCallback(() => setDeletingSpaceId(undefined), []);
 
-  const expandQuickCapture = useCallback((mode?: QuickCaptureMode) => {
+  const expandQuickCapture = useCallback((mode?: QuickCaptureMode, intent?: QuickCaptureIntent) => {
     setQuickCaptureMode(mode);
+    setQuickCaptureIntent(intent);
     setQuickCaptureExpanded(true);
     setQuickCaptureHighlight((n) => n + 1);
   }, []);
   const collapseQuickCapture = useCallback(() => setQuickCaptureExpanded(false), []);
+  const consumeQuickCaptureIntent = useCallback(() => {
+    let intent: QuickCaptureIntent | undefined;
+    setQuickCaptureIntent((current) => {
+      intent = current;
+      return undefined;
+    });
+    return intent;
+  }, []);
 
   const openSearch     = useCallback(() => setSearchOpen(true), []);
   const closeSearch    = useCallback(() => setSearchOpen(false), []);
@@ -124,8 +137,10 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         quickCaptureExpanded,
         quickCaptureHighlight,
         quickCaptureMode,
+        quickCaptureIntent,
         expandQuickCapture,
         collapseQuickCapture,
+        consumeQuickCaptureIntent,
         searchOpen,
         shortcutsOpen,
         sidebarCollapsed,

@@ -69,7 +69,7 @@ export function SearchDialog() {
         <CommandInput
           value={query}
           onValueChange={setQuery}
-          placeholder="Search features, spaces, or items…"
+          placeholder="Search features, groups, or items..."
         />
         <CommandList>
           {!hasAny && <CommandEmpty>No results found</CommandEmpty>}
@@ -102,9 +102,9 @@ export function SearchDialog() {
             </CommandGroup>
           )}
 
-          {/* ── Spaces ── */}
+          {/* ── Groups ── */}
           {spaceResults.length > 0 && (
-            <CommandGroup heading="Spaces">
+            <CommandGroup heading="Groups">
               {spaceResults.map((space) => {
                 const iconKey = (space.icon in SPACE_ICONS ? space.icon : "sparkles") as SpaceIconKey;
                 const Icon = Icons[SPACE_ICONS[iconKey]];
@@ -117,7 +117,7 @@ export function SearchDialog() {
                       setQuery("");
                       closeSearch();
                       setActiveSpace(space.id);
-                      router.push("/canvas" as Route<string>);
+                      router.push("/tasks" as Route<string>);
                     }}
                   >
                     <span className="grid size-5 place-items-center rounded-[5px] bg-[#2e2b26]">
@@ -126,7 +126,7 @@ export function SearchDialog() {
                     <span className="flex-1 min-w-0 font-semibold text-[#f0ebe3]">{space.name}</span>
                     <span className={cn("ml-1.5 size-2 shrink-0 rounded-full", dotColor)} />
                     <span className="ml-auto shrink-0 rounded-[4px] bg-[#2e2b26] px-1.5 py-0.5 font-mono text-[10px] text-[#8d857b]">
-                      Space
+                      Group
                     </span>
                   </CommandItem>
                 );
@@ -149,12 +149,9 @@ export function SearchDialog() {
                     onSelect={() => {
                       setQuery("");
                       closeSearch();
-                      if (item.inbox) {
-                        router.push("/inbox" as Route<string>);
-                        openDetail(item.id);
-                      } else {
-                        jumpToItem(item.id);
-                      }
+                      router.push((item.type === "task" ? "/tasks" : "/library") as Route<string>);
+                      if (item.type === "task") jumpToItem(item.id);
+                      else openDetail(item.id);
                     }}
                   >
                     <span className={cn("mt-0.5 size-2 shrink-0 rounded-[2px]", ACCENT_DOT[item.accent])} />

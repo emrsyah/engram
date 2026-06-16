@@ -35,21 +35,45 @@ import {
 	removeItemTag as coreRemoveItemTag,
 	reorderChecklistItems as coreReorderChecklistItems,
 	removeLink,
+	restoreItems,
+	saveDailyBriefing as coreSaveDailyBriefing,
+	selectItem,
+	setActiveSpace as coreSetActiveSpace,
 	setItemTags as coreSetItemTags,
+	setTaskQueue as coreSetTaskQueue,
 	toggleChecklistItem as coreToggleChecklistItem,
 	toggleItemDone,
 	updateSpace as coreUpdateSpace,
+	upsertDailyNote as coreUpsertDailyNote,
 } from "./engram-core";
 import { DEFAULT_SPACE_ID, PERSIST_DEBOUNCE_MS } from "./config";
+import {
+	focusBuckets as computeFocusBuckets,
+	focusDoneTodayIds,
+	pinToFocus as focusPin,
+	purgeStaleFocusDone,
+	reorderFocusPlan as focusReorder,
+	setFocusTier as focusSetTier,
+	staleFocusDoneIds,
+	unpinFromFocus as focusUnpin,
+	type FocusBuckets,
+} from "./focus";
 import { createLocalStorageAdapter } from "./persistence";
 import {
 	allTags as projectAllTags,
+	allTaskItems as projectAllTaskItems,
 	backlinksForItem as projectBacklinksForItem,
 	focusPinnedItems as projectFocusPinnedItems,
+	groupLibraryBySpace as projectGroupLibraryBySpace,
+	groupLibraryByTag as projectGroupLibraryByTag,
+	groupLibraryByType as projectGroupLibraryByType,
+	groupTasksByQueue as projectGroupTasksByQueue,
 	groupTasksByDue as projectGroupTasksByDue,
 	groupTasksByPriority as projectGroupTasksByPriority,
 	groupTasksBySpace as projectGroupTasksBySpace,
+	groupTasksByTag as projectGroupTasksByTag,
 	inboxItems as projectInboxItems,
+	libraryItems as projectLibraryItems,
 	overdueNotPinned as projectOverdueNotPinned,
 	recentItems,
 	scheduledTasks,
@@ -65,6 +89,7 @@ import {
 	todayTasks as projectTodayTasks,
 	todayUnpinnedTasks as projectTodayUnpinnedTasks,
 	type DueBucket,
+	type LibraryType,
 } from "./projections";
 import { seedItems, seedLinks, seedSpaces, seedViewStates } from "./seed";
 import { DeleteToast } from "./components/delete-toast";
@@ -72,11 +97,14 @@ import { TaskCompleteToast } from "./components/task-complete-toast";
 import type {
 	CanvasViewState,
 	ChecklistItem,
+	DailyBriefing,
 	EngramData,
+	FocusTier,
 	Item,
 	ItemLink,
 	Priority,
 	Space,
+	TaskQueue,
 } from "./types";
 
 type EngramStore = {
@@ -87,6 +115,7 @@ type EngramStore = {
 	viewStates: CanvasViewState[];
 	activeSpaceId: string;
 	selectedItemId?: string;
+	dailyBriefings?: Record<string, DailyBriefing>;
 	// Derived / projected
 	activeSpace?: Space;
 	activeItems: Item[];
@@ -96,15 +125,23 @@ type EngramStore = {
 	scheduledTasks: Item[];
 	tasksByPriority: Record<Priority, Item[]>;
 	// All-tasks grouping projections
+	allTaskItems: Item[];
+	libraryItems: Item[];
+	groupTasksByQueue: () => Map<TaskQueue | "done", Item[]>;
 	groupTasksBySpace: () => Map<string, Item[]>;
 	groupTasksByPriority: () => Map<Priority | undefined, Item[]>;
 	groupTasksByDue: () => Map<DueBucket, Item[]>;
+	groupTasksByTag: () => Map<string, Item[]>;
+	groupLibraryByType: () => Map<LibraryType, Item[]>;
+	groupLibraryBySpace: () => Map<string, Item[]>;
+	groupLibraryByTag: () => Map<string, Item[]>;
 	// Backlinks
 	backlinksForItem: (itemId: string) => Item[];
 	// Mutations
 	setActiveSpace: (spaceId: string) => void;
 	createItem: (input: CreateItemInput) => Item;
 	updateItem: (id: string, patch: Partial<Item>) => void;
+	setTaskQueue: (id: string, queue: TaskQueue, sortOrder?: number) => void;
 	moveItem: (id: string, x: number, y: number) => void;
 	toggleDone: (id: string) => void;
 	connectItems: (fromItemId: string, toItemId: string) => void;
@@ -122,9 +159,13 @@ type EngramStore = {
 	todayTasks: Item[];
 	todayItems: Item[];
 	focusPinnedItems: Item[];
+	focusBuckets: FocusBuckets;
 	todayUnpinnedTasks: Item[];
 	pinToFocus: (id: string) => void;
 	unpinFromFocus: (id: string) => void;
+	setFocusTier: (id: string, tier: FocusTier) => void;
+	reorderFocusPlan: (orderedIds: string[]) => void;
+	saveDailyBriefing: (briefing: DailyBriefing) => void;
 	upsertDailyNote: (text: string) => void;
 	createSpace: (input: CreateSpaceInput) => void;
 	updateSpace: (spaceId: string, patch: UpdateSpaceInput) => void;
@@ -146,6 +187,7 @@ const createInitialData = (): EngramData => ({
 	items: seedItems,
 	links: seedLinks,
 	viewStates: seedViewStates,
+	dailyBriefings: {},
 	activeSpaceId: DEFAULT_SPACE_ID,
 	selectedItemId: undefined,
 });
@@ -204,12 +246,34 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Focus housekeeping — the store owns WHEN; focus.ts owns WHAT.
+  // Sweep done focus tasks left over from previous days.
+  const staleDoneKey = staleFocusDoneIds(data.items, todayPrefix()).join(",");
+  useEffect(() => {
+    if (!staleDoneKey) return;
+    setData((current) => purgeStaleFocusDone(current, todayPrefix()));
+  }, [staleDoneKey]);
+
+  // Sweep today's completed focus tasks at the end of the day.
+  const doneTodayKey = focusDoneTodayIds(data.items, todayPrefix()).join(",");
+  useEffect(() => {
+    if (!doneTodayKey) return;
+    const ids = doneTodayKey.split(",").filter(Boolean);
+    const now = new Date();
+    const endOfDay = new Date(now);
+    endOfDay.setHours(23, 59, 0, 0);
+    const delay = Math.max(0, endOfDay.getTime() - now.getTime());
+    const timeout = window.setTimeout(() => {
+      setData((current) => deleteItems(current, ids));
+    }, delay);
+    return () => window.clearTimeout(timeout);
+  }, [doneTodayKey]);
+
   const setActiveSpace = useCallback(
     (spaceId: string) => {
-      setData((current) => ({ ...current, activeSpaceId: spaceId }));
-      router.push("/canvas" as Route<string>);
+      setData((current) => coreSetActiveSpace(current, spaceId));
     },
-    [router],
+    [],
   );
 
   const setViewState = useCallback((spaceId: string, patch: Partial<CanvasViewState>) => {
@@ -221,7 +285,7 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
       const item = buildItem(input, data);
       setData((current) => addItem(current, item));
       if (!input.stayOnCurrentView) {
-        router.push("/canvas" as Route<string>);
+        router.push((input.type === "task" ? "/tasks" : "/library") as Route<string>);
       }
       return item;
     },
@@ -230,6 +294,10 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
 
   const updateItem = useCallback((id: string, patch: Partial<Item>) => {
     setData((current) => patchItem(current, id, patch));
+  }, []);
+
+  const setTaskQueue = useCallback((id: string, queue: TaskQueue, sortOrder?: number) => {
+    setData((current) => coreSetTaskQueue(current, id, queue, sortOrder));
   }, []);
 
   const moveItem = useCallback(
@@ -284,12 +352,9 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
 
   const jumpToItem = useCallback(
     (id: string) => {
-      setData((current) => {
-        const item = current.items.find((i) => i.id === id);
-        if (!item) return current;
-        return { ...current, activeSpaceId: item.spaceId, selectedItemId: id };
-      });
-      router.push("/canvas" as Route<string>);
+      setData((current) => selectItem(current, id));
+      const item = dataRef.current.items.find((i) => i.id === id);
+      router.push((item?.type === "task" ? "/tasks" : "/library") as Route<string>);
     },
     [router],
   );
@@ -304,11 +369,7 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
     lastDeletedRef.current = null;
     if (undoClearRef.current) clearTimeout(undoClearRef.current);
     if (undoToastIdRef.current !== null) toast.dismiss(undoToastIdRef.current);
-    setData((current) => ({
-      ...current,
-      items: [...current.items, ...items],
-      links: [...current.links, ...links],
-    }));
+    setData((current) => restoreItems(current, items, links));
   }, []);
 
   const removeItem = useCallback(
@@ -415,26 +476,12 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const upsertDailyNote = useCallback((text: string) => {
-    const prefix = todayPrefix();
-    const noteTitle = `Daily Note — ${prefix}`;
-    const existing = data.items.find(
-      (item) => item.type === "thought" && item.title === noteTitle,
-    );
-    if (existing) {
-      setData((current) => patchItem(current, existing.id, { text }));
-    } else {
-      const item = buildItem(
-        { type: "thought", title: noteTitle, text, stayOnCurrentView: true },
-        data,
-      );
-      setData((current) => addItem(current, item));
-    }
-  }, [data]);
+    setData((current) => coreUpsertDailyNote(current, todayPrefix(), text));
+  }, []);
 
   const createSpaceFn = useCallback((input: CreateSpaceInput) => {
     setData((current) => addSpace(current, input));
-    router.push("/canvas" as Route<string>);
-  }, [router]);
+  }, []);
 
   const updateSpaceFn = useCallback((spaceId: string, patch: UpdateSpaceInput) => {
     setData((current) => coreUpdateSpace(current, spaceId, patch));
@@ -450,21 +497,36 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
   const activeLinks = useMemo(() => selectActiveLinks(data), [data]);
   const activeViewState = useMemo(() => selectActiveViewState(data), [data]);
   const recent = useMemo(() => recentItems(data.items), [data.items]);
+  const allTasksList = useMemo(() => projectAllTaskItems(data.items), [data.items]);
+  const libraryList = useMemo(() => projectLibraryItems(data.items), [data.items]);
   const scheduled = useMemo(() => scheduledTasks(data.items), [data.items]);
   const byPriority = useMemo(() => tasksByPriority(data.items), [data.items]);
   const todayTasksList = useMemo(() => projectTodayTasks(data.items), [data.items]);
   const todayItemsList = useMemo(() => projectTodayItems(data.items), [data.items]);
   const focusPinnedList = useMemo(() => projectFocusPinnedItems(data.items), [data.items]);
+  const focusBucketsValue = useMemo(() => computeFocusBuckets(data.items, todayPrefix()), [data.items]);
   const todayUnpinnedList = useMemo(() => projectTodayUnpinnedTasks(data.items), [data.items]);
   const overdueNotPinnedList = useMemo(() => projectOverdueNotPinned(data.items), [data.items]);
   const allTagsList = useMemo(() => projectAllTags(data.items), [data.items]);
 
   const pinToFocus = useCallback((id: string) => {
-    setData((current) => patchItem(current, id, { focusPinned: true }));
+    setData((current) => focusPin(current, id, todayPrefix()));
   }, []);
 
   const unpinFromFocus = useCallback((id: string) => {
-    setData((current) => patchItem(current, id, { focusPinned: false }));
+    setData((current) => focusUnpin(current, id));
+  }, []);
+
+  const setFocusTier = useCallback((id: string, tier: FocusTier) => {
+    setData((current) => focusSetTier(current, id, tier, todayPrefix()));
+  }, []);
+
+  const reorderFocusPlan = useCallback((orderedIds: string[]) => {
+    setData((current) => focusReorder(current, orderedIds));
+  }, []);
+
+  const saveDailyBriefing = useCallback((briefing: DailyBriefing) => {
+    setData((current) => coreSaveDailyBriefing(current, briefing));
   }, []);
 
   const setItemTagsFn = useCallback((id: string, tags: string[]) => {
@@ -492,6 +554,11 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
 		[data.items],
 	);
 
+	const groupTasksByQueueFn = useCallback(
+		() => projectGroupTasksByQueue(data.items),
+		[data.items],
+	);
+
 	const groupTasksByPriorityFn = useCallback(
 		() => projectGroupTasksByPriority(data.items),
 		[data.items],
@@ -499,6 +566,26 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
 
 	const groupTasksByDueFn = useCallback(
 		() => projectGroupTasksByDue(data.items),
+		[data.items],
+	);
+
+	const groupTasksByTagFn = useCallback(
+		() => projectGroupTasksByTag(data.items),
+		[data.items],
+	);
+
+	const groupLibraryByTypeFn = useCallback(
+		() => projectGroupLibraryByType(data.items),
+		[data.items],
+	);
+
+	const groupLibraryBySpaceFn = useCallback(
+		() => projectGroupLibraryBySpace(data.items),
+		[data.items],
+	);
+
+	const groupLibraryByTagFn = useCallback(
+		() => projectGroupLibraryByTag(data.items),
 		[data.items],
 	);
 
@@ -525,21 +612,33 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
 			activeLinks,
 			activeViewState,
 			recentItems: recent,
+			allTaskItems: allTasksList,
+			libraryItems: libraryList,
 			scheduledTasks: scheduled,
 			tasksByPriority: byPriority,
+			groupTasksByQueue: groupTasksByQueueFn,
 			groupTasksBySpace: groupTasksBySpaceFn,
 			groupTasksByPriority: groupTasksByPriorityFn,
 			groupTasksByDue: groupTasksByDueFn,
+			groupTasksByTag: groupTasksByTagFn,
+			groupLibraryByType: groupLibraryByTypeFn,
+			groupLibraryBySpace: groupLibraryBySpaceFn,
+			groupLibraryByTag: groupLibraryByTagFn,
 			backlinksForItem: backlinksForItemFn,
 			todayTasks: todayTasksList,
 			todayItems: todayItemsList,
 			focusPinnedItems: focusPinnedList,
+			focusBuckets: focusBucketsValue,
 			todayUnpinnedTasks: todayUnpinnedList,
 			pinToFocus,
 			unpinFromFocus,
+			setFocusTier,
+			reorderFocusPlan,
+			saveDailyBriefing,
 			setActiveSpace,
 			createItem,
 			updateItem,
+			setTaskQueue,
 			moveItem,
 			toggleDone,
 			connectItems,
@@ -574,23 +673,35 @@ export function EngramProvider({ children }: { children: React.ReactNode }) {
 			activeLinks,
 			activeViewState,
 			recent,
+			allTasksList,
+			libraryList,
 			scheduled,
 			byPriority,
+			groupTasksByQueueFn,
 			groupTasksBySpaceFn,
 			groupTasksByPriorityFn,
 			groupTasksByDueFn,
+			groupTasksByTagFn,
+			groupLibraryByTypeFn,
+			groupLibraryBySpaceFn,
+			groupLibraryByTagFn,
 			backlinksForItemFn,
 			todayTasksList,
 			todayItemsList,
 			focusPinnedList,
+			focusBucketsValue,
 			todayUnpinnedList,
 			overdueNotPinnedList,
 			allTagsList,
 			pinToFocus,
 			unpinFromFocus,
+			setFocusTier,
+			reorderFocusPlan,
+			saveDailyBriefing,
 			setActiveSpace,
 			createItem,
 			updateItem,
+			setTaskQueue,
 			moveItem,
 			toggleDone,
 			connectItems,

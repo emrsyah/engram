@@ -3,543 +3,630 @@
 import { Button } from "@alphonse/ui/components/button";
 import { Checkbox } from "@alphonse/ui/components/checkbox";
 import { Input } from "@alphonse/ui/components/input";
-import { Tabs, TabsList, TabsTrigger } from "@alphonse/ui/components/tabs";
 import { cn } from "@alphonse/ui/lib/utils";
-import { useRef, useState } from "react";
+import {
+	closestCenter,
+	DndContext,
+	KeyboardSensor,
+	PointerSensor,
+	useDroppable,
+	useSensor,
+	useSensors,
+	type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+	SortableContext,
+	sortableKeyboardCoordinates,
+	useSortable,
+	verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { useMemo, useState } from "react";
 
-import { DueChip, PriorityChip } from "./chips";
-import { ChevronDown, ChevronRight, Icons } from "./icons";
-import { SPACE_ICONS, type SpaceIconKey } from "../nav";
-import { todayPrefix } from "../projections";
+import { taskQueueOf } from "../projections";
 import { useEngramStore } from "../store";
-import type { Item, Priority } from "../types";
-import type { DueBucket } from "../projections";
+import type { Item, Space, TaskQueue } from "../types";
+import { useUIStore } from "../ui-store";
+import { DueChip, PriorityChip } from "./chips";
+import { Icons } from "./icons";
 
-// ─── Priority group config ────────────────────────────────────────────────────
+type TaskFilter =
+	| { kind: "all"; value: "all" }
+	| { kind: "group"; value: string }
+	| { kind: "tag"; value: string };
 
-const PRIORITY_GROUPS: { priority: Priority | undefined; label: string }[] = [
-	{ priority: 1, label: "Critical" },
-	{ priority: 2, label: "Important" },
-	{ priority: 3, label: "Eventually" },
-	{ priority: undefined, label: "No priority" },
+type LayoutMode = "columns" | "stacked";
+type PlanningSectionId = "later" | "next" | "now";
+type SectionId = PlanningSectionId | "done";
+
+const SECTIONS: { id: SectionId; label: string; hint: string }[] = [
+	{ id: "later", label: "Backlog", hint: "Captured, not planned yet" },
+	{ id: "next", label: "This week", hint: "Worth doing soon" },
+	{ id: "now", label: "Today", hint: "Ordered focus list" },
 ];
 
-// ─── Due group config ─────────────────────────────────────────────────────────
+const DONE_SECTION = { id: "done" as const, label: "Done", hint: "Completed tasks" };
+const ACTIVE_SECTIONS: PlanningSectionId[] = ["later", "next", "now"];
 
-const DUE_BUCKETS: { bucket: DueBucket; label: string; overdue?: boolean }[] = [
-	{ bucket: "overdue", label: "Overdue", overdue: true },
-	{ bucket: "today", label: "Today" },
-	{ bucket: "upcoming", label: "Upcoming" },
-	{ bucket: "someday", label: "Someday" },
-];
+function taskTitle(task: Item) {
+	return task.title ?? task.text ?? "Untitled task";
+}
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function sortTasksWithDoneAtBottom(tasks: Item[]): Item[] {
+function sortTasks(tasks: Item[]) {
 	return [...tasks].sort((a, b) => {
 		if (a.done !== b.done) return a.done ? 1 : -1;
+		const orderA = a.taskSortOrder ?? Number.MAX_SAFE_INTEGER;
+		const orderB = b.taskSortOrder ?? Number.MAX_SAFE_INTEGER;
+		if (orderA !== orderB) return orderA - orderB;
 		return a.createdAt.localeCompare(b.createdAt);
 	});
 }
 
-// ─── Main view ────────────────────────────────────────────────────────────────
+function sectionOf(task: Item): SectionId {
+	const queue = taskQueueOf(task);
+	if (task.done) return "done";
+	return queue === "waiting" ? "later" : (queue as PlanningSectionId);
+}
 
-type GroupBy = "space" | "priority" | "due";
+function sectionLabel(id: SectionId) {
+	return SECTIONS.find((section) => section.id === id)?.label ?? id;
+}
+
+function spaceName(spaces: Space[], id: string) {
+	return spaces.find((space) => space.id === id)?.name ?? "Ungrouped";
+}
+
+function columnId(section: SectionId) {
+	return `section-${section}`;
+}
+
+function sectionFromColumnId(id: string): SectionId | undefined {
+	return id.startsWith("section-") ? (id.replace("section-", "") as SectionId) : undefined;
+}
 
 export function TasksView() {
-	const {
-		groupTasksBySpace,
-		groupTasksByPriority,
-		groupTasksByDue,
-		spaces,
-		jumpToItem,
-		createItem,
-		toggleDone,
-	} = useEngramStore();
+	const { allTaskItems, allTags, createItem, spaces, setTaskQueue, toggleDone, updateItem } =
+		useEngramStore();
+	const { openDetail } = useUIStore();
+	const [filter, setFilter] = useState<TaskFilter>({ kind: "all", value: "all" });
+	const [layoutMode, setLayoutMode] = useState<LayoutMode>("columns");
+	const [newTask, setNewTask] = useState("");
+	const [focusedTaskId, setFocusedTaskId] = useState<string>();
 
-	const [groupBy, setGroupBy] = useState<GroupBy>("space");
+	const sensors = useSensors(
+		useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+		useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+	);
 
-	const tasksBySpace = groupTasksBySpace();
-	const tasksByPriority = groupTasksByPriority();
-	const tasksByDue = groupTasksByDue();
+	const defaultSpaceId = spaces[0]?.id;
+	const taskTags = allTags.filter((tag) => allTaskItems.some((task) => task.tags?.includes(tag)));
 
-	const totalCount = [...tasksBySpace.values()].reduce((n, ts) => n + ts.length, 0);
+	const visibleTasks = useMemo(() => {
+		const tasks =
+			filter.kind === "group"
+				? allTaskItems.filter((task) => task.spaceId === filter.value)
+				: filter.kind === "tag"
+					? allTaskItems.filter((task) => task.tags?.includes(filter.value))
+					: allTaskItems;
+		return sortTasks(tasks);
+	}, [allTaskItems, filter]);
+
+	const tasksBySection = useMemo(() => {
+		const map = new Map<SectionId, Item[]>(SECTIONS.map((section) => [section.id, []]));
+		map.set("done", []);
+		for (const task of visibleTasks) {
+			const key = sectionOf(task);
+			map.set(key, [...(map.get(key) ?? []), task]);
+		}
+		for (const [key, tasks] of map) map.set(key, sortTasks(tasks));
+		return map;
+	}, [visibleTasks]);
+
+	const addTask = () => {
+		const title = newTask.trim();
+		if (!title || !defaultSpaceId) return;
+		createItem({
+			type: "task",
+			title,
+			taskQueue: "later",
+			spaceId: defaultSpaceId,
+			stayOnCurrentView: true,
+		});
+		setNewTask("");
+	};
+
+	const focusedTask = focusedTaskId
+		? allTaskItems.find((task) => task.id === focusedTaskId && !task.done)
+		: undefined;
+
+	const focusTask = (task: Item) => {
+		if (task.done) return;
+		const todayTasks = sortTasks(
+			allTaskItems.filter((item) => item.id !== task.id && !item.done && sectionOf(item) === "now"),
+		);
+		for (const [index, item] of todayTasks.entries()) {
+			updateItem(item.id, { taskSortOrder: index + 1 });
+		}
+		setTaskQueue(task.id, "now", 0);
+		setFocusedTaskId(task.id);
+	};
+
+	const handleDragEnd = ({ active, over }: DragEndEvent) => {
+		if (!over || active.id === over.id) return;
+		const taskId = String(active.id);
+		const activeTask = allTaskItems.find((task) => task.id === taskId);
+		if (!activeTask || activeTask.done) return;
+
+		const overId = String(over.id);
+		const overTask = allTaskItems.find((task) => task.id === overId);
+		const destination = overTask ? sectionOf(overTask) : sectionFromColumnId(overId);
+		if (!destination || destination === "done") return;
+
+		const currentDestinationTasks = sortTasks(
+			allTaskItems.filter((task) => task.id !== taskId && !task.done && sectionOf(task) === destination),
+		);
+		const overIndex = overTask
+			? currentDestinationTasks.findIndex((task) => task.id === overTask.id)
+			: currentDestinationTasks.length;
+		const insertIndex = overIndex < 0 ? currentDestinationTasks.length : overIndex;
+		const ordered = [
+			...currentDestinationTasks.slice(0, insertIndex),
+			activeTask,
+			...currentDestinationTasks.slice(insertIndex),
+		];
+
+		for (const [index, task] of ordered.entries()) {
+			if (task.id === taskId) setTaskQueue(task.id, destination, index);
+			else updateItem(task.id, { taskSortOrder: index });
+		}
+	};
 
 	return (
-		<section className="h-full overflow-y-auto bg-[#151310] px-8 py-10 text-white md:px-16 lg:px-28">
-			<div className="mx-auto max-w-[860px]">
-				{/* ── Header ── */}
-				<div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-					<div>
-						<h2
-							className="stagger-item flex items-center gap-3 font-bold text-3xl"
-							style={{ animationDelay: "0ms" }}
-						>
-							<Icons.square className="size-7 text-[#9b88ff]" />
-							Tasks
-						</h2>
-						<p
-							className="stagger-item mt-3 max-w-2xl text-[#b0a69a]"
-							style={{ animationDelay: "40ms" }}
-						>
-							All tasks across every space. Group by space, priority, or due date.
-						</p>
+		<section className="flex h-full bg-[#151310] text-white">
+			<TaskSecondSidebar
+				filter={filter}
+				onFilter={setFilter}
+				spaces={spaces}
+				tasks={allTaskItems}
+				tags={taskTags}
+			/>
+
+			<div className="min-w-0 flex-1 overflow-y-auto px-5 py-7 lg:px-8">
+				<div className="mx-auto max-w-[1280px]">
+					<div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+						<div>
+							<h2 className="flex items-center gap-3 font-bold text-3xl">
+								<Icons.square className="size-7 text-[#9b88ff]" />
+								Tasks
+							</h2>
+							<p className="mt-2 max-w-2xl text-[#a99f93] text-sm">
+								Capture to Backlog, plan into This week, and keep Today small and ordered.
+							</p>
+						</div>
+
+						<div className="flex flex-wrap items-center gap-2">
+							<div className="rounded-[8px] bg-[#23201d] p-1">
+								{(["columns", "stacked"] as LayoutMode[]).map((mode) => (
+									<button
+										key={mode}
+										type="button"
+										onClick={() => setLayoutMode(mode)}
+										className={cn(
+											"h-8 rounded-[6px] px-3 font-semibold text-sm capitalize",
+											layoutMode === mode
+												? "bg-[#312d28] text-white"
+												: "text-[#948c82] hover:text-white",
+										)}
+									>
+										{mode}
+									</button>
+								))}
+							</div>
+						</div>
 					</div>
 
-					<div className="flex items-center gap-3">
-						<span className="shrink-0 rounded-[6px] border border-[#302c27] bg-[#211e1a] px-2.5 py-1 font-mono text-[#9f9588] text-xs">
-							{totalCount} task{totalCount === 1 ? "" : "s"}
-						</span>
-
-						<Tabs value={groupBy} onValueChange={(v) => setGroupBy(v as GroupBy)}>
-							<TabsList className="rounded-[8px] bg-[#23201d] p-1">
-								<TabsTrigger
-									value="space"
-									className="h-8 rounded-[6px] px-3 text-[#948c82] data-active:bg-[#312d28] data-active:text-white"
-								>
-									Space
-								</TabsTrigger>
-								<TabsTrigger
-									value="priority"
-									className="h-8 rounded-[6px] px-3 text-[#948c82] data-active:bg-[#312d28] data-active:text-white"
-								>
-									Priority
-								</TabsTrigger>
-								<TabsTrigger
-									value="due"
-									className="h-8 rounded-[6px] px-3 text-[#948c82] data-active:bg-[#312d28] data-active:text-white"
-								>
-									Due
-								</TabsTrigger>
-							</TabsList>
-						</Tabs>
+					<div className="mt-6 flex gap-2 rounded-[9px] border border-[#2a2621] bg-[#1b1815] p-2">
+						<Input
+							value={newTask}
+							onChange={(event) => setNewTask(event.target.value)}
+							onKeyDown={(event) => {
+								if (event.key === "Enter") addTask();
+							}}
+							placeholder="Add to Backlog..."
+							className="h-10 border-0 bg-transparent text-[#f0ebe3] placeholder:text-[#6b6460] focus-visible:ring-0"
+						/>
+						<Button
+							type="button"
+							onClick={addTask}
+							className="h-10 rounded-[7px] bg-[#907ce8] px-4 font-bold text-[#17131f] hover:bg-[#a08ef2]"
+						>
+							<Icons.plus className="size-4" />
+							Add
+						</Button>
 					</div>
-				</div>
 
-				{/* ── Groups ── */}
-				<div className="mt-9 space-y-3">
-					{totalCount === 0 ? (
-						<EmptyState />
-					) : groupBy === "space" ? (
-						<SpaceGroups
-							tasksBySpace={tasksBySpace}
-							spaces={spaces}
-							jumpToItem={jumpToItem}
-							toggleDone={toggleDone}
-							createItem={createItem}
-						/>
-					) : groupBy === "priority" ? (
-						<PriorityGroups
-							tasksByPriority={tasksByPriority}
-							jumpToItem={jumpToItem}
-							toggleDone={toggleDone}
-							createItem={createItem}
-							spaces={spaces}
-						/>
-					) : (
-						<DueGroups
-							tasksByDue={tasksByDue}
-							jumpToItem={jumpToItem}
-							toggleDone={toggleDone}
-							createItem={createItem}
-							spaces={spaces}
-						/>
-					)}
+					{focusedTask ? (
+						<div className="mt-4 flex items-center gap-3 rounded-[9px] border border-[#4b4168] bg-[#201b2d] px-4 py-3">
+							<Icons.target className="size-5 shrink-0 text-[#c7bcff]" />
+							<div className="min-w-0 flex-1">
+								<p className="text-[#8f84b8] text-xs font-bold uppercase tracking-[0.14em]">Focused task</p>
+								<p className="truncate font-bold text-[#f0ebe3]">{taskTitle(focusedTask)}</p>
+							</div>
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								onClick={() => setFocusedTaskId(undefined)}
+								className="h-8 rounded-[6px] px-3 text-[#a69acb] hover:text-white"
+							>
+								Clear
+							</Button>
+						</div>
+					) : null}
+
+					<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+						<div
+							className={cn(
+								"mt-6 gap-4",
+								layoutMode === "columns"
+									? "grid min-w-[780px] grid-cols-3"
+									: "grid grid-cols-1",
+							)}
+						>
+							{SECTIONS.map((section) => (
+								<TaskSection
+									key={section.id}
+									section={section}
+									tasks={tasksBySection.get(section.id) ?? []}
+									spaces={spaces}
+									onToggleDone={toggleDone}
+									onQueue={setTaskQueue}
+									onOpen={openDetail}
+									onFocus={focusTask}
+									focusedTaskId={focusedTaskId}
+								/>
+							))}
+						</div>
+					</DndContext>
+
+					<DoneArchive
+						tasks={tasksBySection.get("done") ?? []}
+						spaces={spaces}
+						onToggleDone={toggleDone}
+						onOpen={openDetail}
+					/>
 				</div>
 			</div>
 		</section>
 	);
 }
 
-// ─── Empty state ─────────────────────────────────────────────────────────────
-
-function EmptyState() {
+function TaskSecondSidebar({
+	filter,
+	onFilter,
+	spaces,
+	tasks,
+	tags,
+}: {
+	filter: TaskFilter;
+	onFilter: (filter: TaskFilter) => void;
+	spaces: Space[];
+	tasks: Item[];
+	tags: string[];
+}) {
 	return (
-		<div
-			className="stagger-item flex flex-col items-center gap-3 rounded-[10px] border border-dashed border-[#34302b] px-6 py-16 text-center"
-			style={{ animationDelay: "80ms" }}
-		>
-			<Icons.square className="size-8 text-[#4c463e]" />
-			<p className="font-semibold text-[#c8bfb2]">No tasks yet</p>
-			<p className="max-w-sm text-[#82786e] text-sm">
-				Create a task in any space and it will appear here, grouped however you prefer.
+		<aside className="hidden w-[248px] shrink-0 overflow-y-auto border-[#292622] border-r bg-[#100f0d] px-3 py-5 lg:block">
+			<SidebarButton
+				active={filter.kind === "all"}
+				label="All tasks"
+				count={tasks.length}
+				icon={<Icons.square className="size-4" />}
+				onClick={() => onFilter({ kind: "all", value: "all" })}
+			/>
+
+			<SidebarSection title="Groups">
+				{spaces.map((space) => (
+					<SidebarButton
+						key={space.id}
+						active={filter.kind === "group" && filter.value === space.id}
+						label={space.name}
+						count={tasks.filter((task) => task.spaceId === space.id).length}
+						icon={<Icons.book className="size-4" />}
+						onClick={() => onFilter({ kind: "group", value: space.id })}
+					/>
+				))}
+			</SidebarSection>
+
+			<SidebarSection title="Tags">
+				{tags.length === 0 ? (
+					<p className="px-3 py-2 text-[#5f574f] text-xs">No task tags yet</p>
+				) : (
+					tags.map((tag) => (
+						<SidebarButton
+							key={tag}
+							active={filter.kind === "tag" && filter.value === tag}
+							label={`#${tag}`}
+							count={tasks.filter((task) => task.tags?.includes(tag)).length}
+							icon={<Icons.flag className="size-4" />}
+							onClick={() => onFilter({ kind: "tag", value: tag })}
+						/>
+					))
+				)}
+			</SidebarSection>
+		</aside>
+	);
+}
+
+function SidebarSection({ title, children }: { title: string; children: React.ReactNode }) {
+	return (
+		<div className="mt-6">
+			<p className="mb-2 px-3 font-bold text-[#736c63] text-[11px] uppercase tracking-[0.14em]">
+				{title}
 			</p>
+			<div className="space-y-1">{children}</div>
 		</div>
 	);
 }
 
-// ─── Space grouping ───────────────────────────────────────────────────────────
-
-function SpaceGroups({
-	tasksBySpace,
-	spaces,
-	jumpToItem,
-	toggleDone,
-	createItem,
-}: {
-	tasksBySpace: Map<string, Item[]>;
-	spaces: { id: string; name: string; icon: string; sortOrder: number }[];
-	jumpToItem: (id: string) => void;
-	toggleDone: (id: string) => void;
-	createItem: (input: Parameters<ReturnType<typeof useEngramStore>["createItem"]>[0]) => Item;
-}) {
-	const sortedSpaces = [...spaces].sort((a, b) => a.sortOrder - b.sortOrder);
-
-	return (
-		<>
-			{sortedSpaces.map((space, i) => {
-				const tasks = tasksBySpace.get(space.id) ?? [];
-				const iconKey = (space.icon in SPACE_ICONS ? space.icon : "sparkles") as SpaceIconKey;
-				const SpaceIcon = Icons[SPACE_ICONS[iconKey]];
-				const label = (
-					<span className="flex items-center gap-2">
-						<SpaceIcon className="size-4 text-[#9b88ff]" />
-						{space.name}
-					</span>
-				);
-				return (
-					<TaskGroup
-						key={space.id}
-						label={label}
-						tasks={tasks}
-						index={i}
-						jumpToItem={jumpToItem}
-						toggleDone={toggleDone}
-						onAdd={(title) =>
-							createItem({
-								type: "task",
-								title,
-								spaceId: space.id,
-								stayOnCurrentView: true,
-							})
-						}
-					/>
-				);
-			})}
-		</>
-	);
-}
-
-// ─── Priority grouping ────────────────────────────────────────────────────────
-
-function PriorityGroups({
-	tasksByPriority,
-	jumpToItem,
-	toggleDone,
-	createItem,
-	spaces,
-}: {
-	tasksByPriority: Map<Priority | undefined, Item[]>;
-	jumpToItem: (id: string) => void;
-	toggleDone: (id: string) => void;
-	createItem: (input: Parameters<ReturnType<typeof useEngramStore>["createItem"]>[0]) => Item;
-	spaces: { id: string; name: string; icon: string; sortOrder: number }[];
-}) {
-	const defaultSpaceId = [...spaces].sort((a, b) => a.sortOrder - b.sortOrder)[0]?.id;
-
-	return (
-		<>
-			{PRIORITY_GROUPS.map((group, i) => {
-				const tasks = tasksByPriority.get(group.priority) ?? [];
-				const label = (
-					<span className="flex items-center gap-2">
-						<PriorityChip priority={group.priority} />
-						<span>{group.label}</span>
-					</span>
-				);
-				return (
-					<TaskGroup
-						key={String(group.priority)}
-						label={label}
-						tasks={tasks}
-						index={i}
-						jumpToItem={jumpToItem}
-						toggleDone={toggleDone}
-						onAdd={(title) =>
-							createItem({
-								type: "task",
-								title,
-								priority: group.priority,
-								spaceId: defaultSpaceId,
-								stayOnCurrentView: true,
-							})
-						}
-					/>
-				);
-			})}
-		</>
-	);
-}
-
-// ─── Due grouping ─────────────────────────────────────────────────────────────
-
-function DueGroups({
-	tasksByDue,
-	jumpToItem,
-	toggleDone,
-	createItem,
-	spaces,
-}: {
-	tasksByDue: Map<DueBucket, Item[]>;
-	jumpToItem: (id: string) => void;
-	toggleDone: (id: string) => void;
-	createItem: (input: Parameters<ReturnType<typeof useEngramStore>["createItem"]>[0]) => Item;
-	spaces: { id: string; name: string; icon: string; sortOrder: number }[];
-}) {
-	const defaultSpaceId = [...spaces].sort((a, b) => a.sortOrder - b.sortOrder)[0]?.id;
-
-	return (
-		<>
-			{DUE_BUCKETS.map((cfg, i) => {
-				const tasks = tasksByDue.get(cfg.bucket) ?? [];
-				const label = (
-					<span
-						className={cn(
-							"flex items-center gap-2",
-							cfg.overdue && "text-[#e46f50]",
-						)}
-					>
-						{cfg.overdue && (
-							<span className="size-2 rounded-full bg-[#e46f50] inline-block" />
-						)}
-						{cfg.label}
-					</span>
-				);
-				return (
-					<TaskGroup
-						key={cfg.bucket}
-						label={label}
-						tasks={tasks}
-						index={i}
-						jumpToItem={jumpToItem}
-						toggleDone={toggleDone}
-						overdue={cfg.overdue}
-						onAdd={(title) => {
-							const prefix = todayPrefix();
-							let dueAt: string | undefined;
-							if (cfg.bucket === "today") {
-								dueAt = `${prefix}T10:00:00.000Z`;
-							} else if (cfg.bucket === "upcoming") {
-								const tomorrow = new Date();
-								tomorrow.setDate(tomorrow.getDate() + 1);
-								const tp = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
-								dueAt = `${tp}T10:00:00.000Z`;
-							}
-							createItem({
-								type: "task",
-								title,
-								dueAt,
-								someday: cfg.bucket === "someday" ? true : undefined,
-								spaceId: defaultSpaceId,
-								stayOnCurrentView: true,
-							});
-						}}
-					/>
-				);
-			})}
-		</>
-	);
-}
-
-// ─── Collapsible task group ───────────────────────────────────────────────────
-
-function TaskGroup({
+function SidebarButton({
+	active,
 	label,
-	tasks,
-	index,
-	jumpToItem,
-	toggleDone,
-	onAdd,
-	overdue,
+	count,
+	icon,
+	onClick,
 }: {
-	label: React.ReactNode;
-	tasks: Item[];
-	index: number;
-	jumpToItem: (id: string) => void;
-	toggleDone: (id: string) => void;
-	onAdd: (title: string) => void;
-	overdue?: boolean;
+	active: boolean;
+	label: string;
+	count: number;
+	icon: React.ReactNode;
+	onClick: () => void;
 }) {
-	const [expanded, setExpanded] = useState(true);
-	const [adding, setAdding] = useState(false);
-	const [newTitle, setNewTitle] = useState("");
-	const inputRef = useRef<HTMLInputElement>(null);
-	const sorted = sortTasksWithDoneAtBottom(tasks);
-	const openCount = tasks.filter((t) => !t.done).length;
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			className={cn(
+				"flex w-full items-center gap-3 rounded-[7px] px-3 py-2 text-left text-sm transition-colors",
+				active ? "bg-[#22201f] text-white" : "text-[#b7afa5] hover:bg-[#171614] hover:text-white",
+			)}
+		>
+			<span className="text-[#907ce8]">{icon}</span>
+			<span className="min-w-0 flex-1 truncate font-semibold">{label}</span>
+			<span className="rounded-[5px] bg-[#252220] px-1.5 py-0.5 font-mono text-[#82786e] text-[11px]">
+				{count}
+			</span>
+		</button>
+	);
+}
 
-	const handleAdd = () => {
-		const title = newTitle.trim();
-		if (!title) {
-			setAdding(false);
-			setNewTitle("");
-			return;
-		}
-		onAdd(title);
-		setNewTitle("");
-		inputRef.current?.focus();
-	};
+function TaskSection({
+	section,
+	tasks,
+	spaces,
+	onToggleDone,
+	onQueue,
+	onOpen,
+	onFocus,
+	focusedTaskId,
+}: {
+	section: { id: SectionId; label: string; hint: string };
+	tasks: Item[];
+	spaces: Space[];
+	onToggleDone: (id: string) => void;
+	onQueue: (id: string, queue: TaskQueue) => void;
+	onOpen: (id: string) => void;
+	onFocus: (task: Item) => void;
+	focusedTaskId?: string;
+}) {
+	const { setNodeRef, isOver } = useDroppable({ id: columnId(section.id) });
 
 	return (
-		<div
-			className="stagger-item"
-			style={{ animationDelay: `${80 + index * 50}ms` }}
+		<section
+			ref={setNodeRef}
+			className={cn(
+				"min-h-[300px] rounded-[9px] border bg-[#151412]",
+				isOver ? "border-[#907ce8] bg-[#191620]" : "border-[#26221e]",
+			)}
 		>
-			{/* Group header */}
-			<Button
-				type="button"
-				variant="ghost"
-				onClick={() => setExpanded((v) => !v)}
-				className="mb-1 flex w-full items-center gap-2 rounded-[7px] px-3 py-2 text-left font-semibold text-sm text-[#c8bfb2] hover:bg-[#1e1b17] active:scale-[0.99]"
-			>
-				{expanded ? (
-					<ChevronDown className={cn("size-3.5 shrink-0", overdue ? "text-[#e46f50]" : "text-[#6b6560]")} />
-				) : (
-					<ChevronRight className={cn("size-3.5 shrink-0", overdue ? "text-[#e46f50]" : "text-[#6b6560]")} />
-				)}
-				<span className="flex-1">{label}</span>
-				<span
-					className={cn(
-						"rounded-[5px] px-1.5 py-0.5 font-mono text-[11px]",
-						overdue
-							? "bg-[#2d1a14] text-[#e46f50]"
-							: "bg-[#252220] text-[#82786e]",
-					)}
-				>
-					{openCount}
-				</span>
-			</Button>
-
-			{/* Tasks */}
-			<div
-				className={cn(
-					"overflow-hidden transition-all duration-200",
-					expanded ? "max-h-[9999px] opacity-100" : "max-h-0 opacity-0",
-				)}
-			>
-				<div
-					className={cn(
-						"ml-2 rounded-[8px] border",
-						overdue ? "border-[#3d1e16]" : "border-[#26221e]",
-						"bg-[#1b1815]",
-					)}
-				>
-					{sorted.length > 0 ? (
-						<div className="divide-y divide-[#221e1b]">
-							{sorted.map((task) => (
-								<TaskRow
-									key={task.id}
-									task={task}
-									jumpToItem={jumpToItem}
-									toggleDone={toggleDone}
-									overdue={overdue}
-								/>
-							))}
+			<header className="border-[#26221e] border-b px-4 py-3">
+				<div className="flex items-center justify-between gap-3">
+					<div className="min-w-0">
+						<h3 className="truncate font-bold text-[#efe9df] text-lg">{section.label}</h3>
+						<p className="mt-0.5 truncate text-[#70685f] text-xs">{section.hint}</p>
+					</div>
+					<span className="rounded-[5px] bg-[#252220] px-1.5 py-0.5 font-mono text-[#82786e] text-[11px]">
+						{tasks.length}
+					</span>
+				</div>
+			</header>
+			<SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
+				<div className="space-y-2 p-3">
+					{tasks.length === 0 ? (
+						<div className="rounded-[7px] border border-dashed border-[#302c27] px-3 py-8 text-center text-[#5f574f] text-sm">
+							Drop tasks here
 						</div>
 					) : (
-						<p className="px-4 py-4 text-[#4c463e] text-sm">Nothing here yet</p>
+						tasks.map((task) => (
+							<SortableTaskCard
+								key={task.id}
+								task={task}
+								groupName={spaceName(spaces, task.spaceId)}
+								onToggleDone={onToggleDone}
+								onQueue={onQueue}
+								onOpen={() => onOpen(task.id)}
+								onFocus={() => onFocus(task)}
+								focused={focusedTaskId === task.id}
+							/>
+						))
 					)}
+				</div>
+			</SortableContext>
+		</section>
+	);
+}
 
-					{/* Quick-add row */}
-					<div className={cn("border-t", overdue ? "border-[#3d1e16]" : "border-[#221e1b]")}>
-						{adding ? (
-							<div className="flex items-center gap-2 px-3 py-2">
-								<span className="size-4 shrink-0" />
-								<span className="size-4 shrink-0" />
-								<Input
-									ref={inputRef}
-									autoFocus
-									value={newTitle}
-									onChange={(e) => setNewTitle(e.target.value)}
-									onKeyDown={(e) => {
-										if (e.key === "Enter") handleAdd();
-										if (e.key === "Escape") {
-											setAdding(false);
-											setNewTitle("");
-										}
-									}}
-									placeholder="Task title…"
-									className="h-7 flex-1 border-0 bg-transparent text-[#e0d8cf] text-sm placeholder:text-[#4a4540] focus-visible:ring-0"
-								/>
-								<Button
-									type="button"
-									size="sm"
-									onClick={handleAdd}
-									className="h-7 gap-1 rounded-[6px] bg-[#907ce8] px-3 font-semibold text-[12px] text-[#17131f] transition-colors duration-150 hover:bg-[#a08ef2] active:scale-[0.96]"
-								>
-									Add
-								</Button>
-							</div>
-						) : (
+function DoneArchive({
+	tasks,
+	spaces,
+	onToggleDone,
+	onOpen,
+}: {
+	tasks: Item[];
+	spaces: Space[];
+	onToggleDone: (id: string) => void;
+	onOpen: (id: string) => void;
+}) {
+	if (tasks.length === 0) return null;
+
+	return (
+		<section className="mt-6 rounded-[9px] border border-[#211e1b] bg-[#11100f] opacity-75">
+			<header className="flex items-center justify-between border-[#211e1b] border-b px-4 py-2.5">
+				<div>
+					<h3 className="font-bold text-[#8f877d]">Done</h3>
+					<p className="text-[#5f574f] text-xs">Completed tasks stay out of the planning lanes.</p>
+				</div>
+				<span className="rounded-[5px] bg-[#201d19] px-1.5 py-0.5 font-mono text-[#6d655c] text-[11px]">
+					{tasks.length}
+				</span>
+			</header>
+			<div className="grid gap-2 p-3 md:grid-cols-2 xl:grid-cols-3">
+				{sortTasks(tasks).map((task) => (
+					<div
+						key={task.id}
+						className="flex items-start gap-2.5 rounded-[7px] border border-[#24211e] bg-[#191714] px-3 py-2"
+					>
+						<Checkbox
+							checked={task.done}
+							onCheckedChange={() => onToggleDone(task.id)}
+							className="mt-0.5 rounded-full opacity-70"
+						/>
+						<div className="min-w-0 flex-1">
 							<button
 								type="button"
-								onClick={() => setAdding(true)}
-								className="flex w-full items-center gap-2 rounded-b-[8px] px-4 py-2.5 text-[#4c463e] text-sm transition-colors duration-150 hover:bg-[#201d19] hover:text-[#907ce8]"
+								onClick={() => onOpen(task.id)}
+								className="block max-w-full truncate text-left font-semibold text-[#746d66] text-sm line-through hover:text-[#9f968d]"
 							>
-								<Icons.plus className="size-3.5" />
-								Add task
+								{taskTitle(task)}
 							</button>
+							<p className="mt-1 truncate text-[#5d554e] text-[10px]">
+								{spaceName(spaces, task.spaceId)}
+							</p>
+						</div>
+					</div>
+				))}
+			</div>
+		</section>
+	);
+}
+
+function SortableTaskCard({
+	task,
+	groupName,
+	onToggleDone,
+	onQueue,
+	onOpen,
+	onFocus,
+	focused,
+}: {
+	task: Item;
+	groupName: string;
+	onToggleDone: (id: string) => void;
+	onQueue: (id: string, queue: TaskQueue) => void;
+	onOpen: () => void;
+	onFocus: () => void;
+	focused: boolean;
+}) {
+	const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+		id: task.id,
+		disabled: task.done,
+	});
+
+	return (
+		<article
+			ref={setNodeRef}
+			style={{ transform: CSS.Transform.toString(transform), transition }}
+			{...attributes}
+			{...listeners}
+			className={cn(
+				"cursor-grab rounded-[7px] border border-[#2a2621] bg-[#201d19] px-3 py-2.5 text-left shadow-sm",
+				"transition-colors hover:border-[#3a3530] hover:bg-[#25211d] active:cursor-grabbing",
+				focused && "border-[#907ce8] bg-[#241f33]",
+				isDragging && "opacity-60",
+				task.done && "cursor-default opacity-70",
+			)}
+		>
+			<div className="flex items-start gap-2.5">
+				<span onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
+					<Checkbox
+						checked={task.done}
+						onCheckedChange={() => onToggleDone(task.id)}
+						className="mt-0.5 rounded-full"
+					/>
+				</span>
+				<div className="min-w-0 flex-1">
+					<button
+						type="button"
+						onPointerDown={(event) => event.stopPropagation()}
+						onClick={(event) => {
+							event.stopPropagation();
+							onOpen();
+						}}
+						className={cn(
+							"block max-w-full truncate text-left font-semibold text-[#f0ebe3] text-sm hover:text-white",
+							task.done && "text-[#655e56] line-through",
 						)}
+					>
+						{taskTitle(task)}
+					</button>
+					<div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+						<span className="rounded-[5px] bg-[#2a2621] px-1.5 py-0.5 text-[#82786e] text-[10px]">
+							{groupName}
+						</span>
+						<PriorityChip priority={task.priority} />
+						<DueChip dueAt={task.dueAt} />
+						{task.tags?.slice(0, 2).map((tag) => (
+							<span key={tag} className="rounded-[5px] bg-[#242036] px-1.5 py-0.5 text-[#c7bcff] text-[10px]">
+								#{tag}
+							</span>
+						))}
 					</div>
 				</div>
 			</div>
-		</div>
-	);
-}
-
-// ─── Task row ─────────────────────────────────────────────────────────────────
-
-function TaskRow({
-	task,
-	jumpToItem,
-	toggleDone,
-	overdue,
-}: {
-	task: Item;
-	jumpToItem: (id: string) => void;
-	toggleDone: (id: string) => void;
-	overdue?: boolean;
-}) {
-	return (
-		<Button
-			type="button"
-			variant="ghost"
-			onClick={() => jumpToItem(task.id)}
-			className={cn(
-				"h-auto w-full items-start justify-start gap-3 rounded-none px-4 py-3 text-left font-normal",
-				"transition-[background-color,transform] duration-150",
-				"hover:bg-[#201d19]",
-				"active:scale-[0.99] active:bg-[#242019]",
-				overdue && !task.done && "hover:bg-[#1e1410]",
-			)}
-		>
-			<span
-				onClick={(e) => e.stopPropagation()}
-				className="mt-0.5 shrink-0"
-			>
-				<Checkbox
-					checked={task.done}
-					onCheckedChange={() => toggleDone(task.id)}
-					className="rounded-full"
-				/>
-			</span>
-
-			<span className="min-w-0 flex-1">
-				<span
-					className={cn(
-						"block font-semibold text-[#f0ebe3]",
-						task.done && "text-[#655e56] line-through",
-						overdue && !task.done && "text-[#f0ebe3]",
-					)}
+			{!task.done ? (
+				<div
+					onPointerDown={(event) => event.stopPropagation()}
+					onClick={(event) => event.stopPropagation()}
+					className="mt-2 flex flex-wrap gap-1"
 				>
-					{task.title ?? task.text ?? "Untitled"}
-				</span>
-				{(task.priority ?? task.dueAt) && (
-					<span className="mt-1.5 flex flex-wrap gap-1.5">
-						<PriorityChip priority={task.priority} />
-						<DueChip dueAt={task.dueAt} />
-					</span>
-				)}
-			</span>
-		</Button>
+					{ACTIVE_SECTIONS.map((queue) => (
+						<button
+							key={queue}
+							type="button"
+							onClick={() => onQueue(task.id, queue)}
+							className={cn(
+								"rounded-[5px] px-2 py-0.5 font-semibold text-[10px]",
+								taskQueueOf(task) === queue
+									? "bg-[#907ce8] text-[#17131f]"
+									: "bg-[#2a2621] text-[#82786e] hover:text-[#d8d0c5]",
+							)}
+						>
+							{sectionLabel(queue)}
+						</button>
+					))}
+					<button
+						type="button"
+						onClick={onFocus}
+						className={cn(
+							"ml-auto rounded-[5px] px-2 py-0.5 font-semibold text-[10px]",
+							focused
+								? "bg-[#c7bcff] text-[#17131f]"
+								: "bg-[#2b2540] text-[#c7bcff] hover:text-white",
+						)}
+					>
+						Focus
+					</button>
+				</div>
+			) : null}
+		</article>
 	);
 }

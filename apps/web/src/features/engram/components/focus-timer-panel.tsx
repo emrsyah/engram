@@ -3,62 +3,31 @@
 import { Button } from "@alphonse/ui/components/button";
 import { cn } from "@alphonse/ui/lib/utils";
 import { ClockIcon as Clock, Pause, Play, RotateCcw, CancelIcon as X } from "./icons";
-import { useEffect, useRef, useState } from "react";
+
+import { usePomodoro } from "./use-pomodoro";
 
 const WORK_PRESETS = [15, 25, 30, 45, 60];
-const DEFAULT_WORK = 25;
-const DEFAULT_BREAK = 5;
-
-type Phase = "idle" | "work" | "break";
 
 export function FocusTimerPanel({ onClose }: { onClose: () => void }) {
-	const [workMins, setWorkMins] = useState(DEFAULT_WORK);
-	const [breakMins] = useState(DEFAULT_BREAK);
-	const [phase, setPhase] = useState<Phase>("idle");
-	const [remaining, setRemaining] = useState(DEFAULT_WORK * 60);
-	const [running, setRunning] = useState(false);
-	const [sessions, setSessions] = useState(0);
-	const phaseRef = useRef(phase);
-	phaseRef.current = phase;
-
-	const workSecs = workMins * 60;
-	const breakSecs = breakMins * 60;
-
-	useEffect(() => {
-		if (!running) return;
-		const id = setInterval(() => {
-			setRemaining((s) => {
-				if (s > 1) return s - 1;
-				clearInterval(id);
-				setRunning(false);
-				const next: Phase = phaseRef.current === "work" ? "break" : "work";
-				if (phaseRef.current === "work") setSessions((n) => n + 1);
-				setPhase(next);
-				setRemaining(next === "break" ? breakSecs : workSecs);
-				return 0;
-			});
-		}, 1000);
-		return () => clearInterval(id);
-	}, [running, workSecs, breakSecs]);
-
-	const start = () => {
-		if (phase === "idle") setPhase("work");
-		setRunning(true);
-	};
-	const pause = () => setRunning(false);
-	const reset = () => {
-		setRunning(false);
-		setPhase("idle");
-		setRemaining(workSecs);
-	};
-
-	const mins = Math.floor(remaining / 60)
-		.toString()
-		.padStart(2, "0");
-	const secs = (remaining % 60).toString().padStart(2, "0");
-	const total = phase === "break" ? breakSecs : workSecs;
-	const progress = total > 0 ? (total - remaining) / total : 0;
-	const accent = phase === "break" ? "#43b6a6" : "#907ce8";
+	const {
+		workMins,
+		setWorkMins,
+		breakMins,
+		phase,
+		setPhase,
+		setRemaining,
+		running,
+		sessions,
+		workSecs,
+		breakSecs,
+		start,
+		pause,
+		reset,
+		mins,
+		secs,
+		progress,
+		accent,
+	} = usePomodoro(25, 5);
 
 	return (
 		<div className="absolute top-[calc(100%+8px)] right-0 z-50 w-[280px] rounded-[12px] border border-[#2e2b26] bg-[#1a1714] shadow-2xl">

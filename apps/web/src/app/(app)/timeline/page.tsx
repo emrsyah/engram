@@ -1,5 +1,6 @@
-import { TimelineView } from "@/features/engram/components/timeline-view";
+import type { Route } from "next";
+import { redirect } from "next/navigation";
 
 export default function TimelinePage() {
-  return <TimelineView />;
+  redirect("/tasks" as Route<string>);
 }

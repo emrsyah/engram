@@ -1,6 +1,15 @@
 import { RECENT_ITEMS_LIMIT, SEARCH_RESULT_LIMIT } from "./config";
 import { seedViewStates } from "./seed";
-import type { CanvasViewState, EngramData, Item, ItemLink, Priority, Space } from "./types";
+import type {
+  CanvasViewState,
+  EngramData,
+  Item,
+  ItemLink,
+  ItemType,
+  Priority,
+  Space,
+  TaskQueue,
+} from "./types";
 
 /**
  * Projections — read-only lenses over the canonical Engram data.
@@ -174,9 +183,51 @@ export function buildWeekDays(): { label: string; datePrefix: string }[] {
 
 // ─── All-tasks grouping helpers (for the Tasks view) ─────────────────────────
 
-/** All tasks across every space (excl. inbox), sorted by createdAt. */
-function allTaskItems(items: Item[]): Item[] {
-	return items.filter((i) => i.type === "task" && !i.inbox);
+function compareTaskOrder(a: Item, b: Item): number {
+	if (a.done !== b.done) return a.done ? 1 : -1;
+	const orderA = a.taskSortOrder ?? Number.MAX_SAFE_INTEGER;
+	const orderB = b.taskSortOrder ?? Number.MAX_SAFE_INTEGER;
+	if (orderA !== orderB) return orderA - orderB;
+	return a.createdAt.localeCompare(b.createdAt);
+}
+
+/** All tasks across every group, sorted by queue order. */
+export function allTaskItems(items: Item[]): Item[] {
+	return items.filter((i) => i.type === "task").sort(compareTaskOrder);
+}
+
+export const TASK_QUEUES: TaskQueue[] = ["now", "next", "later", "waiting"];
+
+export function taskQueueOf(task: Item): TaskQueue {
+	return task.taskQueue ?? "next";
+}
+
+export function groupTasksByQueue(items: Item[]): Map<TaskQueue | "done", Item[]> {
+	const result = new Map<TaskQueue | "done", Item[]>([
+		["now", []],
+		["next", []],
+		["later", []],
+		["waiting", []],
+		["done", []],
+	]);
+	for (const task of allTaskItems(items)) {
+		const key = task.done ? "done" : taskQueueOf(task);
+		result.get(key)!.push(task);
+	}
+	return result;
+}
+
+export function groupTasksByTag(items: Item[]): Map<string, Item[]> {
+	const result = new Map<string, Item[]>();
+	for (const task of allTaskItems(items)) {
+		const tags = task.tags?.length ? task.tags : ["untagged"];
+		for (const tag of tags) {
+			const bucket = result.get(tag) ?? [];
+			bucket.push(task);
+			result.set(tag, bucket);
+		}
+	}
+	return result;
 }
 
 /**
@@ -250,6 +301,48 @@ export function groupTasksByDue(items: Item[]): Map<DueBucket, Item[]> {
 	result.get("upcoming")!.sort((a, b) => a.dueAt!.localeCompare(b.dueAt!));
 	result.get("someday")!.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
+	return result;
+}
+
+export type LibraryType = Extract<ItemType, "thought" | "link">;
+
+export function libraryItems(items: Item[]): Item[] {
+	return items
+		.filter((item) => item.type === "thought" || item.type === "link")
+		.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+export function groupLibraryByType(items: Item[]): Map<LibraryType, Item[]> {
+	const result = new Map<LibraryType, Item[]>([
+		["thought", []],
+		["link", []],
+	]);
+	for (const item of libraryItems(items)) {
+		result.get(item.type as LibraryType)!.push(item);
+	}
+	return result;
+}
+
+export function groupLibraryBySpace(items: Item[]): Map<string, Item[]> {
+	const result = new Map<string, Item[]>();
+	for (const item of libraryItems(items)) {
+		const bucket = result.get(item.spaceId) ?? [];
+		bucket.push(item);
+		result.set(item.spaceId, bucket);
+	}
+	return result;
+}
+
+export function groupLibraryByTag(items: Item[]): Map<string, Item[]> {
+	const result = new Map<string, Item[]>();
+	for (const item of libraryItems(items)) {
+		const tags = item.tags?.length ? item.tags : ["untagged"];
+		for (const tag of tags) {
+			const bucket = result.get(tag) ?? [];
+			bucket.push(item);
+			result.set(tag, bucket);
+		}
+	}
 	return result;
 }
 

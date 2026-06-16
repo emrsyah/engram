@@ -16,7 +16,7 @@ import { Calendar } from "@alphonse/ui/components/calendar";
 import { Checkbox } from "@alphonse/ui/components/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@alphonse/ui/components/tabs";
 import { cn } from "@alphonse/ui/lib/utils";
-import { CalendarDays as CalendarDaysIcon, ListIcon } from "./icons";
+import { CalendarDays as CalendarDaysIcon, ListIcon, Icons } from "./icons";
 import { useMemo, useState } from "react";
 
 import { PriorityChip } from "./chips";
@@ -73,13 +73,17 @@ export function TimelineView() {
   );
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext id="timeline-dnd" sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <section className="h-full overflow-y-auto bg-[#151310] px-8 py-10 text-white md:px-16 lg:px-28">
         <div className="mx-auto max-w-[1160px]">
           <Tabs defaultValue="list" className="gap-0">
             <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
               <div>
-                <h2 className="stagger-item font-bold text-3xl" style={{ animationDelay: "0ms" }}>
+                <h2
+                  className="stagger-item flex items-center gap-3 font-bold text-3xl"
+                  style={{ animationDelay: "0ms" }}
+                >
+                  <Icons.calendar className="size-7 text-[#9b88ff]" />
                   Timeline
                 </h2>
                 <p
@@ -91,7 +95,11 @@ export function TimelineView() {
                 </p>
               </div>
 
-              <TabsList className="rounded-[8px] bg-[#23201d] p-1">
+              <div className="flex shrink-0 items-center gap-3">
+                <span className="rounded-[6px] border border-[#302c27] bg-[#211e1a] px-2.5 py-1 font-mono text-[#9f9588] text-xs">
+                  {scheduledTasks.length} task{scheduledTasks.length === 1 ? "" : "s"}
+                </span>
+                <TabsList className="rounded-[8px] bg-[#23201d] p-1">
                 <TabsTrigger
                   value="list"
                   className="h-8 rounded-[6px] px-3 text-[#948c82] data-active:bg-[#312d28] data-active:text-white"
@@ -107,6 +115,7 @@ export function TimelineView() {
                   Calendar
                 </TabsTrigger>
               </TabsList>
+              </div>
             </div>
 
             <TabsContent value="list" className="mt-9">

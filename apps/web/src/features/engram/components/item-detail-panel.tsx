@@ -303,7 +303,7 @@ export function ItemDetailPanel() {
                     </div>
                   </div>
 
-                  <DndContext sensors={sensors} onDragEnd={handleChecklistDragEnd}>
+                  <DndContext id="checklist-dnd" sensors={sensors} onDragEnd={handleChecklistDragEnd}>
                     <SortableContext items={checklist.map((ci) => ci.id)} strategy={verticalListSortingStrategy}>
                       <div className="space-y-0.5">
                         {checklist.map((ci) => (

@@ -419,6 +419,7 @@ export function FocusTasksPanel({ onClose }: { onClose: () => void }) {
 				{/* Task list */}
 				<div className="max-h-[480px] overflow-y-auto px-2 py-3">
 					<DndContext
+						id="focus-tasks-dnd"
 						sensors={sensors}
 						collisionDetection={closestCenter}
 						onDragStart={handleDragStart}

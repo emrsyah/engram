@@ -1,5 +1,17 @@
 import { TASK_ACCENT } from "./config";
-import type { Accent, CanvasViewState, ChecklistItem, EngramData, Item, ItemType, Priority, Space } from "./types";
+import type {
+  Accent,
+  CanvasViewState,
+  ChecklistItem,
+  DailyBriefing,
+  EngramData,
+  Item,
+  ItemLink,
+  ItemType,
+  Priority,
+  Space,
+  TaskQueue,
+} from "./types";
 
 /**
  * The pure Engram domain core.
@@ -22,6 +34,8 @@ export type CreateItemInput = {
   source?: string;
   caption?: string;
   focusPinned?: boolean;
+  taskQueue?: TaskQueue;
+  taskSortOrder?: number;
   tags?: string[];
   /** Override which space the item is created in (defaults to activeSpaceId). */
   spaceId?: string;
@@ -79,58 +93,66 @@ export type UpdateSpaceInput = {
   sortOrder?: number;
 };
 
-export function updateSpace(data: EngramData, spaceId: string, patch: UpdateSpaceInput): EngramData {
+export function updateSpace(
+  data: EngramData,
+  spaceId: string,
+  patch: UpdateSpaceInput,
+): EngramData {
   const timestamp = now();
   return {
     ...data,
     spaces: data.spaces.map((s) =>
-      s.id === spaceId
-        ? { ...s, ...patch, updatedAt: timestamp }
-        : s,
+      s.id === spaceId ? { ...s, ...patch, updatedAt: timestamp } : s,
     ),
   };
 }
 
 export function deleteSpace(data: EngramData, spaceId: string): EngramData {
-	const remaining = data.spaces.filter((s) => s.id !== spaceId);
-	const remainingViewStates = data.viewStates.filter((vs) => vs.spaceId !== spaceId);
-	const remainingItems = data.items.filter((i) => i.spaceId !== spaceId);
-	const remainingLinks = data.links
-		.filter(
-			(l) =>
-				!remainingItems.some((i) => i.id === l.fromItemId) &&
-				!remainingItems.some((i) => i.id === l.toItemId)
-					? false
-					: true,
-		)
-		.filter(
-			(l) =>
-				remainingItems.some((i) => i.id === l.fromItemId) &&
-				remainingItems.some((i) => i.id === l.toItemId),
-		);
+  const remaining = data.spaces.filter((s) => s.id !== spaceId);
+  const remainingViewStates = data.viewStates.filter((vs) => vs.spaceId !== spaceId);
+  const remainingItems = data.items.filter((i) => i.spaceId !== spaceId);
+  const remainingLinks = data.links
+    .filter((l) =>
+      !remainingItems.some((i) => i.id === l.fromItemId) &&
+      !remainingItems.some((i) => i.id === l.toItemId)
+        ? false
+        : true,
+    )
+    .filter(
+      (l) =>
+        remainingItems.some((i) => i.id === l.fromItemId) &&
+        remainingItems.some((i) => i.id === l.toItemId),
+    );
 
-	const activeSpaceId =
-		data.activeSpaceId === spaceId ? (remaining[0]?.id ?? data.activeSpaceId) : data.activeSpaceId;
+  const activeSpaceId =
+    data.activeSpaceId === spaceId ? (remaining[0]?.id ?? data.activeSpaceId) : data.activeSpaceId;
 
-	return {
-		...data,
-		spaces: remaining,
-		viewStates: remainingViewStates,
-		items: remainingItems,
-		links: remainingLinks,
-		activeSpaceId,
-	};
+  return {
+    ...data,
+    spaces: remaining,
+    viewStates: remainingViewStates,
+    items: remainingItems,
+    links: remainingLinks,
+    activeSpaceId,
+  };
 }
 
 function taskAccent(priority?: Priority): Accent {
   return priority ? TASK_ACCENT[priority] : "gold";
 }
 
+function nextTaskSortOrder(data: EngramData, queue: TaskQueue): number {
+  const orders = data.items
+    .filter((item) => item.type === "task" && (item.taskQueue ?? "next") === queue)
+    .map((item) => item.taskSortOrder ?? 0);
+  return orders.length ? Math.max(...orders) + 1 : 0;
+}
 
 /** Build the Item a capture would create. */
 export function buildItem(input: CreateItemInput, data: EngramData): Item {
   const timestamp = now();
   const targetSpaceId = input.spaceId ?? data.activeSpaceId;
+  const taskQueue = input.type === "task" ? (input.taskQueue ?? "later") : undefined;
   return {
     id: createId("item"),
     spaceId: targetSpaceId,
@@ -145,12 +167,27 @@ export function buildItem(input: CreateItemInput, data: EngramData): Item {
     priority: input.priority,
     dueAt: input.dueAt,
     focusPinned: input.focusPinned,
+    taskQueue,
+    taskSortOrder:
+      input.type === "task" ? (input.taskSortOrder ?? nextTaskSortOrder(data, taskQueue ?? "later")) : undefined,
     tags: input.tags,
     inbox: input.inbox,
     someday: input.someday,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
+}
+
+export function setTaskQueue(
+  data: EngramData,
+  id: string,
+  queue: TaskQueue,
+  sortOrder?: number,
+): EngramData {
+  return patchItem(data, id, {
+    taskQueue: queue,
+    taskSortOrder: sortOrder ?? nextTaskSortOrder(data, queue),
+  });
 }
 
 export function addItem(data: EngramData, item: Item): EngramData {
@@ -190,7 +227,8 @@ export function deleteItems(data: EngramData, ids: string[]): EngramData {
     ...data,
     items: data.items.filter((item) => !set.has(item.id)),
     links: data.links.filter((link) => !set.has(link.fromItemId) && !set.has(link.toItemId)),
-    selectedItemId: data.selectedItemId && set.has(data.selectedItemId) ? undefined : data.selectedItemId,
+    selectedItemId:
+      data.selectedItemId && set.has(data.selectedItemId) ? undefined : data.selectedItemId,
   };
 }
 
@@ -336,7 +374,11 @@ export function removeItemTag(data: EngramData, id: string, tag: string): Engram
   return patchItem(data, id, { tags });
 }
 
-export function moveItemToSpace(data: EngramData, itemId: string, targetSpaceId: string): EngramData {
+export function moveItemToSpace(
+  data: EngramData,
+  itemId: string,
+  targetSpaceId: string,
+): EngramData {
   const item = data.items.find((i) => i.id === itemId);
   if (!item) return data;
   const validLinks = data.links.filter((l) => {
@@ -347,7 +389,9 @@ export function moveItemToSpace(data: EngramData, itemId: string, targetSpaceId:
   });
   return {
     ...data,
-    items: data.items.map((i) => i.id === itemId ? { ...i, spaceId: targetSpaceId, updatedAt: now() } : i),
+    items: data.items.map((i) =>
+      i.id === itemId ? { ...i, spaceId: targetSpaceId, updatedAt: now() } : i,
+    ),
     links: validLinks,
   };
 }
@@ -369,10 +413,74 @@ export function fileItem(data: EngramData, itemId: string, targetSpaceId: string
   return {
     ...data,
     items: data.items.map((i) =>
-      i.id === itemId
-        ? { ...i, spaceId: targetSpaceId, inbox: false, updatedAt: now() }
-        : i,
+      i.id === itemId ? { ...i, spaceId: targetSpaceId, inbox: false, updatedAt: now() } : i,
     ),
     links: validLinks,
   };
+}
+
+// ── Selection & navigation ──────────────────────────────────────────────────
+
+/** Make a space active. */
+export function setActiveSpace(data: EngramData, spaceId: string): EngramData {
+  return { ...data, activeSpaceId: spaceId };
+}
+
+/** Select an item, switching to its space. No-op if the item is gone. */
+export function selectItem(data: EngramData, id: string): EngramData {
+  const item = data.items.find((i) => i.id === id);
+  if (!item) return data;
+  return { ...data, activeSpaceId: item.spaceId, selectedItemId: id };
+}
+
+/**
+ * Restore previously deleted items and their links (undo). Items already present
+ * are skipped; links are re-added only if they still satisfy the link invariants
+ * against the restored item set (no self/cross-space/duplicate, both endpoints
+ * present), so undo can never resurrect an invalid link.
+ */
+export function restoreItems(data: EngramData, items: Item[], links: ItemLink[]): EngramData {
+  const presentIds = new Set(data.items.map((i) => i.id));
+  const itemsToAdd = items.filter((i) => !presentIds.has(i.id));
+  const nextItems = [...data.items, ...itemsToAdd];
+
+  const itemById = new Map(nextItems.map((i) => [i.id, i]));
+  const existingLinkIds = new Set(data.links.map((l) => l.id));
+  const validLinks = links.filter((l) => {
+    if (existingLinkIds.has(l.id)) return false;
+    if (l.fromItemId === l.toItemId) return false;
+    const from = itemById.get(l.fromItemId);
+    const to = itemById.get(l.toItemId);
+    if (!from || !to || from.spaceId !== to.spaceId) return false;
+    return !data.links.some(
+      (existing) =>
+        existing.spaceId === from.spaceId &&
+        ((existing.fromItemId === l.fromItemId && existing.toItemId === l.toItemId) ||
+          (existing.fromItemId === l.toItemId && existing.toItemId === l.fromItemId)),
+    );
+  });
+
+  return { ...data, items: nextItems, links: [...data.links, ...validLinks] };
+}
+
+// ── Daily briefing & note ───────────────────────────────────────────────────
+
+/** Store the AI briefing for its date, replacing any existing one. */
+export function saveDailyBriefing(data: EngramData, briefing: DailyBriefing): EngramData {
+  return {
+    ...data,
+    dailyBriefings: { ...data.dailyBriefings, [briefing.date]: briefing },
+  };
+}
+
+/** Create or update today's daily-note thought, keyed by its titled prefix. */
+export function upsertDailyNote(data: EngramData, datePrefix: string, text: string): EngramData {
+  const noteTitle = `Daily Note — ${datePrefix}`;
+  const existing = data.items.find((item) => item.type === "thought" && item.title === noteTitle);
+  if (existing) return patchItem(data, existing.id, { text });
+  const item = buildItem(
+    { type: "thought", title: noteTitle, text, stayOnCurrentView: true },
+    data,
+  );
+  return addItem(data, item);
 }

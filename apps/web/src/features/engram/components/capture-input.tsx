@@ -4,76 +4,19 @@ import { cn } from "@alphonse/ui/lib/utils";
 import { CalendarIcon, FlagIcon, Hash as HashIcon, LayoutDashboard as LayoutDashboardIcon } from "./icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { type CaptureToken, highlightSegments, type Segment } from "../capture-grammar";
 import type { ItemType } from "../types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CaptureInput — single-line input with live syntax highlighting and trigger
-// popups for @mention, !priority, ~space, and /command.
+// popups for @mention, !priority, ~space, and /command. The capture syntax
+// itself lives in ../capture-grammar (shared with QuickCaptureBar's parser).
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type MentionItem = { id: string; label: string; type: ItemType };
 export type SpaceItem = { id: string; name: string };
 
-export type CaptureToken = "priority" | "tag" | "date" | "mention" | "space";
-
-type Segment = { text: string; kind: "plain" | CaptureToken };
-type Range = { start: number; end: number; kind: CaptureToken };
-
-const TAG_RE = /#\w[\w-]*/g;
-const MENTION_RE = /@\w*/g;
-const SPACE_TRIGGER_RE = /~\S*/g;
-const PRIORITY_RE = /(^|\s)(!p?[123])\b/gi;
-const DATE_WORD_RE = /\b(?:tonight|today|tomorrow|next week|someday|later)\b/gi;
-const TIME_RE = /\b(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/gi;
-
-function collectSimple(text: string, re: RegExp, kind: CaptureToken, out: Range[]) {
-  re.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
-    out.push({ start: m.index, end: m.index + m[0].length, kind });
-    if (m.index === re.lastIndex) re.lastIndex++;
-  }
-}
-
-function tokenize(text: string, enabled: CaptureToken[], spaceHighlight: boolean): Segment[] {
-  if (!text) return [];
-  const ranges: Range[] = [];
-
-  if (enabled.includes("priority")) {
-    PRIORITY_RE.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = PRIORITY_RE.exec(text))) {
-      const lead = m[1]?.length ?? 0;
-      ranges.push({ start: m.index + lead, end: m.index + m[0].length, kind: "priority" });
-    }
-  }
-  if (enabled.includes("tag")) collectSimple(text, TAG_RE, "tag", ranges);
-  if (enabled.includes("mention")) collectSimple(text, MENTION_RE, "mention", ranges);
-  if (spaceHighlight) collectSimple(text, SPACE_TRIGGER_RE, "space", ranges);
-  if (enabled.includes("date")) {
-    collectSimple(text, DATE_WORD_RE, "date", ranges);
-    collectSimple(text, TIME_RE, "date", ranges);
-  }
-
-  ranges.sort((a, b) => a.start - b.start || b.end - a.end);
-  const accepted: Range[] = [];
-  let lastEnd = -1;
-  for (const r of ranges) {
-    if (r.start < lastEnd) continue;
-    accepted.push(r);
-    lastEnd = r.end;
-  }
-
-  const segments: Segment[] = [];
-  let cursor = 0;
-  for (const r of accepted) {
-    if (r.start > cursor) segments.push({ text: text.slice(cursor, r.start), kind: "plain" });
-    segments.push({ text: text.slice(r.start, r.end), kind: r.kind });
-    cursor = r.end;
-  }
-  if (cursor < text.length) segments.push({ text: text.slice(cursor), kind: "plain" });
-  return segments;
-}
+export type { CaptureToken };
 
 const SEGMENT_CLASS: Record<Segment["kind"], string> = {
   plain: "text-white",
@@ -219,7 +162,7 @@ export function CaptureInput({
   })();
 
   const dropdownOpen = popup !== null && popupItems.length > 0;
-  const segments = tokenize(value, highlight, spaceEnabled);
+  const segments = highlightSegments(value, highlight, spaceEnabled);
 
   const syncScroll = useCallback(() => {
     if (backdropRef.current && ref.current) backdropRef.current.scrollLeft = ref.current.scrollLeft;

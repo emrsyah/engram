@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 export default function DashboardPage() {
   const router = useRouter();
   useEffect(() => {
-    router.replace("/canvas");
+    router.replace("/tasks");
   }, [router]);
   return null;
 }

@@ -2,7 +2,6 @@
 
 import { Button, buttonVariants } from "@alphonse/ui/components/button";
 import { cn } from "@alphonse/ui/lib/utils";
-import { CheckmarkSquareIcon as CheckSquare, NotebookPen, TimerIcon as Timer } from "./icons";
 import type { Route } from "next";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -10,26 +9,22 @@ import { usePathname } from "next/navigation";
 import { NAV_VIEWS } from "../nav";
 import { useEngramStore } from "../store";
 import { useUIStore } from "../ui-store";
-import { FocusScratchpadPanel } from "./focus-scratchpad-panel";
-import { FocusTasksPanel } from "./focus-tasks-panel";
-import { FocusTimerPanel } from "./focus-timer-panel";
 import { Icons } from "./icons";
+
+const ROUTE_TITLES: Record<string, string> = {
+	"/tasks": "Tasks",
+	"/library": "Library",
+};
 
 export function TopBar() {
 	const pathname = usePathname();
-	const { activeSpace, activeItems } = useEngramStore();
+	const { activeSpace } = useEngramStore();
 	const {
 		openSearch,
 		expandQuickCapture,
 		sidebarCollapsed,
 		toggleSidebar,
 		openShortcuts,
-		timerOpen,
-		scratchpadOpen,
-		focusTasksOpen,
-		toggleTimer,
-		toggleScratchpad,
-		toggleFocusTasks,
 	} = useUIStore();
 
 	return (
@@ -49,13 +44,8 @@ export function TopBar() {
 				)}
 				<Icons.layout className="size-4 text-[#8a8378]" />
 				<h1 className="truncate font-bold text-white">
-					{pathname === "/focus" ? "Focus" : activeSpace?.name ?? "Mind"}
+					{ROUTE_TITLES[pathname] ?? activeSpace?.name ?? "Mind"}
 				</h1>
-				{pathname !== "/focus" && (
-					<span className="text-[#776f65] text-sm">
-						/ {activeItems.length} items
-					</span>
-				)}
 			</div>
 
 			<div className="flex items-center gap-4">
@@ -100,68 +90,6 @@ export function TopBar() {
 					</span>
 				</Button>
 
-				{/* ── Focus panel buttons ── */}
-				<div className="flex items-center gap-1">
-					<div className="relative">
-						<Button
-							type="button"
-							variant="ghost"
-							size="icon-xs"
-							onClick={toggleTimer}
-							title="Pomodoro timer"
-							className={cn(
-								"size-8",
-								timerOpen
-									? "bg-[#251f38] text-[#907ce8]"
-									: "text-[#706a62] hover:text-[#c8bfb2]",
-							)}
-						>
-							<Timer className="size-4" />
-						</Button>
-						{timerOpen && <FocusTimerPanel onClose={toggleTimer} />}
-					</div>
-
-					<div className="relative">
-						<Button
-							type="button"
-							variant="ghost"
-							size="icon-xs"
-							onClick={toggleScratchpad}
-							title="Daily scratchpad"
-							className={cn(
-								"size-8",
-								scratchpadOpen
-									? "bg-[#251f38] text-[#907ce8]"
-									: "text-[#706a62] hover:text-[#c8bfb2]",
-							)}
-						>
-							<NotebookPen className="size-4" />
-						</Button>
-						{scratchpadOpen && (
-							<FocusScratchpadPanel onClose={toggleScratchpad} />
-						)}
-					</div>
-
-					<div className="relative">
-						<Button
-							type="button"
-							variant="ghost"
-							size="icon-xs"
-							onClick={toggleFocusTasks}
-							title="Focus tasks"
-							className={cn(
-								"size-8",
-								focusTasksOpen
-									? "bg-[#251f38] text-[#907ce8]"
-									: "text-[#706a62] hover:text-[#c8bfb2]",
-							)}
-						>
-							<CheckSquare className="size-4" />
-						</Button>
-						{focusTasksOpen && <FocusTasksPanel onClose={toggleFocusTasks} />}
-					</div>
-				</div>
-
 				<Button
 					type="button"
 					variant="ghost"
@@ -176,11 +104,7 @@ export function TopBar() {
 				<Button
 					type="button"
 					onClick={() =>
-						expandQuickCapture(
-							pathname === "/timeline"
-								? "task"
-								: undefined,
-						)
+						expandQuickCapture(pathname === "/library" ? "thought" : "task")
 					}
 					className="h-10 rounded-[8px] bg-[#907ce8] px-4 font-bold text-[#17131f] transition-transform duration-100 hover:bg-[#a08ef2] active:scale-[0.97]"
 				>

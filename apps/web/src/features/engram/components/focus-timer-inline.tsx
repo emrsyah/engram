@@ -6,58 +6,40 @@ import { PopoverContent, PopoverRoot, PopoverTrigger } from "@alphonse/ui/compon
 import { ToggleGroup, ToggleGroupItem } from "@alphonse/ui/components/toggle-group";
 import { cn } from "@alphonse/ui/lib/utils";
 import { ClockIcon as Clock, Pause, Play, RotateCcw, Settings2 } from "./icons";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
+
+import { usePomodoro } from "./use-pomodoro";
 
 const EASE_OUT = "cubic-bezier(0.23, 1, 0.32, 1)";
-
-type Phase = "idle" | "work" | "break";
 
 const WORK_PRESETS = [15, 25, 30, 45, 60];
 const BREAK_PRESETS = [5, 10, 15];
 
 export function FocusTimerInline() {
-	const [workMins, setWorkMins] = useState(25);
-	const [breakMins, setBreakMins] = useState(5);
-	const [phase, setPhase] = useState<Phase>("idle");
-	const [remaining, setRemaining] = useState(25 * 60);
-	const [running, setRunning] = useState(false);
-	const [sessions, setSessions] = useState(0);
+	const {
+		workMins,
+		setWorkMins,
+		breakMins,
+		setBreakMins,
+		phase,
+		setPhase,
+		setRemaining,
+		running,
+		setRunning,
+		sessions,
+		workSecs,
+		breakSecs,
+		start,
+		pause,
+		reset,
+		mins,
+		secs,
+		progress,
+		accent,
+	} = usePomodoro(25, 5);
 	const [customOpen, setCustomOpen] = useState(false);
 	const [customWork, setCustomWork] = useState("25");
 	const [customBreak, setCustomBreak] = useState("5");
-	const phaseRef = useRef(phase);
-	phaseRef.current = phase;
-
-	const workSecs = workMins * 60;
-	const breakSecs = breakMins * 60;
-
-	useEffect(() => {
-		if (!running) return;
-		const id = setInterval(() => {
-			setRemaining((s) => {
-				if (s > 1) return s - 1;
-				clearInterval(id);
-				setRunning(false);
-				const next: Phase = phaseRef.current === "work" ? "break" : "work";
-				if (phaseRef.current === "work") setSessions((n) => n + 1);
-				setPhase(next);
-				setRemaining(next === "break" ? breakSecs : workSecs);
-				return 0;
-			});
-		}, 1000);
-		return () => clearInterval(id);
-	}, [running, workSecs, breakSecs]);
-
-	const start = () => {
-		if (phase === "idle") setPhase("work");
-		setRunning(true);
-	};
-	const pause = () => setRunning(false);
-	const reset = () => {
-		setRunning(false);
-		setPhase("idle");
-		setRemaining(workSecs);
-	};
 
 	const switchPhase = useCallback(
 		(p: "work" | "break") => {
@@ -65,7 +47,7 @@ export function FocusTimerInline() {
 			setPhase(p);
 			setRemaining(p === "break" ? breakSecs : workSecs);
 		},
-		[breakSecs, workSecs],
+		[breakSecs, workSecs, setRunning, setPhase, setRemaining],
 	);
 
 	const applyCustom = () => {
@@ -79,13 +61,6 @@ export function FocusTimerInline() {
 		setCustomOpen(false);
 	};
 
-	const mins = Math.floor(remaining / 60)
-		.toString()
-		.padStart(2, "0");
-	const secs = (remaining % 60).toString().padStart(2, "0");
-	const total = phase === "break" ? breakSecs : workSecs;
-	const progress = total > 0 ? (total - remaining) / total : 0;
-	const accent = phase === "break" ? "#43b6a6" : "#907ce8";
 	const activeMins = phase === "break" ? breakMins : workMins;
 
 	const statusLine =

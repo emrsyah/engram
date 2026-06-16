@@ -61,6 +61,11 @@ const ItemSchema = z.object({
 	dueAt: z.string().optional(),
 	checklistItems: z.array(ChecklistItemSchema).optional(),
 	focusPinned: z.boolean().optional(),
+	focusPlanDate: z.string().optional(),
+	focusTier: z.enum(["top", "backlog"]).optional(),
+	focusSortOrder: z.number().optional(),
+	taskQueue: z.enum(["now", "next", "later", "waiting"]).optional(),
+	taskSortOrder: z.number().optional(),
 	tags: z.array(z.string()).optional(),
 	inbox: z.boolean().optional(),
 	someday: z.boolean().optional(),
@@ -80,6 +85,22 @@ const ItemLinkSchema = z.object({
 	createdAt: z.string(),
 });
 
+const DailyBriefingSuggestionSchema = z.object({
+	taskId: z.string(),
+	reason: z.string(),
+	target: z.enum(["top", "backlog"]),
+});
+
+const DailyBriefingSchema = z.object({
+	date: z.string(),
+	headline: z.string(),
+	summary: z.string(),
+	topThreeRationale: z.array(z.string()),
+	risks: z.array(z.string()),
+	suggestedAdjustments: z.array(DailyBriefingSuggestionSchema),
+	generatedAt: z.string(),
+});
+
 const CanvasViewStateSchema = z.object({
 	id: z.string(),
 	spaceId: z.string(),
@@ -95,6 +116,7 @@ const EngramDataSchema = z.object({
 	items: z.array(ItemSchema),
 	links: z.array(ItemLinkSchema),
 	viewStates: z.array(CanvasViewStateSchema),
+	dailyBriefings: z.record(z.string(), DailyBriefingSchema).optional(),
 	// clusters field silently ignored if present in old saves.
 	clusters: z.array(z.unknown()).optional(),
 	activeSpaceId: z.string(),
@@ -131,4 +153,3 @@ export function createLocalStorageAdapter(): EngramPersistence {
 		},
 	};
 }
-

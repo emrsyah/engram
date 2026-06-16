@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@alphonse/ui/components/button";
 import { Checkbox } from "@alphonse/ui/components/checkbox";
 import {
@@ -41,7 +41,11 @@ export function InboxView() {
   const { openDetail, expandQuickCapture } = useUIStore();
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const sortedSpaces = [...spaces].sort((a, b) => a.sortOrder - b.sortOrder);
+  const [triageMode, setTriageMode] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const activeRowRef = useRef<HTMLDivElement | null>(null);
+  const sortedSpaces = useMemo(() => [...spaces].sort((a, b) => a.sortOrder - b.sortOrder), [spaces]);
+  const activeItem = inboxItems[activeIndex];
 
   const allSelected = inboxItems.length > 0 && selected.size === inboxItems.length;
   const someSelected = selected.size > 0;
@@ -79,6 +83,121 @@ export function InboxView() {
     setSelected(new Set());
   }, [selected, removeItems]);
 
+  const moveActive = useCallback(
+    (direction: 1 | -1) => {
+      if (inboxItems.length === 0) return;
+      setActiveIndex((current) => {
+        const next = current + direction;
+        if (next < 0) return inboxItems.length - 1;
+        if (next >= inboxItems.length) return 0;
+        return next;
+      });
+    },
+    [inboxItems.length],
+  );
+
+  const fileActiveItem = useCallback(
+    (spaceIndex: number) => {
+      if (!activeItem) return;
+      const targetSpace = sortedSpaces[spaceIndex];
+      if (!targetSpace) return;
+
+      fileItem(activeItem.id, targetSpace.id);
+      toast.success(`Filed to ${targetSpace.name}`);
+      setActiveIndex((current) => Math.min(current, Math.max(inboxItems.length - 2, 0)));
+    },
+    [activeItem, fileItem, inboxItems.length, sortedSpaces],
+  );
+
+  const deleteActiveItem = useCallback(() => {
+    if (!activeItem) return;
+    removeItems([activeItem.id]);
+    setActiveIndex((current) => Math.min(current, Math.max(inboxItems.length - 2, 0)));
+  }, [activeItem, inboxItems.length, removeItems]);
+
+  useEffect(() => {
+    if (activeIndex <= inboxItems.length - 1) return;
+    setActiveIndex(Math.max(inboxItems.length - 1, 0));
+  }, [activeIndex, inboxItems.length]);
+
+  useEffect(() => {
+    if (!triageMode) return;
+    activeRowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [activeIndex, triageMode]);
+
+  useEffect(() => {
+    if (!triageMode) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const isEditable =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable;
+
+      if (isEditable || event.metaKey || event.ctrlKey || event.altKey) return;
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        setTriageMode(false);
+        return;
+      }
+
+      if (event.key === "j" || event.key === "J" || event.key === "ArrowDown") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        moveActive(1);
+        return;
+      }
+
+      if (event.key === "k" || event.key === "K" || event.key === "ArrowUp") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        moveActive(-1);
+        return;
+      }
+
+      if ((event.key === "Enter" || event.key === "o" || event.key === "O") && activeItem) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        openDetail(activeItem.id);
+        return;
+      }
+
+      if ((event.key === "d" || event.key === "D" || event.key === "Backspace") && activeItem) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        deleteActiveItem();
+        return;
+      }
+
+      if (event.key === " " && activeItem?.type === "task") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        toggleDone(activeItem.id);
+        return;
+      }
+
+      if (/^[1-9]$/.test(event.key)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        fileActiveItem(Number(event.key) - 1);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
+  }, [
+    activeItem,
+    deleteActiveItem,
+    fileActiveItem,
+    moveActive,
+    openDetail,
+    toggleDone,
+    triageMode,
+  ]);
+
   return (
     <section className="h-full overflow-y-auto bg-[#151310] px-8 py-10 text-white md:px-16 lg:px-28">
       <div className="mx-auto max-w-[860px]">
@@ -99,10 +218,64 @@ export function InboxView() {
               decide at capture time.
             </p>
           </div>
-          <span className="shrink-0 rounded-[6px] border border-[#302c27] bg-[#211e1a] px-2.5 py-1 font-mono text-[#9f9588] text-xs">
-            {inboxItems.length} item{inboxItems.length === 1 ? "" : "s"}
-          </span>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setTriageMode((value) => !value)}
+              disabled={inboxItems.length === 0}
+              className={cn(
+                "flex h-8 items-center gap-1.5 rounded-[7px] border px-3 font-semibold text-xs transition-colors",
+                triageMode
+                  ? "border-[#907ce8] bg-[#2a2440] text-[#cfc7ff]"
+                  : "border-[#302c27] bg-[#211e1a] text-[#9f9588] hover:border-[#3a352e] hover:text-[#d8d2ca]",
+                inboxItems.length === 0 && "cursor-not-allowed opacity-50 hover:border-[#302c27]",
+              )}
+            >
+              <Icons.keyboard className="size-3.5" />
+              Triage
+            </button>
+            <span className="rounded-[6px] border border-[#302c27] bg-[#211e1a] px-2.5 py-1 font-mono text-[#9f9588] text-xs">
+              {inboxItems.length} item{inboxItems.length === 1 ? "" : "s"}
+            </span>
+          </div>
         </div>
+
+        {triageMode && inboxItems.length > 0 && (
+          <div className="mt-6 rounded-[10px] border border-[#3a3252] bg-[#1e1b2a] px-4 py-3">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+              <span className="font-semibold text-[#cfc7ff]">
+                Triage {activeIndex + 1} / {inboxItems.length}
+              </span>
+              <span className="text-[#9087b8]">J/K move</span>
+              <span className="text-[#9087b8]">1-9 file</span>
+              <span className="text-[#9087b8]">Enter open</span>
+              <span className="text-[#9087b8]">D delete</span>
+              <span className="text-[#9087b8]">Esc exit</span>
+            </div>
+            {sortedSpaces.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {sortedSpaces.slice(0, 9).map((space, index) => {
+                  const iconKey = (space.icon in SPACE_ICONS
+                    ? space.icon
+                    : "sparkles") as SpaceIconKey;
+                  const SpaceIcon = Icons[SPACE_ICONS[iconKey]];
+                  return (
+                    <button
+                      key={space.id}
+                      type="button"
+                      onClick={() => fileActiveItem(index)}
+                      className="flex h-7 items-center gap-1.5 rounded-[6px] border border-[#3a3252] bg-[#241f3a] px-2 text-[12px] font-medium text-[#cfc7ff] hover:bg-[#2d2750] hover:text-white"
+                    >
+                      <span className="font-mono text-[#9087b8]">{index + 1}</span>
+                      <SpaceIcon className="size-3.5" />
+                      {space.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Bulk action bar */}
         {someSelected && (
@@ -209,6 +382,8 @@ export function InboxView() {
                   spaces={sortedSpaces}
                   selected={selected.has(item.id)}
                   anySelected={someSelected}
+                  active={triageMode && i === activeIndex}
+                  ref={triageMode && i === activeIndex ? activeRowRef : undefined}
                   onSelect={() => toggleSelect(item.id)}
                   onOpen={() => openDetail(item.id)}
                   onToggleDone={() => toggleDone(item.id)}
@@ -238,41 +413,45 @@ export function InboxView() {
   );
 }
 
-function InboxRow({
-  item,
-  index,
-  spaces,
-  selected,
-  anySelected,
-  onSelect,
-  onOpen,
-  onToggleDone,
-  onDelete,
-  onFile,
-}: {
+const InboxRow = forwardRef<HTMLDivElement, {
   item: Item;
   index: number;
   spaces: { id: string; name: string; icon: string; color: Accent }[];
   selected: boolean;
   anySelected: boolean;
+  active: boolean;
   onSelect: () => void;
   onOpen: () => void;
   onToggleDone: () => void;
   onDelete: () => void;
   onFile: (spaceId: string, spaceName: string) => void;
-}) {
+}>(function InboxRow({
+  item,
+  index,
+  spaces,
+  selected,
+  anySelected,
+  active,
+  onSelect,
+  onOpen,
+  onToggleDone,
+  onDelete,
+  onFile,
+}, ref) {
   const TypeIcon = Icons[TYPE_ICON[item.type]];
   const label = item.title?.trim() || item.text?.trim() || item.url || item.source || "Untitled";
   const secondary = item.title?.trim() && item.text?.trim() ? item.text.trim() : undefined;
 
   return (
     <div
+      ref={ref}
       className={cn(
         "stagger-item group flex items-start gap-3 rounded-[10px] border bg-[#1b1815] px-4 py-3",
-        "transition-[border-color,background-color] duration-150",
+        "transition-[border-color,background-color,box-shadow] duration-150",
         selected
           ? "border-[#3a3252] bg-[#1e1b2a]"
           : "border-[#2a2621] hover:border-[#3a352e] hover:bg-[#201d19]",
+        active && "border-[#907ce8] bg-[#211d2d] shadow-[0_0_0_1px_rgba(144,124,232,0.35)]",
       )}
       style={{ animationDelay: `${80 + index * 30}ms` }}
     >
@@ -370,4 +549,4 @@ function InboxRow({
       </div>
     </div>
   );
-}
+});

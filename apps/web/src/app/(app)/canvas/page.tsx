@@ -1,5 +1,6 @@
-import { BoardView } from "@/features/engram/components/board-view";
+import type { Route } from "next";
+import { redirect } from "next/navigation";
 
 export default function CanvasPage() {
-  return <BoardView />;
+  redirect("/tasks" as Route<string>);
 }

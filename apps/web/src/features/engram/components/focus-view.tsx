@@ -1,893 +1,751 @@
 "use client";
 
 import { Button } from "@alphonse/ui/components/button";
-import { Card } from "@alphonse/ui/components/card";
 import { Checkbox } from "@alphonse/ui/components/checkbox";
-import { Input } from "@alphonse/ui/components/input";
-import { ScrollArea } from "@alphonse/ui/components/scroll-area";
 import { cn } from "@alphonse/ui/lib/utils";
+import { useCallback, useState } from "react";
+import { toast } from "sonner";
+
+import { todayPrefix } from "../projections";
+import { useEngramStore } from "../store";
+import { useUIStore } from "../ui-store";
+import type { DailyBriefing, FocusTier, Item } from "../types";
+import { DueChip, PriorityChip } from "./chips";
 import {
-	closestCenter,
-	DndContext,
-	type DragEndEvent,
-	DragOverlay,
-	type DragStartEvent,
-	KeyboardSensor,
-	PointerSensor,
-	useSensor,
-	useSensors,
-} from "@dnd-kit/core";
-import {
-	arrayMove,
-	SortableContext,
-	sortableKeyboardCoordinates,
-	useSortable,
-	verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import {
+	ArrowUpRightIcon,
 	CheckmarkIcon as Check,
 	ChevronDown,
 	ChevronRight,
-	GripVertical,
-	Pin,
+	ClockIcon,
+	Loader,
 	PinOff,
 	PlusIcon as Plus,
-	Target,
+	Sparkles,
+	Icons,
 } from "./icons";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { TODAY_FOCUS_SPACE_ID } from "../config";
-import { useEngramStore } from "../store";
-import type { Item } from "../types";
-import { DueChip, PriorityChip } from "./chips";
-import { FocusScratchpadInline } from "./focus-scratchpad-inline";
-import { FocusTimerInline } from "./focus-timer-inline";
+type BriefingStatus = "idle" | "loading";
 
-const TOP_N = 3;
-
-// ─── Custom easing tokens ─────────────────────────────────────────────────────
-const _EASE_IN_OUT = "cubic-bezier(0.77, 0, 0.175, 1)";
-const EASE_OUT = "cubic-bezier(0.23, 1, 0.32, 1)";
-
-// ─── Celebration burst (WAAPI, interruptible, respects reduced motion) ──────
-
-type Particle = {
-	id: number;
-	x: number;
-	y: number;
-	color: string;
-	angle: number;
-	dist: number;
+type BriefingTask = {
+	id: string;
+	title: string;
+	priority?: number;
+	dueAt?: string;
+	done?: boolean;
 };
 
-function CelebrationBurst({
-	origin,
-}: {
-	origin: { x: number; y: number } | null;
-}) {
-	const [particles, setParticles] = useState<Particle[]>([]);
-	const countRef = useRef(0);
-	const containerRef = useRef<HTMLDivElement>(null);
-
-	useEffect(() => {
-		if (!origin) return;
-		const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-		if (reduced) return;
-
-		const colors = ["#907ce8", "#d9a82f", "#43b6a6", "#e46f50", "#4aa5c8"];
-		const next: Particle[] = Array.from({ length: 16 }, (_, i) => ({
-			id: ++countRef.current,
-			x: origin.x,
-			y: origin.y,
-			color: colors[i % colors.length],
-			angle: (360 / 16) * i,
-			dist: 36 + Math.random() * 30,
-		}));
-		setParticles(next);
-		const t = setTimeout(() => setParticles([]), 700);
-		return () => clearTimeout(t);
-	}, [origin]);
-
-	useEffect(() => {
-		if (!containerRef.current) return;
-		const els = containerRef.current.querySelectorAll<HTMLElement>(".focus-particle");
-		els.forEach((el) => {
-			const tx = el.style.getPropertyValue("--tx");
-			const ty = el.style.getPropertyValue("--ty");
-			el.animate(
-				[
-					{ transform: "translate(0,0) scale(1)", opacity: 1 },
-					{ transform: `translate(${tx}, ${ty}) scale(0)`, opacity: 0 },
-				],
-				{ duration: 650, fill: "forwards", easing: EASE_OUT },
-			);
-		});
-	}, [particles]);
-
-	return (
-		<div ref={containerRef} className="pointer-events-none fixed inset-0 z-[300]">
-			{particles.map((p) => {
-				const rad = (p.angle * Math.PI) / 180;
-				const tx = Math.cos(rad) * p.dist;
-				const ty = Math.sin(rad) * p.dist;
-				return (
-					<div
-						key={p.id}
-						className="focus-particle absolute size-2 rounded-full"
-						style={{
-							left: p.x,
-							top: p.y,
-							backgroundColor: p.color,
-							["--tx" as string]: `${tx}px`,
-							["--ty" as string]: `${ty}px`,
-						}}
-					/>
-				);
-			})}
-		</div>
-	);
-}
-
-// ─── Sortable task row (top priority card) ─────────────────────────────────────
-
-function SortablePriorityCard({
-	task,
-	onToggle,
-	onUnpin,
-}: {
-	task: Item;
-	onToggle: (id: string, origin: { x: number; y: number }) => void;
-	onUnpin: (id: string) => void;
-}) {
-	const { toggleChecklistItem } = useEngramStore();
-	const {
-		attributes,
-		listeners,
-		setNodeRef,
-		transform,
-		transition,
-		isDragging,
-	} = useSortable({ id: task.id });
-
-	const style = {
-		transform: CSS.Transform.toString(transform),
-		transition: transition ?? undefined,
+function asBriefingTask(task: Item): BriefingTask {
+	return {
+		id: task.id,
+		title: task.title ?? task.text ?? "Untitled task",
+		priority: task.priority,
+		dueAt: task.dueAt,
+		done: task.done,
 	};
-	const checkRef = useRef<HTMLButtonElement>(null);
-
-	const handleCheck = () => {
-		if (!checkRef.current) return;
-		const rect = checkRef.current.getBoundingClientRect();
-		onToggle(task.id, {
-			x: rect.left + rect.width / 2,
-			y: rect.top + rect.height / 2,
-		});
-	};
-
-	return (
-		<div
-			ref={setNodeRef}
-			style={style}
-			className={cn(
-				"group rounded-[10px] border border-[#907ce8]/20 bg-[#1e1b25] p-4",
-				"hover:border-[#907ce8]/40",
-				isDragging && "opacity-40",
-				task.done && "opacity-55 border-[#3a3530]/50",
-			)}
-		>
-			<div className="flex items-start gap-3">
-				<Button
-					type="button"
-					variant="ghost"
-					size="icon-xs"
-					{...attributes}
-					{...listeners}
-					tabIndex={-1}
-					className="mt-0.5 cursor-grab touch-none text-[#5a546d] opacity-0 transition-opacity duration-150 active:scale-[0.96] active:cursor-grabbing group-hover:opacity-100"
-				>
-					<GripVertical className="size-4" />
-				</Button>
-				<Checkbox
-					ref={checkRef}
-					checked={task.done}
-					onCheckedChange={handleCheck}
-					className={cn(
-						"mt-1 shrink-0 rounded-[4px] border-[#5a546d] transition-colors duration-200",
-						task.done && "border-[#907ce8] bg-[#907ce8]",
-					)}
-				/>
-				<div className="min-w-0 flex-1">
-					<p
-						className={cn(
-							"font-semibold text-[#e0d8cf] text-base leading-snug",
-							task.done && "text-[#6b6560] line-through font-normal",
-						)}
-					>
-						{task.title ?? task.text ?? "Untitled task"}
-					</p>
-					{(task.priority || task.dueAt) && (
-						<div className="mt-2 flex flex-wrap gap-1.5">
-							{task.priority && <PriorityChip priority={task.priority} />}
-							{task.dueAt && <DueChip dueAt={task.dueAt} />}
-						</div>
-					)}
-					{task.checklistItems && task.checklistItems.length > 0 && (
-						<div className="mt-3 space-y-1.5">
-							{task.checklistItems.map((ci) => (
-								<button
-									key={ci.id}
-									type="button"
-									onClick={() => toggleChecklistItem(task.id, ci.id)}
-									className="nodrag flex w-full items-center gap-2 text-left active:scale-[0.98]"
-								>
-									<span
-										className={cn(
-											"flex size-4 shrink-0 items-center justify-center rounded-[4px] border border-[#5a546d] transition-colors duration-200",
-											ci.done && "border-[#907ce8] bg-[#907ce8]",
-										)}
-									>
-										{ci.done && <Check className="size-2.5 text-white" />}
-									</span>
-									<span
-										className={cn(
-											"text-[#b0a99f] text-sm leading-snug",
-											ci.done && "text-[#5a5450] line-through",
-										)}
-									>
-										{ci.text}
-									</span>
-								</button>
-							))}
-						</div>
-					)}
-				</div>
-				<Button
-					type="button"
-					variant="ghost"
-					size="icon-xs"
-					onClick={() => onUnpin(task.id)}
-					title="Remove from focus"
-					className="mt-1 shrink-0 text-[#5a546d] opacity-0 transition-opacity duration-150 active:scale-[0.95] hover:text-[#e46f50] group-hover:opacity-100"
-				>
-					<PinOff className="size-4" />
-				</Button>
-			</div>
-		</div>
-	);
 }
-
-// ─── Sortable task row (backlog) ──────────────────────────────────────────────
-
-function SortableBacklogRow({
-	task,
-	onToggle,
-	onUnpin,
-}: {
-	task: Item;
-	onToggle: (id: string, origin: { x: number; y: number }) => void;
-	onUnpin: (id: string) => void;
-}) {
-	const { toggleChecklistItem } = useEngramStore();
-	const {
-		attributes,
-		listeners,
-		setNodeRef,
-		transform,
-		transition,
-		isDragging,
-	} = useSortable({ id: task.id });
-
-	const style = {
-		transform: CSS.Transform.toString(transform),
-		transition: transition ?? undefined,
-	};
-	const checkRef = useRef<HTMLButtonElement>(null);
-
-	const handleCheck = () => {
-		if (!checkRef.current) return;
-		const rect = checkRef.current.getBoundingClientRect();
-		onToggle(task.id, {
-			x: rect.left + rect.width / 2,
-			y: rect.top + rect.height / 2,
-		});
-	};
-
-	return (
-		<div
-			ref={setNodeRef}
-			style={style}
-			className={cn(
-				"group flex items-start gap-2 rounded-[7px] px-2 py-2",
-				"transition-colors duration-150 hover:bg-[#211e1a]",
-				isDragging && "opacity-40",
-				task.done && "opacity-55",
-			)}
-		>
-			<Button
-				type="button"
-				variant="ghost"
-				size="icon-xs"
-				{...attributes}
-				{...listeners}
-				tabIndex={-1}
-				className="mt-0.5 cursor-grab touch-none text-[#3e3a35] opacity-0 transition-opacity duration-150 active:scale-[0.96] active:cursor-grabbing group-hover:opacity-100"
-			>
-				<GripVertical className="size-3.5" />
-			</Button>
-			<Checkbox
-				ref={checkRef}
-				checked={task.done}
-				onCheckedChange={handleCheck}
-				className={cn(
-					"mt-0.5 shrink-0 rounded-[4px] border-[#4a4540] transition-colors duration-200",
-					task.done && "border-[#907ce8] bg-[#907ce8]",
-				)}
-			/>
-			<div className="min-w-0 flex-1">
-				<p
-					className={cn(
-						"text-[#e0d8cf] text-sm leading-snug",
-						task.done && "text-[#6b6560] line-through",
-					)}
-				>
-					{task.title ?? task.text ?? "Untitled task"}
-				</p>
-				{(task.priority || task.dueAt) && (
-					<div className="mt-1 flex flex-wrap gap-1">
-						{task.priority && <PriorityChip priority={task.priority} />}
-						{task.dueAt && <DueChip dueAt={task.dueAt} />}
-					</div>
-				)}
-			</div>
-			<Button
-				type="button"
-				variant="ghost"
-				size="icon-xs"
-				onClick={() => onUnpin(task.id)}
-				title="Remove from focus"
-				className="mt-0.5 shrink-0 text-[#3e3a35] opacity-0 transition-opacity duration-150 active:scale-[0.95] hover:text-[#e46f50] group-hover:opacity-100"
-			>
-				<PinOff className="size-3.5" />
-			</Button>
-		</div>
-	);
-}
-
-// ─── Overdue section ─────────────────────────────────────────────────────────
-
-function OverdueSection() {
-	const { overdueNotPinnedTasks, pinToFocus } = useEngramStore();
-	const [expanded, setExpanded] = useState(true);
-
-	if (overdueNotPinnedTasks.length === 0) return null;
-
-	return (
-		<div className="border-[#252220] border-t pt-4">
-			<Button
-				type="button"
-				variant="ghost"
-				onClick={() => setExpanded((v) => !v)}
-				className="mb-2 flex w-full items-center gap-1.5 px-2 text-left active:scale-[0.98]"
-			>
-				{expanded ? (
-					<ChevronDown className="size-3 text-[#c06b4a]" />
-				) : (
-					<ChevronRight className="size-3 text-[#c06b4a]" />
-				)}
-				<span className="font-bold text-[#c06b4a] text-[11px] uppercase tracking-widest">
-					Overdue
-				</span>
-				<span className="ml-auto rounded-full bg-[#2d1a14] px-1.5 py-0.5 font-mono text-[#c06b4a] text-[10px]">
-					{overdueNotPinnedTasks.length}
-				</span>
-			</Button>
-			<div
-				className={cn(
-					"space-y-0.5 overflow-hidden transition-all",
-					expanded ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0",
-				)}
-				style={{ transition: "max-height 300ms ease-out, opacity 200ms ease-out" }}
-			>
-				{overdueNotPinnedTasks.map((task, i) => (
-					<div
-						key={task.id}
-						className="group flex items-start gap-2 rounded-[7px] px-2 py-2 transition-colors duration-150 hover:bg-[#1f1712]"
-						style={{
-							transitionDelay: expanded ? `${i * 30}ms` : "0ms",
-							transitionProperty: "background-color, opacity, transform",
-						}}
-					>
-						<div className="min-w-0 flex-1">
-							<p className="text-[#b0a99f] text-sm leading-snug">
-								{task.title ?? task.text ?? "Untitled task"}
-							</p>
-							<div className="mt-1 flex flex-wrap gap-1">
-								{task.priority && <PriorityChip priority={task.priority} />}
-								{task.dueAt && (
-									<span className="rounded-[5px] border border-[#5a2518] bg-[#2d1a14] px-2 py-0.5 font-mono text-[10px] text-[#e46f50]">
-										{new Date(task.dueAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-									</span>
-								)}
-							</div>
-						</div>
-						<Button
-							type="button"
-							variant="ghost"
-							onClick={() => pinToFocus(task.id)}
-							title="Add to focus"
-							className="mt-0.5 shrink-0 size-7 text-[#3e3a35] opacity-0 transition-opacity duration-150 active:scale-[0.95] hover:text-[#907ce8] group-hover:opacity-100"
-						>
-							<Pin className="size-3.5" />
-						</Button>
-					</div>
-				))}
-			</div>
-		</div>
-	);
-}
-
-// ─── Today's unpinned section ────────────────────────────────────────────────
-
-function TodayUnpinnedSection() {
-	const { todayUnpinnedTasks, pinToFocus } = useEngramStore();
-	const [expanded, setExpanded] = useState(true);
-
-	if (todayUnpinnedTasks.length === 0) return null;
-
-	return (
-		<div className="border-[#252220] border-t pt-4">
-			<Button
-				type="button"
-				variant="ghost"
-				onClick={() => setExpanded((v) => !v)}
-				className="mb-2 flex w-full items-center gap-1.5 px-2 text-left active:scale-[0.98]"
-			>
-				{expanded ? (
-					<ChevronDown className="size-3 text-[#6b6560]" />
-				) : (
-					<ChevronRight className="size-3 text-[#6b6560]" />
-				)}
-				<span className="font-bold text-[#6b6560] text-[11px] uppercase tracking-widest">
-					Due today
-				</span>
-				<span className="ml-auto rounded-full bg-[#252220] px-1.5 py-0.5 font-mono text-[#8a8378] text-[10px]">
-					{todayUnpinnedTasks.length}
-				</span>
-			</Button>
-			<div
-				className={cn(
-					"space-y-0.5 overflow-hidden transition-all",
-					expanded ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0",
-				)}
-				style={{ transition: "max-height 300ms ease-out, opacity 200ms ease-out" }}
-			>
-				{todayUnpinnedTasks.map((task, i) => (
-					<div
-						key={task.id}
-						className="group flex items-start gap-2 rounded-[7px] px-2 py-2 transition-colors duration-150 hover:bg-[#211e1a]"
-						style={{
-							transitionDelay: expanded ? `${i * 30}ms` : "0ms",
-							transitionProperty: "background-color, opacity, transform",
-						}}
-					>
-						<div className="min-w-0 flex-1">
-							<p className="text-[#b0a99f] text-sm leading-snug">
-								{task.title ?? task.text ?? "Untitled task"}
-							</p>
-							{(task.priority || task.dueAt) && (
-								<div className="mt-1 flex flex-wrap gap-1">
-									{task.priority && <PriorityChip priority={task.priority} />}
-									{task.dueAt && <DueChip dueAt={task.dueAt} />}
-								</div>
-							)}
-						</div>
-						<Button
-							type="button"
-							variant="ghost"
-							onClick={() => pinToFocus(task.id)}
-							title="Add to focus"
-							className="mt-0.5 shrink-0 size-7 text-[#3e3a35] opacity-0 transition-opacity duration-150 active:scale-[0.95] hover:text-[#907ce8] group-hover:opacity-100"
-						>
-							<Pin className="size-3.5" />
-						</Button>
-					</div>
-				))}
-			</div>
-		</div>
-	);
-}
-
-// ─── Main view ────────────────────────────────────────────────────────────────
 
 export function FocusView() {
 	const {
-		focusPinnedItems,
-		toggleDone,
-		unpinFromFocus,
-		createItem,
+		items,
+		dailyBriefings,
+		focusBuckets,
 		overdueNotPinnedTasks,
 		todayUnpinnedTasks,
+		toggleDone,
+		pinToFocus,
+		unpinFromFocus,
+		setFocusTier,
+		reorderFocusPlan,
+		saveDailyBriefing,
+		jumpToItem,
 	} = useEngramStore();
+	const { expandQuickCapture } = useUIStore();
 
-	const [taskOrder, setTaskOrder] = useState<string[]>([]);
-	const [activeId, setActiveId] = useState<string | null>(null);
-	const [burst, setBurst] = useState<{ x: number; y: number } | null>(null);
-	const [addingTask, setAddingTask] = useState(false);
-	const [newTaskText, setNewTaskText] = useState("");
-	const inputRef = useRef<HTMLInputElement>(null);
+	const prefix = todayPrefix();
+	const [briefingStatus, setBriefingStatus] = useState<BriefingStatus>("idle");
+	const [briefingOpen, setBriefingOpen] = useState(true);
+	const [attentionOpen, setAttentionOpen] = useState(true);
+	const [doneOpen, setDoneOpen] = useState(false);
 
-	useEffect(() => {
-		setTaskOrder((prev) => {
-			const existingIds = new Set(focusPinnedItems.map((t) => t.id));
-			const filtered = prev.filter((id) => existingIds.has(id));
-			const newIds = focusPinnedItems
-				.map((t) => t.id)
-				.filter((id) => !filtered.includes(id));
-			return [...filtered, ...newIds];
-		});
-	}, [focusPinnedItems]);
+	const { top: topItems, backlog: backlogItems, done: doneItems, pending: pendingFocusItems, legacy: legacyPinnedItems } =
+		focusBuckets;
 
-	useEffect(() => {
-		if (addingTask) inputRef.current?.focus();
-	}, [addingTask]);
-
-	const orderedItems = useMemo(() => {
-		const map = new Map(focusPinnedItems.map((t) => [t.id, t]));
-		return taskOrder.map((id) => map.get(id)).filter(Boolean) as Item[];
-	}, [taskOrder, focusPinnedItems]);
-
-	const pendingItems = orderedItems.filter((t) => !t.done);
-	const doneItems = orderedItems.filter((t) => t.done);
-	const topItems = pendingItems.slice(0, TOP_N);
-	const backlogItems = pendingItems.slice(TOP_N);
 	const doneCount = doneItems.length;
-	const totalCount = orderedItems.length;
-	const isEmpty = totalCount === 0;
-	const allDone = totalCount > 0 && pendingItems.length === 0;
-	const suggestionCount =
-		overdueNotPinnedTasks.length + todayUnpinnedTasks.length;
+	const todaysCount = doneItems.length + pendingFocusItems.length;
+	const briefing = dailyBriefings?.[prefix];
+	const noteExcerpt =
+		items.find((item) => item.type === "thought" && item.title?.startsWith("Daily Note") && item.title.includes(prefix))?.text ??
+		"";
 
-	const sensors = useSensors(
-		useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-		useSensor(KeyboardSensor, {
-			coordinateGetter: sortableKeyboardCoordinates,
-		}),
-	);
-
-	const handleDragStart = ({ active }: DragStartEvent) =>
-		setActiveId(active.id as string);
-	const handleDragEnd = ({ active, over }: DragEndEvent) => {
-		setActiveId(null);
-		if (!over || active.id === over.id) return;
-		setTaskOrder((order) => {
-			const oldIndex = order.indexOf(active.id as string);
-			const newIndex = order.indexOf(over.id as string);
-			return arrayMove(order, oldIndex, newIndex);
-		});
-	};
-
-	const handleToggle = useCallback(
-		(id: string, origin: { x: number; y: number }) => {
-			const task = focusPinnedItems.find((t) => t.id === id);
-			if (task && !task.done) {
-				setBurst(origin);
-				setTimeout(() => setBurst(null), 700);
-			}
-			toggleDone(id);
-		},
-		[focusPinnedItems, toggleDone],
-	);
-
-	const handleAddTask = () => {
-		const text = newTaskText.trim();
-		if (!text) {
-			setAddingTask(false);
-			return;
-		}
-		createItem({
-			type: "task",
-			title: text,
-			spaceId: TODAY_FOCUS_SPACE_ID,
-			focusPinned: true,
-			stayOnCurrentView: true,
-		});
-		setNewTaskText("");
-		inputRef.current?.focus();
-	};
-
-	const activeTask = activeId
-		? focusPinnedItems.find((t) => t.id === activeId)
-		: null;
-
-	const today = new Date().toLocaleDateString("en-US", {
+	const todayLabel = new Date().toLocaleDateString("en-US", {
 		weekday: "long",
 		month: "long",
 		day: "numeric",
 	});
 
-	return (
-		<>
-			<style>{`
-				@media (prefers-reduced-motion: reduce) {
-					*, *::before, *::after {
-						animation-duration: 0.01ms !important;
-						animation-iteration-count: 1 !important;
-						transition-duration: 0.01ms !important;
-					}
-				}
-			`}</style>
-			<CelebrationBurst origin={burst} />
+	const orderedIds = pendingFocusItems.map((item) => item.id);
+	const moveTask = useCallback(
+		(taskId: string, direction: -1 | 1) => {
+			const current = orderedIds.indexOf(taskId);
+			const next = current + direction;
+			if (current < 0 || next < 0 || next >= orderedIds.length) return;
+			const copy = [...orderedIds];
+			const [id] = copy.splice(current, 1);
+			copy.splice(next, 0, id);
+			reorderFocusPlan(copy);
+		},
+		[orderedIds, reorderFocusPlan],
+	);
 
-			<section className="h-full bg-[#151310] text-white">
-				<div className="mx-auto flex h-full max-w-[1400px] flex-col p-6 lg:flex-row lg:gap-6 lg:p-10">
-					{/* ── Left column (70%) ── */}
-					<ScrollArea className="min-h-0 h-full w-full lg:w-[70%] lg:shrink-0">
-						<div className="p-1">
-						<div className="mb-6">
+	const addExistingToFocus = (task: Item, tier: FocusTier) => {
+		pinToFocus(task.id);
+		setFocusTier(task.id, tier);
+	};
+
+	const captureFocusTask = () => expandQuickCapture("task", "focus-task");
+
+	const generateBriefing = async () => {
+		setBriefingStatus("loading");
+		try {
+			const response = await fetch("/api/focus/briefing", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					date: prefix,
+					topTasks: topItems.map(asBriefingTask),
+					backlogTasks: backlogItems.map(asBriefingTask),
+					overdueTasks: overdueNotPinnedTasks.map(asBriefingTask),
+					dueTodayTasks: todayUnpinnedTasks.map(asBriefingTask),
+					noteExcerpt: noteExcerpt.slice(0, 2000),
+				}),
+			});
+			const data = (await response.json()) as Partial<DailyBriefing> & { error?: string };
+			if (!response.ok || data.error) {
+				throw new Error(data.error ?? "Could not generate briefing.");
+			}
+			if (
+				!data.date ||
+				!data.headline ||
+				!data.summary ||
+				!data.generatedAt ||
+				!Array.isArray(data.topThreeRationale) ||
+				!Array.isArray(data.risks) ||
+				!Array.isArray(data.suggestedAdjustments)
+			) {
+				throw new Error("Briefing response was incomplete.");
+			}
+			saveDailyBriefing(data as DailyBriefing);
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Could not generate briefing.");
+		} finally {
+			setBriefingStatus("idle");
+		}
+	};
+
+	return (
+		<section className="relative h-full overflow-y-auto bg-[#151310] text-[#f4eee7]">
+			<div className="mx-auto min-h-full w-full max-w-[980px] px-6 py-10 md:px-10 lg:py-14">
+				<header className="mb-10">
+					<div className="mb-4 flex flex-wrap items-end justify-between gap-5">
+						<div>
 							<h2
-								className="stagger-item font-bold text-3xl"
+								className="stagger-item flex items-center gap-3 font-bold text-3xl"
 								style={{ animationDelay: "0ms" }}
 							>
+								<Icons.target className="size-7 text-[#907ce8]" />
 								Focus
 							</h2>
 							<p
-								className="stagger-item mt-3 text-[#b0a69a]"
+								className="stagger-item mt-3 max-w-2xl text-[#b0a69a]"
 								style={{ animationDelay: "40ms" }}
 							>
-								Your top {TOP_N} priorities for {today}, then the backlog. Drag to reorder.
+								{todayLabel} — plan your top three and stay on track.
 							</p>
 						</div>
-
-						{totalCount > 0 && (
-							<div className="mb-6 flex items-center gap-3">
-								<div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#252220]">
-									<div
-										className="h-full rounded-full bg-[#907ce8] transition-transform duration-500 ease-out"
-										style={{
-											transform: `scaleX(${doneCount / totalCount})`,
-											transformOrigin: "left",
-										}}
-									/>
-								</div>
-								<span className="shrink-0 font-mono text-[#6b6560] text-xs">
-									{doneCount}/{totalCount}
-								</span>
-							</div>
-						)}
-
-						<DndContext
-							sensors={sensors}
-							collisionDetection={closestCenter}
-							onDragStart={handleDragStart}
-							onDragEnd={handleDragEnd}
-						>
-							{/* ── Top 3 Priorities ── */}
-							{topItems.length > 0 && (
-								<div className="mb-6">
-									<p className="mb-3 font-bold text-[#9b88ff] text-[11px] uppercase tracking-[0.14em]">
-										Top {TOP_N} Priorities
-									</p>
-									<SortableContext
-										items={taskOrder}
-										strategy={verticalListSortingStrategy}
-									>
-										<div className="space-y-3">
-											{topItems.map((task, i) => (
-												<SortablePriorityCard
-													key={task.id}
-													task={task}
-													onToggle={handleToggle}
-													onUnpin={unpinFromFocus}
-												/>
-											))}
-										</div>
-									</SortableContext>
-								</div>
-							)}
-
-							{/* ── Backlog ── */}
-							{backlogItems.length > 0 && (
-								<div className="mb-4">
-									<p className="mb-2 px-2 font-bold text-[#6b6560] text-[11px] uppercase tracking-[0.14em]">
-										Backlog
-									</p>
-									<SortableContext
-										items={taskOrder}
-										strategy={verticalListSortingStrategy}
-									>
-										<div className="space-y-0.5">
-											{backlogItems.map((task) => (
-												<SortableBacklogRow
-													key={task.id}
-													task={task}
-													onToggle={handleToggle}
-													onUnpin={unpinFromFocus}
-												/>
-											))}
-										</div>
-									</SortableContext>
-								</div>
-							)}
-
-							{/* ── All done note ── */}
-							{allDone && (
-								<div className="mb-5 flex items-center gap-2.5 px-2">
-									<Check className="size-4 shrink-0 text-[#756e65]" />
-									<p className="text-[#8d857b] text-sm">
-										Focus cleared — everything you pinned today is done.
-									</p>
-								</div>
-							)}
-
-							{/* ── Done items ── */}
-							{doneItems.length > 0 && (
-								<div className="mb-4">
-									<div className="mb-2 flex items-center gap-2 px-2">
-										<div className="h-px flex-1 bg-[#252220]" />
-										<span className="text-[#4a4540] text-[10px]">
-											completed
-										</span>
-										<div className="h-px flex-1 bg-[#252220]" />
-									</div>
-									<SortableContext
-										items={taskOrder}
-										strategy={verticalListSortingStrategy}
-									>
-										<div className="space-y-0.5">
-											{doneItems.map((task) => (
-												<SortableBacklogRow
-													key={task.id}
-													task={task}
-													onToggle={handleToggle}
-													onUnpin={unpinFromFocus}
-												/>
-											))}
-										</div>
-									</SortableContext>
-								</div>
-							)}
-
-							{/* ── Empty state ── */}
-							{isEmpty && (
-								<div
-									className="stagger-item flex flex-col items-center gap-3 rounded-[10px] border border-[#34302b] border-dashed px-6 py-16 text-center"
-									style={{ animationDelay: "80ms" }}
-								>
-									<Target className="size-8 text-[#4c463e]" />
-									<p className="font-semibold text-[#c8bfb2]">
-										Nothing in focus yet
-									</p>
-									<p className="max-w-sm text-[#82786e] text-sm">
-										Pick the few tasks that would make today count. Pin
-										them here and start at the top.
-									</p>
-									{addingTask ? (
-										<div className="mt-1 flex w-full max-w-xs items-center gap-2 rounded-[7px] border border-[#907ce8]/40 bg-[#211e1a] px-3 py-2 text-left">
-											<Input
-												ref={inputRef}
-												value={newTaskText}
-												onChange={(e) => setNewTaskText(e.target.value)}
-												onKeyDown={(e) => {
-													if (e.key === "Enter") handleAddTask();
-													if (e.key === "Escape") {
-														setAddingTask(false);
-														setNewTaskText("");
-													}
-												}}
-												placeholder="Task title…"
-												className="h-7 border-0 bg-transparent text-[#e0d8cf] text-sm placeholder:text-[#4a4540] focus-visible:ring-0"
-											/>
-											<Button
-												type="button"
-												size="sm"
-												onClick={handleAddTask}
-												className="h-7 shrink-0 rounded-[6px] bg-[#907ce8] px-3 font-semibold text-[#17131f] hover:bg-[#a08ef2] active:scale-[0.96]"
-											>
-												Add
-											</Button>
-										</div>
-									) : (
-										<Button
-											type="button"
-											onClick={() => setAddingTask(true)}
-											className="mt-1 h-8 gap-1.5 rounded-[7px] bg-[#907ce8] px-3 font-semibold text-[#17131f] hover:bg-[#a08ef2] active:scale-[0.96]"
-										>
-											<Plus className="size-3.5" />
-											Add a task
-										</Button>
-									)}
-									{suggestionCount > 0 && (
-										<p className="mt-1 text-[#6b6560] text-xs">
-											or pin one of the{" "}
-											{suggestionCount === 1
-												? "tasks"
-												: `${suggestionCount} tasks`}{" "}
-											waiting below
-										</p>
-									)}
-								</div>
-							)}
-
-							{/* ── Add task ── */}
-							{!isEmpty && (
-								<div className="mt-2">
-									{addingTask ? (
-										<div className="flex items-center gap-2 rounded-[7px] border border-[#907ce8]/40 bg-[#211e1a] px-3 py-2.5">
-											<Input
-												ref={inputRef}
-												value={newTaskText}
-												onChange={(e) => setNewTaskText(e.target.value)}
-												onKeyDown={(e) => {
-													if (e.key === "Enter") handleAddTask();
-													if (e.key === "Escape") {
-														setAddingTask(false);
-														setNewTaskText("");
-													}
-												}}
-												placeholder="Task title…"
-												className="h-7 border-0 bg-transparent text-[#e0d8cf] text-sm placeholder:text-[#4a4540] focus-visible:ring-0"
-											/>
-											<Button
-												type="button"
-												size="sm"
-												onClick={handleAddTask}
-												className="h-7 gap-1.5 rounded-[6px] bg-[#907ce8] px-3 font-semibold text-[#17131f] transition-colors duration-150 hover:bg-[#a08ef2] active:scale-[0.96]"
-											>
-												Add
-											</Button>
-										</div>
-									) : (
-										<Button
-											type="button"
-											variant="outline"
-											onClick={() => setAddingTask(true)}
-											className="flex w-full items-center gap-2 rounded-[7px] border-[#2e2b26] border-dashed bg-transparent px-3 py-2.5 text-[#4a4540] text-sm transition-colors duration-150 hover:border-[#907ce8]/40 hover:text-[#907ce8] active:scale-[0.98]"
-										>
-											<Plus className="size-4" />
-											Add to focus
-										</Button>
-									)}
-								</div>
-							)}
-
-							{/* ── Overdue ── */}
-							<div className="mt-4">
-								<OverdueSection />
-							</div>
-
-							{/* ── Today's unpinned ── */}
-							<div className="mt-4">
-								<TodayUnpinnedSection />
-							</div>
-
-							<DragOverlay>
-								{activeTask && (
-									<div className="rounded-[7px] border border-[#907ce8]/30 bg-[#1c1916] px-3 py-2 shadow-xl">
-										<p className="text-[#e0d8cf] text-sm">
-											{activeTask.title ?? activeTask.text ?? "Untitled task"}
-										</p>
-									</div>
-								)}
-							</DragOverlay>
-						</DndContext>
+						<span className="shrink-0 rounded-[6px] border border-[#302c27] bg-[#211e1a] px-2.5 py-1 font-mono text-[#9f9588] text-xs">
+							{topItems.length} top · {backlogItems.length} backlog
+						</span>
 					</div>
-					</ScrollArea>
-
-					{/* ── Right column (30%) ── */}
-					<ScrollArea className="min-h-0 h-full w-full lg:w-[30%]">
-						<div className="flex flex-col gap-4 p-1">
-						<Card className="gap-0 rounded-[10px] border-[#2e2b26] bg-[#1a1714] p-0 transition-colors duration-150 hover:border-[#3a3630]">
-							<FocusTimerInline />
-						</Card>
-
-						<Card className="flex-1 gap-0 rounded-[10px] border-[#2e2b26] bg-[#1a1714] p-0 transition-colors duration-150 hover:border-[#3a3630]">
-							<FocusScratchpadInline />
-						</Card>
+					{todaysCount > 0 ? (
+						<div className="h-px w-full bg-[#302a24]">
+							<div
+								className="h-px bg-[#907ce8] transition-transform duration-500"
+								style={{
+									transform: `scaleX(${doneCount / todaysCount})`,
+									transformOrigin: "left",
+								}}
+							/>
 						</div>
-					</ScrollArea>
+					) : null}
+				</header>
+
+				<div className="space-y-11">
+					<DailyBriefingCard
+						briefing={briefing}
+						status={briefingStatus}
+						open={briefingOpen}
+						onOpenChange={setBriefingOpen}
+						onGenerate={generateBriefing}
+						canRegenerate={Boolean(briefing)}
+					/>
+
+					<FocusSection
+						title="Top 3"
+						description="Pinned for the next deep-work block"
+						items={topItems}
+						empty="Move one task here when you know what matters first."
+						tone="top"
+						onToggle={toggleDone}
+						onUnpin={unpinFromFocus}
+						onMove={moveTask}
+						onSetTier={setFocusTier}
+						onJump={jumpToItem}
+					/>
+
+					<CaptureFocusTask onCapture={captureFocusTask} />
+
+					<AttentionCluster
+						attentionOpen={attentionOpen}
+						onToggleOpen={() => setAttentionOpen((value) => !value)}
+						overdueTasks={overdueNotPinnedTasks}
+						todayTasks={todayUnpinnedTasks}
+						legacyPinnedItems={legacyPinnedItems}
+						onAdd={addExistingToFocus}
+						onJump={jumpToItem}
+					/>
+
+					<FocusSection
+						title="Backlog"
+						description="Selected for today, not competing with the top three"
+						items={backlogItems}
+						empty="Keep this short. Add only tasks worth seeing today."
+						tone="backlog"
+						onToggle={toggleDone}
+						onUnpin={unpinFromFocus}
+						onMove={moveTask}
+						onSetTier={setFocusTier}
+						onJump={jumpToItem}
+					/>
+
+					<DoneSection
+						open={doneOpen}
+						onOpenChange={setDoneOpen}
+						items={doneItems}
+						onToggle={toggleDone}
+						onJump={jumpToItem}
+					/>
 				</div>
-			</section>
-		</>
+			</div>
+		</section>
+	);
+}
+
+function CaptureFocusTask({ onCapture }: { onCapture: () => void }) {
+	return (
+		<section className="rounded-[10px] border border-[#2e2b26] border-dashed px-4 py-3">
+			<button
+				type="button"
+				onClick={onCapture}
+				className="flex w-full items-center justify-center gap-2 text-[#82786e] text-sm transition-colors hover:text-[#c4b5fd]"
+			>
+				<Plus className="size-4" />
+				Capture focus task
+			</button>
+		</section>
+	);
+}
+
+function DoneSection({
+	open,
+	onOpenChange,
+	items,
+	onToggle,
+	onJump,
+}: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	items: Item[];
+	onToggle: (id: string) => void;
+	onJump: (id: string) => void;
+}) {
+	return (
+		<section className="border-[#252220] border-t pt-5">
+			<button
+				type="button"
+				onClick={() => onOpenChange(!open)}
+				className="flex w-full items-center justify-between gap-4 text-left"
+			>
+				<div>
+					<p className="flex items-center gap-2 font-bold text-[#746a60] text-[11px] uppercase tracking-[0.24em]">
+						<Check className="size-3.5" />
+						Done Today
+					</p>
+					<p className="mt-1 text-[#5f5750] text-xs">
+						Clears automatically at 23:59.
+					</p>
+				</div>
+				<span className="flex items-center gap-2 font-mono text-[#5f564d] text-xs">
+					{items.length}
+					{open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+				</span>
+			</button>
+			{open ? (
+				items.length > 0 ? (
+					<div className="mt-3 space-y-2">
+						{items.map((task) => (
+							<div
+								key={task.id}
+								className="flex items-center gap-3 rounded-[10px] border border-[#252220] bg-[#171411] px-4 py-3 opacity-65"
+							>
+								<Checkbox
+									checked={task.done}
+									onCheckedChange={() => onToggle(task.id)}
+									className="rounded-full border-[#5f5750] data-[state=checked]:border-[#746a60] data-[state=checked]:bg-[#746a60]"
+								/>
+								<button type="button" onClick={() => onJump(task.id)} className="min-w-0 flex-1 text-left">
+									<span className="block truncate text-[#8a8378] text-sm line-through">
+										{task.title ?? task.text ?? "Untitled task"}
+									</span>
+								</button>
+								<span className="font-mono text-[#4f4943] text-[10px]">23:59</span>
+							</div>
+						))}
+					</div>
+				) : (
+					<p className="mt-3 rounded-[10px] border border-[#2e2b26] border-dashed px-4 py-3 text-[#5f5750] text-sm">
+						No completed focus tasks yet.
+					</p>
+				)
+			) : null}
+		</section>
+	);
+}
+
+function DailyBriefingCard({
+	briefing,
+	status,
+	open,
+	onOpenChange,
+	onGenerate,
+	canRegenerate,
+}: {
+	briefing?: DailyBriefing;
+	status: BriefingStatus;
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	onGenerate: () => void;
+	canRegenerate: boolean;
+}) {
+	const loading = status === "loading";
+	return (
+		<section className="rounded-[14px] border border-[#3a3327] bg-[#201c16] px-7 py-6 shadow-[0_18px_70px_rgba(0,0,0,0.18)]">
+			<div className={cn("flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between", open && "mb-4")}>
+				<button type="button" onClick={() => onOpenChange(!open)} className="min-w-0 text-left">
+					<span className="flex items-center gap-2 font-bold text-[#d9a82f] text-[11px] uppercase tracking-[0.22em]">
+						{open ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+						<Sparkles className="size-3.5" />
+						<span>Daily Briefing</span>
+					</span>
+					{briefing ? (
+						<p className="mt-2 text-[#746a60] text-xs">
+							Generated {new Date(briefing.generatedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+						</p>
+					) : null}
+				</button>
+				<Button
+					type="button"
+					size="sm"
+					onClick={onGenerate}
+					disabled={loading}
+					className="h-8 rounded-[7px] bg-[#d9a82f] px-3 font-semibold text-[#1d1608] hover:bg-[#e5b83d]"
+				>
+					{loading ? <Loader className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+					{canRegenerate ? "Regenerate" : "Generate"}
+				</Button>
+			</div>
+			{!open ? null : briefing ? (
+				<div className="space-y-5">
+					<div>
+						<h2 className="font-semibold text-[#f2eadf] text-2xl leading-snug">{briefing.headline}</h2>
+						<p className="mt-3 max-w-[74ch] text-[#c7bcb0] text-base leading-7">{briefing.summary}</p>
+					</div>
+					<div className="grid gap-5 border-[#342d26] border-t pt-5 md:grid-cols-2">
+						<BriefingList title="Why these three" items={briefing.topThreeRationale} />
+						<BriefingList title="Watch" items={briefing.risks} />
+					</div>
+				</div>
+			) : (
+				<div className="grid gap-4 py-2 md:grid-cols-[minmax(0,1fr)_260px] md:items-end">
+					<div>
+						<p className="text-[#c7bcb0] text-xl leading-8">
+							Start the day with a generated read of what matters, what is waiting,
+							and what might slip.
+						</p>
+						<div className="mt-5 grid gap-2 sm:grid-cols-3">
+							<BriefingSource label="Top tasks" value="Priority" />
+							<BriefingSource label="Backlog" value="Capacity" />
+							<BriefingSource label="Due work" value="Risk" />
+						</div>
+					</div>
+					<div className="rounded-[10px] border border-[#342d26] bg-[#181511] px-4 py-3">
+						<p className="font-bold text-[#81776d] text-[11px] uppercase tracking-[0.18em]">Output</p>
+						<ul className="mt-3 space-y-2 text-[#8f857a] text-sm">
+							<li className="flex gap-2">
+								<Check className="mt-0.5 size-3.5 shrink-0 text-[#70675e]" />
+								A short headline
+							</li>
+							<li className="flex gap-2">
+								<Check className="mt-0.5 size-3.5 shrink-0 text-[#70675e]" />
+								Why the top three matter
+							</li>
+							<li className="flex gap-2">
+								<Check className="mt-0.5 size-3.5 shrink-0 text-[#70675e]" />
+								Risks to watch today
+							</li>
+						</ul>
+					</div>
+				</div>
+			)}
+		</section>
+	);
+}
+
+function BriefingSource({ label, value }: { label: string; value: string }) {
+	return (
+		<div className="rounded-[9px] border border-[#342d26] bg-[#181511] px-3 py-2.5">
+			<p className="font-mono text-[#5f5750] text-[10px] uppercase tracking-[0.14em]">{label}</p>
+			<p className="mt-1 font-semibold text-[#b8aea3] text-sm">{value}</p>
+		</div>
+	);
+}
+
+function BriefingList({ title, items }: { title: string; items: string[] }) {
+	return (
+		<div>
+			<p className="mb-3 font-bold text-[#81776d] text-[11px] uppercase tracking-[0.2em]">{title}</p>
+			{items.length > 0 ? (
+				<ul className="space-y-2">
+					{items.map((item, index) => (
+						<li key={`${item}-${index}`} className="flex gap-2.5 text-[#b8aea3] text-sm leading-6">
+							<Check className="mt-1 size-3.5 shrink-0 text-[#62b68d]" />
+							<span>{item}</span>
+						</li>
+					))}
+				</ul>
+			) : (
+				<p className="text-[#5f5750] text-sm">No notes.</p>
+			)}
+		</div>
+	);
+}
+
+function FocusSection({
+	title,
+	description,
+	items,
+	empty,
+	tone,
+	onToggle,
+	onUnpin,
+	onMove,
+	onSetTier,
+	onJump,
+}: {
+	title: string;
+	description: string;
+	items: Item[];
+	empty: string;
+	tone: "top" | "backlog";
+	onToggle: (id: string) => void;
+	onUnpin: (id: string) => void;
+	onMove: (id: string, direction: -1 | 1) => void;
+	onSetTier: (id: string, tier: FocusTier) => void;
+	onJump: (id: string) => void;
+}) {
+	return (
+		<section>
+			<div className="mb-3 flex items-end justify-between gap-4">
+				<div>
+					<p
+						className={cn(
+							"font-bold text-[11px] uppercase tracking-[0.24em]",
+							tone === "top" ? "text-[#8d8276]" : "text-[#746a60]",
+						)}
+					>
+						{title}
+					</p>
+					<p className="mt-1 text-[#6d6259] text-xs">{description}</p>
+				</div>
+				<span className="font-mono text-[#5f564d] text-xs">{items.length}</span>
+			</div>
+			<div className="space-y-2">
+				{items.length > 0
+					? items.map((task, index) => (
+						<FocusTaskRow
+							key={task.id}
+							task={task}
+							index={index}
+							tone={tone}
+							onToggle={onToggle}
+							onUnpin={onUnpin}
+							onMove={onMove}
+							onSetTier={onSetTier}
+							onJump={onJump}
+						/>
+					))
+					: (
+					<div className="rounded-[10px] border border-[#2e2b26] border-dashed px-5 py-7 text-[#6f675f] text-sm">
+						{empty}
+					</div>
+				)}
+			</div>
+		</section>
+	);
+}
+
+function FocusTaskRow({
+	task,
+	index,
+	tone,
+	onToggle,
+	onUnpin,
+	onMove,
+	onSetTier,
+	onJump,
+}: {
+	task: Item;
+	index: number;
+	tone: "top" | "backlog";
+	onToggle: (id: string) => void;
+	onUnpin: (id: string) => void;
+	onMove: (id: string, direction: -1 | 1) => void;
+	onSetTier: (id: string, tier: FocusTier) => void;
+	onJump: (id: string) => void;
+}) {
+	return (
+		<div
+			className={cn(
+				"group rounded-[10px] border px-4 py-4 transition-colors",
+				tone === "top"
+					? "border-[#3a3128] bg-[#201c16] hover:border-[#4a3d32]"
+					: "border-[#2d2822] bg-[#1b1814] hover:border-[#3a332b]",
+				task.done && "opacity-55",
+			)}
+		>
+			<div className="flex items-center gap-4">
+				{tone === "top" ? (
+					<span className="w-7 shrink-0 text-center font-mono font-semibold text-[#8b8175] text-xl">
+						{index + 1}
+					</span>
+				) : null}
+				<Checkbox
+					checked={task.done}
+					onCheckedChange={() => onToggle(task.id)}
+					className="rounded-full border-[#6f655a] data-[state=checked]:border-[#62b68d] data-[state=checked]:bg-[#62b68d]"
+				/>
+				<div className="min-w-0 flex-1">
+					<button type="button" onClick={() => onJump(task.id)} className="block text-left">
+						<span
+							className={cn(
+								"font-semibold text-[#e3d9ce] text-base leading-5 hover:text-white",
+								task.done && "text-[#6b6560] line-through",
+							)}
+						>
+							{task.title ?? task.text ?? "Untitled task"}
+						</span>
+					</button>
+					{(task.priority || task.dueAt) && (
+						<div className="mt-2 flex flex-wrap items-center gap-2">
+							{task.priority && <PriorityChip priority={task.priority} />}
+							{task.dueAt && <DueChip dueAt={task.dueAt} />}
+						</div>
+					)}
+				</div>
+				<div className="flex shrink-0 items-center gap-1 opacity-100 md:opacity-0 md:transition-opacity md:group-hover:opacity-100">
+					<Button type="button" variant="ghost" size="icon-xs" title="Move up" onClick={() => onMove(task.id, -1)}>
+						<ChevronDown className="size-3.5 rotate-180 text-[#6b6560]" />
+					</Button>
+					<Button type="button" variant="ghost" size="icon-xs" title="Move down" onClick={() => onMove(task.id, 1)}>
+						<ChevronDown className="size-3.5 text-[#6b6560]" />
+					</Button>
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						onClick={() => onSetTier(task.id, tone === "top" ? "backlog" : "top")}
+						className="h-6 rounded-[5px] border border-[#342d27] px-2 text-[#8a8378] hover:text-[#907ce8]"
+					>
+						{tone === "top" ? "backlog" : "top"}
+					</Button>
+					<Button type="button" variant="ghost" size="icon-xs" title="Remove from focus" onClick={() => onUnpin(task.id)}>
+						<PinOff className="size-3.5 text-[#6b6560] hover:text-[#e46f50]" />
+					</Button>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function AttentionCluster({
+	attentionOpen,
+	onToggleOpen,
+	overdueTasks,
+	todayTasks,
+	legacyPinnedItems,
+	onAdd,
+	onJump,
+}: {
+	attentionOpen: boolean;
+	onToggleOpen: () => void;
+	overdueTasks: Item[];
+	todayTasks: Item[];
+	legacyPinnedItems: Item[];
+	onAdd: (task: Item, tier: FocusTier) => void;
+	onJump: (id: string) => void;
+}) {
+	const total = overdueTasks.length + todayTasks.length + legacyPinnedItems.length;
+	return (
+		<section>
+			<button
+				type="button"
+				onClick={onToggleOpen}
+				className="mb-3 flex w-full items-center justify-between gap-4 text-left"
+			>
+				<div>
+					<p className="flex items-center gap-2 font-bold text-[#e46f50] text-[11px] uppercase tracking-[0.24em]">
+						<ClockIcon className="size-3.5" />
+						Needs Attention
+					</p>
+					<p className="mt-1 text-[#6d6259] text-xs">
+						Overdue and due-today tasks that are not in the plan.
+					</p>
+				</div>
+				<span className="flex items-center gap-2 font-mono text-[#5f564d] text-xs">
+					{total}
+					{attentionOpen ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+				</span>
+			</button>
+			{attentionOpen ? (
+				total > 0 ? (
+					<div className="space-y-7">
+					{overdueTasks.length > 0 ? (
+						<AttentionGroup
+							label="Overdue"
+							tasks={overdueTasks}
+							empty=""
+							tone="danger"
+							onAdd={onAdd}
+							onJump={onJump}
+						/>
+					) : null}
+					{todayTasks.length > 0 ? (
+						<AttentionGroup
+							label="Due today"
+							tasks={todayTasks}
+							empty=""
+							tone="neutral"
+							onAdd={onAdd}
+							onJump={onJump}
+						/>
+					) : null}
+					{legacyPinnedItems.length > 0 ? (
+						<AttentionGroup
+							label="Pinned earlier"
+							tasks={legacyPinnedItems}
+							empty=""
+							tone="neutral"
+							onAdd={onAdd}
+							onJump={onJump}
+						/>
+					) : null}
+					</div>
+				) : (
+					<p className="rounded-[10px] border border-[#2e2b26] border-dashed px-4 py-3 text-[#5f5750] text-sm">
+						No date-bound tasks need attention.
+					</p>
+				)
+			) : null}
+		</section>
+	);
+}
+
+function AttentionGroup({
+	label,
+	tasks,
+	empty,
+	tone,
+	onAdd,
+	onJump,
+}: {
+	label: string;
+	tasks: Item[];
+	empty: string;
+	tone: "danger" | "neutral";
+	onAdd: (task: Item, tier: FocusTier) => void;
+	onJump: (id: string) => void;
+}) {
+	return (
+		<div>
+			<div className="mb-2 flex items-center justify-between">
+				<p
+					className={cn(
+						"font-bold text-[11px] uppercase tracking-[0.2em]",
+						tone === "danger" ? "text-[#e46f50]" : "text-[#81776d]",
+					)}
+				>
+					{label}
+				</p>
+				<span className="font-mono text-[#5f5750] text-[10px]">{tasks.length}</span>
+			</div>
+			{tasks.length > 0 ? (
+				<div className="space-y-2">
+					{tasks.map((task) => (
+						<div
+							key={task.id}
+							className="group flex items-center gap-3 rounded-[10px] border border-[#2d2822] bg-[#1b1814] px-4 py-3 hover:border-[#3a332b]"
+						>
+							<button
+								type="button"
+								onClick={() => onAdd(task, "top")}
+								aria-label="Add to top focus"
+								className="size-5 shrink-0 rounded-full border border-[#6f655a] transition-colors hover:border-[#907ce8]"
+							/>
+							<button type="button" onClick={() => onJump(task.id)} className="min-w-0 flex-1 text-left">
+								<span className="block truncate font-semibold text-[#d8cec2] text-sm">
+									{task.title ?? task.text ?? "Untitled task"}
+								</span>
+							</button>
+							<div className="hidden shrink-0 flex-wrap items-center gap-2 sm:flex">
+								{task.priority && <PriorityChip priority={task.priority} />}
+								{task.dueAt && <DueChip dueAt={task.dueAt} />}
+							</div>
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								onClick={() => onAdd(task, "top")}
+								className="h-7 rounded-[6px] border border-[#342d27] px-2 text-[#907ce8]"
+							>
+								focus
+							</Button>
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon-xs"
+								title="Add to backlog"
+								onClick={() => onAdd(task, "backlog")}
+								className="text-[#8a8378]"
+							>
+								<ArrowUpRightIcon className="size-3.5" />
+							</Button>
+						</div>
+					))}
+				</div>
+			) : (
+				<p className="rounded-[10px] border border-[#2e2b26] border-dashed px-4 py-3 text-[#5f5750] text-sm">
+					{empty}
+				</p>
+			)}
+		</div>
 	);
 }

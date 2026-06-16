@@ -2,6 +2,8 @@ export type EngramView = "board" | "timeline";
 export type ItemType = "thought" | "task" | "image" | "link" | "file";
 export type Priority = 1 | 2 | 3;
 export type Accent = "violet" | "gold" | "teal" | "red" | "blue";
+export type FocusTier = "top" | "backlog";
+export type TaskQueue = "now" | "next" | "later" | "waiting";
 
 export type ChecklistItem = {
 	id: string;
@@ -42,6 +44,11 @@ export type Item = {
 	dueAt?: string;
 	checklistItems?: ChecklistItem[];
 	focusPinned?: boolean;
+	focusPlanDate?: string;
+	focusTier?: FocusTier;
+	focusSortOrder?: number;
+	taskQueue?: TaskQueue;
+	taskSortOrder?: number;
 	tags?: string[];
 	/** Captured but not yet placed in a space — lives in the Inbox until filed. */
 	inbox?: boolean;
@@ -57,6 +64,22 @@ export type ItemLink = {
 	fromItemId: string;
 	toItemId: string;
 	createdAt: string;
+};
+
+export type DailyBriefingSuggestion = {
+	taskId: string;
+	reason: string;
+	target: FocusTier;
+};
+
+export type DailyBriefing = {
+	date: string;
+	headline: string;
+	summary: string;
+	topThreeRationale: string[];
+	risks: string[];
+	suggestedAdjustments: DailyBriefingSuggestion[];
+	generatedAt: string;
 };
 
 /**
@@ -79,6 +102,7 @@ export type EngramData = {
 	items: Item[];
 	links: ItemLink[];
 	viewStates: CanvasViewState[];
+	dailyBriefings?: Record<string, DailyBriefing>;
 	activeSpaceId: string;
 	selectedItemId?: string;
 };

@@ -7,7 +7,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@alphonse/ui/components/dropdown-menu";
 import { Input } from "@alphonse/ui/components/input";
@@ -45,6 +44,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { usePathname } from "next/navigation";
 import { toast } from "sonner";
 
+import { parseCapture } from "../capture-grammar";
 import { CaptureInput, type MentionItem } from "./capture-input";
 import { Icons } from "./icons";
 import { SPACE_ICONS, type SpaceIconKey } from "../nav";
@@ -77,16 +77,6 @@ const EASE_DRAWER  = "cubic-bezier(0.32, 0.72, 0, 1)";
 const EASE_OUT     = "cubic-bezier(0.23, 1, 0.32, 1)";
 
 const TEXTAREA_MAX_PX = 280; // ~10 lines
-
-type ParsedTaskText = {
-  cleanText: string;
-  priority?: Priority;
-  dueDate?: Date;
-  dueHasTime?: boolean;
-  someday?: boolean;
-  tags: string[];
-  tokens: { kind: "priority" | "date" | "tag" | "someday"; label: string }[];
-};
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -139,128 +129,9 @@ function toDateInputValue(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function parseTaskText(value: string, base = new Date()): ParsedTaskText {
-  let cleanText = value;
-  const tokens: ParsedTaskText["tokens"] = [];
-
-  const priorityMatch = cleanText.match(/(?:^|\s)!(?:p)?([123])\b/i);
-  const priority = priorityMatch ? (Number(priorityMatch[1]) as Priority) : undefined;
-  if (priorityMatch) {
-    tokens.push({ kind: "priority", label: `P${priority}` });
-    cleanText = cleanText.replace(priorityMatch[0], priorityMatch[0].startsWith(" ") ? " " : "");
-  }
-
-  // Strip @mentions — these become explicit node connections, not part of the title.
-  cleanText = cleanText.replace(/(?:^|\s)@\w[\w-]*/g, "");
-
-  const tagMatches = [...cleanText.matchAll(/#(\w[\w-]*)/g)];
-  const tags = tagMatches.map((m) => m[1]);
-  for (const tag of tags) {
-    tokens.push({ kind: "tag", label: `#${tag}` });
-    cleanText = cleanText.replace(`#${tag}`, "");
-  }
-
-  // "someday" / "later" defers with no due date — and wins over date parsing.
-  const somedayMatch = cleanText.match(/\b(?:someday|later)\b/i);
-  let someday = false;
-  if (somedayMatch) {
-    someday = true;
-    tokens.push({ kind: "someday", label: "Someday" });
-    cleanText = cleanText.replace(somedayMatch[0], "");
-  }
-
-  const parsedDue = someday ? null : parseDuePhrase(cleanText, base);
-  if (parsedDue) {
-    tokens.push({ kind: "date", label: parsedDue.label });
-    cleanText = cleanText.slice(0, parsedDue.start) + cleanText.slice(parsedDue.end);
-  }
-
-  return {
-    cleanText: cleanText.replace(/\s{2,}/g, " ").trim(),
-    priority,
-    dueDate: parsedDue?.date,
-    dueHasTime: parsedDue?.hasTime,
-    someday,
-    tags,
-    tokens,
-  };
-}
-
-function parseDuePhrase(value: string, base: Date) {
-  const patterns: { regex: RegExp; offsetDays: number; label: string }[] = [
-    { regex: /\btonight\b/i, offsetDays: 0, label: "Tonight" },
-    { regex: /\btoday\b/i, offsetDays: 0, label: "Today" },
-    { regex: /\btomorrow\b/i, offsetDays: 1, label: "Tomorrow" },
-    { regex: /\bnext week\b/i, offsetDays: 7, label: "Next week" },
-  ];
-
-  for (const pattern of patterns) {
-    const match = value.match(pattern.regex);
-    if (!match || match.index === undefined) continue;
-    const date = startOfDay(new Date(base));
-    date.setDate(date.getDate() + pattern.offsetDays);
-    const time = parseTimeNear(value, match.index, match.index + match[0].length);
-    if (time) {
-      date.setHours(time.hours, time.minutes, 0, 0);
-    }
-    return {
-      date,
-      label: time ? `${pattern.label} ${time.label}` : pattern.label,
-      hasTime: !!time,
-      start: time?.start ?? match.index,
-      end: time?.end ?? match.index + match[0].length,
-    };
-  }
-
-  const timeOnly = value.match(/\b(?:at\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
-  if (timeOnly?.index !== undefined) {
-    const date = startOfDay(new Date(base));
-    const time = normalizeTime(timeOnly[1], timeOnly[2], timeOnly[3]);
-    date.setHours(time.hours, time.minutes, 0, 0);
-    return {
-      date,
-      label: `Today ${time.label}`,
-      hasTime: true,
-      start: timeOnly.index,
-      end: timeOnly.index + timeOnly[0].length,
-    };
-  }
-
-  return null;
-}
-
-function parseTimeNear(value: string, start: number, end: number) {
-  const after = value.slice(end, end + 16);
-  const before = value.slice(Math.max(0, start - 16), start);
-  const afterMatch = after.match(/^\s*(?:at\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
-  if (afterMatch) {
-    const time = normalizeTime(afterMatch[1], afterMatch[2], afterMatch[3]);
-    return { ...time, start, end: end + afterMatch[0].length };
-  }
-  const beforeMatch = before.match(/\b(?:at\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*$/i);
-  if (beforeMatch && beforeMatch.index !== undefined) {
-    const time = normalizeTime(beforeMatch[1], beforeMatch[2], beforeMatch[3]);
-    const tokenStart = start - before.length + beforeMatch.index;
-    return { ...time, start: tokenStart, end };
-  }
-  return null;
-}
-
-function normalizeTime(hourText: string, minuteText: string | undefined, meridiem: string) {
-  const hour = Number(hourText);
-  const minutes = minuteText ? Number(minuteText) : 0;
-  const lower = meridiem.toLowerCase();
-  const hours = lower === "pm" && hour < 12 ? hour + 12 : lower === "am" && hour === 12 ? 0 : hour;
-  return {
-    hours,
-    minutes,
-    label: `${hour}:${String(minutes).padStart(2, "0")}${lower}`,
-  };
-}
-
 export function QuickCaptureBar() {
   const pathname = usePathname();
-  const { createItem, addChecklistItem, connectItems, activeItems, spaces, activeSpaceId } =
+  const { createItem, addChecklistItem, connectItems, activeItems, spaces, activeSpaceId, setFocusTier } =
     useEngramStore();
   const {
     openNoteEditor,
@@ -269,6 +140,7 @@ export function QuickCaptureBar() {
     quickCaptureMode,
     expandQuickCapture,
     collapseQuickCapture,
+    consumeQuickCaptureIntent,
   } = useUIStore();
 
   const contextualMode: Mode = "task";
@@ -296,8 +168,8 @@ export function QuickCaptureBar() {
   const [batchSomeday, setBatchSomeday] = useState(false);
   // Nodes to connect the new item to, chosen via "@" mention.
   const [connections, setConnections] = useState<MentionItem[]>([]);
-  // Where the capture lands: the Inbox (default) or a specific space.
-  const [captureTarget, setCaptureTarget] = useState<"inbox" | string>("inbox");
+  // Where the capture lands: a lightweight group.
+  const [captureTarget, setCaptureTarget] = useState<string>(activeSpaceId);
 
   // Attach
   const [file, setFile] = useState<FileState | null>(null);
@@ -341,8 +213,8 @@ export function QuickCaptureBar() {
     setBatchTags([]);
     setBatchSomeday(false);
     setConnections([]);
-    setCaptureTarget("inbox");
-  }, [contextualMode, quickCaptureMode]);
+    setCaptureTarget(activeSpaceId);
+  }, [activeSpaceId, contextualMode, quickCaptureMode]);
 
   const collapse = useCallback(() => { collapseQuickCapture(); reset(); }, [collapseQuickCapture, reset]);
 
@@ -416,7 +288,7 @@ export function QuickCaptureBar() {
     });
   }, []);
 
-  const parsedTask = mode === "task" ? parseTaskText(text) : undefined;
+  const parsedTask = mode === "task" ? parseCapture(text) : undefined;
   const taskText = parsedTask?.cleanText ?? text.trim();
   const effectivePriority = parsedTask?.priority ?? priority;
   const effectiveDueDate = parsedTask?.dueDate ?? dueDate;
@@ -425,8 +297,7 @@ export function QuickCaptureBar() {
   const effectiveSomeday = (parsedTask?.someday ?? false) || batchSomeday;
 
   // Resolve the capture destination once per render.
-  const isInbox = captureTarget === "inbox";
-  const targetSpaceId = isInbox ? undefined : captureTarget;
+  const targetSpaceId = captureTarget;
   const targetSpaceName = spaces.find((s) => s.id === captureTarget)?.name;
 
   const allTasks = (() => {
@@ -452,26 +323,23 @@ export function QuickCaptureBar() {
 
   // When the destination isn't the board you're looking at, don't yank the view;
   // surface a toast instead so the capture isn't silently invisible.
-  const stayOnCurrentView = isInbox
-    ? true
-    : targetSpaceId !== activeSpaceId
+  const stayOnCurrentView = targetSpaceId !== activeSpaceId
       ? true
-      : pathname !== "/canvas";
+      : pathname !== "/tasks" && pathname !== "/library";
 
   const notifyTarget = () => {
-    if (isInbox) toast.success("Added to Inbox");
-    else if (targetSpaceId !== activeSpaceId) toast.success(`Added to ${targetSpaceName}`);
+    if (targetSpaceId !== activeSpaceId) toast.success(`Added to ${targetSpaceName}`);
   };
 
   const commit = () => {
     if (!canCommit) return;
     const trimmed = text.trim();
+    const captureIntent = consumeQuickCaptureIntent();
 
     if (mode === "thought") {
       const item = createItem({
         type: "thought",
         text: trimmed,
-        inbox: isInbox || undefined,
         spaceId: targetSpaceId,
         stayOnCurrentView,
       });
@@ -492,6 +360,7 @@ export function QuickCaptureBar() {
           : toDateInputValue(effectiveDueDate)
         : undefined;
       const [main, ...subs] = allTasks;
+      const focusTask = captureIntent === "focus-task";
       const item = createItem({
         type: "task",
         title: main,
@@ -499,10 +368,11 @@ export function QuickCaptureBar() {
         dueAt: due,
         someday: !due && effectiveSomeday ? true : undefined,
         tags: effectiveTags.length > 0 ? effectiveTags : undefined,
-        inbox: isInbox || undefined,
-        spaceId: targetSpaceId,
+        spaceId: focusTask ? activeSpaceId : targetSpaceId,
+        focusPinned: focusTask || undefined,
         stayOnCurrentView,
       });
+      if (focusTask) setFocusTier(item.id, "backlog");
       for (const sub of subs) addChecklistItem(item.id, sub);
       linkConnections(item.id);
       notifyTarget();
@@ -523,7 +393,6 @@ export function QuickCaptureBar() {
         type: "link",
         url: trimmed,
         title: extractDomain(trimmed),
-        inbox: isInbox || undefined,
         spaceId: targetSpaceId,
         stayOnCurrentView,
       });
@@ -540,7 +409,6 @@ export function QuickCaptureBar() {
         title: file.name,
         url: file.previewUrl,
         source: file.name,
-        inbox: isInbox || undefined,
         spaceId: targetSpaceId,
         stayOnCurrentView,
       });
@@ -562,7 +430,6 @@ export function QuickCaptureBar() {
     const item = createItem({
       type: "thought",
       text: trimmed || "",
-      inbox: isInbox || undefined,
       spaceId: targetSpaceId,
       stayOnCurrentView: true,
     });
@@ -775,7 +642,7 @@ export function QuickCaptureBar() {
                     onEnter={() => inputRef.current?.focus()}
                   />
                   {pendingTasks.length > 1 && (
-                    <DndContext sensors={taskSensors} onDragEnd={handlePendingTaskDragEnd}>
+                    <DndContext id="pending-tasks-dnd" sensors={taskSensors} onDragEnd={handlePendingTaskDragEnd}>
                       <SortableContext
                         items={pendingTasks.slice(1).map((_, index) => `pending-${index + 1}`)}
                         strategy={verticalListSortingStrategy}
@@ -830,7 +697,7 @@ export function QuickCaptureBar() {
                     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); commit(); return; }
                     if (e.key === "Enter") {
                       e.preventDefault();
-                      const parsed = parseTaskText(text);
+                      const parsed = parseCapture(text);
                       if (parsed.cleanText) {
                         setPendingTasks((p) => [...p, parsed.cleanText]);
                         if (parsed.priority) setPriority(parsed.priority);
@@ -1122,17 +989,17 @@ function CaptureTargetSelector({
   spaces,
   className,
 }: {
-  target: "inbox" | string;
-  onChange: (target: "inbox" | string) => void;
+  target: string;
+  onChange: (target: string) => void;
   spaces: Space[];
   className?: string;
 }) {
   const sortedSpaces = [...spaces].sort((a, b) => a.sortOrder - b.sortOrder);
-  const activeSpace = target === "inbox" ? undefined : spaces.find((s) => s.id === target);
+  const activeSpace = spaces.find((s) => s.id === target) ?? sortedSpaces[0];
   const TriggerIcon = activeSpace
     ? Icons[SPACE_ICONS[(activeSpace.icon in SPACE_ICONS ? activeSpace.icon : "sparkles") as SpaceIconKey]]
-    : Icons.inbox;
-  const triggerLabel = activeSpace ? activeSpace.name : "Inbox";
+    : Icons.book;
+  const triggerLabel = activeSpace ? activeSpace.name : "Group";
 
   return (
     <DropdownMenu>
@@ -1145,7 +1012,7 @@ function CaptureTargetSelector({
           className,
         )}
       >
-        <TriggerIcon className={cn("size-3.5 shrink-0", target === "inbox" && "text-[#9b88ff]")} />
+        <TriggerIcon className="size-3.5 shrink-0 text-[#9b88ff]" />
         <span className="truncate">{triggerLabel}</span>
         <Icons.chevronRight className="size-3 shrink-0 rotate-90 opacity-60" />
       </DropdownMenuTrigger>
@@ -1155,15 +1022,6 @@ function CaptureTargetSelector({
         sideOffset={6}
         className="min-w-[180px] rounded-[10px] border-[#2e2b26] bg-[#1a1714] text-[#efe9df]"
       >
-        <DropdownMenuItem
-          onClick={() => onChange("inbox")}
-          className="cursor-pointer text-[#b0a99f] focus:bg-[#22201f] focus:text-white"
-        >
-          <Icons.inbox className="mr-1.5 size-4 text-[#9b88ff]" />
-          Inbox
-          <span className="ml-auto font-mono text-[10px] text-[#6b6258] uppercase">Default</span>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator className="bg-[#2e2b26]" />
         {sortedSpaces.map((space) => {
           const iconKey = (space.icon in SPACE_ICONS ? space.icon : "sparkles") as SpaceIconKey;
           const SpaceIcon = Icons[SPACE_ICONS[iconKey]];
