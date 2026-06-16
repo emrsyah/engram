@@ -36,6 +36,7 @@ import { taskQueueOf } from "../projections";
 import { useEngramStore } from "../store";
 import type { Item, Space, TaskQueue } from "../types";
 import { useUIStore } from "../ui-store";
+import { usePersistentState } from "../use-persistent-state";
 import { DueChip, PriorityChip } from "./chips";
 import { Icons } from "./icons";
 
@@ -47,21 +48,25 @@ type TaskFilter =
 type LayoutMode = "columns" | "stacked";
 type PlanningSectionId = "later" | "next" | "now";
 type SectionId = PlanningSectionId | "done";
-type TasksUiState = {
+
+/** Durable view preferences — persisted across navigation and reload. */
+type TasksPrefs = {
 	filter: TaskFilter;
 	layoutMode: LayoutMode;
+	collapsed: Record<PlanningSectionId, boolean>;
+	doneOpen: boolean;
+};
+
+/** Ephemeral, per-visit state — fine to reset when leaving the page. */
+type TasksUiState = {
 	newTask: string;
 	focusedTaskId?: string;
-	doneOpen: boolean;
 	blitzOpen: boolean;
 	blitzSession: number;
 };
 type TasksUiAction =
-	| { type: "filter"; filter: TaskFilter }
-	| { type: "layout"; layoutMode: LayoutMode }
 	| { type: "newTask"; newTask: string }
 	| { type: "focusTask"; taskId?: string }
-	| { type: "doneOpen"; open: boolean }
 	| { type: "openBlitz" }
 	| { type: "blitzOpen"; open: boolean };
 
@@ -72,27 +77,27 @@ const SECTIONS: { id: SectionId; label: string; hint: string }[] = [
 ];
 
 const ACTIVE_SECTIONS: PlanningSectionId[] = ["later", "next", "now"];
-const INITIAL_TASKS_UI: TasksUiState = {
+
+const TASKS_PREFS_KEY = "engram.tasks.prefs.v1";
+const DEFAULT_TASKS_PREFS: TasksPrefs = {
 	filter: { kind: "all", value: "all" },
-	layoutMode: "columns",
-	newTask: "",
+	layoutMode: "stacked",
+	collapsed: { later: false, next: false, now: false },
 	doneOpen: false,
+};
+
+const INITIAL_TASKS_UI: TasksUiState = {
+	newTask: "",
 	blitzOpen: false,
 	blitzSession: 0,
 };
 
 function tasksUiReducer(state: TasksUiState, action: TasksUiAction): TasksUiState {
 	switch (action.type) {
-		case "filter":
-			return { ...state, filter: action.filter };
-		case "layout":
-			return { ...state, layoutMode: action.layoutMode };
 		case "newTask":
 			return { ...state, newTask: action.newTask };
 		case "focusTask":
 			return { ...state, focusedTaskId: action.taskId };
-		case "doneOpen":
-			return { ...state, doneOpen: action.open };
 		case "openBlitz":
 			return { ...state, blitzOpen: true, blitzSession: state.blitzSession + 1 };
 		case "blitzOpen":
@@ -147,6 +152,13 @@ export function TasksView() {
 		useEngramStore();
 	const { openDetail } = useUIStore();
 	const [ui, dispatchUi] = useReducer(tasksUiReducer, INITIAL_TASKS_UI);
+	const [prefs, setPrefs] = usePersistentState<TasksPrefs>(TASKS_PREFS_KEY, DEFAULT_TASKS_PREFS);
+
+	const setFilter = (filter: TaskFilter) => setPrefs((p) => ({ ...p, filter }));
+	const setLayout = (layoutMode: LayoutMode) => setPrefs((p) => ({ ...p, layoutMode }));
+	const setDoneOpen = (doneOpen: boolean) => setPrefs((p) => ({ ...p, doneOpen }));
+	const toggleSection = (id: PlanningSectionId) =>
+		setPrefs((p) => ({ ...p, collapsed: { ...p.collapsed, [id]: !p.collapsed[id] } }));
 
 	const sensors = useSensors(
 		useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -157,10 +169,10 @@ export function TasksView() {
 	const taskTags = allTags.filter((tag) => allTaskItems.some((task) => task.tags?.includes(tag)));
 
 	const visibleTasks = sortTasks(
-		ui.filter.kind === "group"
-			? allTaskItems.filter((task) => task.spaceId === ui.filter.value)
-			: ui.filter.kind === "tag"
-				? allTaskItems.filter((task) => task.tags?.includes(ui.filter.value))
+		prefs.filter.kind === "group"
+			? allTaskItems.filter((task) => task.spaceId === prefs.filter.value)
+			: prefs.filter.kind === "tag"
+				? allTaskItems.filter((task) => task.tags?.includes(prefs.filter.value))
 				: allTaskItems,
 	);
 
@@ -190,10 +202,10 @@ export function TasksView() {
 		? allTaskItems.find((task) => task.id === ui.focusedTaskId && !task.done)
 		: undefined;
 	const activeFilterLabel =
-		ui.filter.kind === "group"
-			? spaceName(spaces, ui.filter.value)
-			: ui.filter.kind === "tag"
-				? `#${ui.filter.value}`
+		prefs.filter.kind === "group"
+			? spaceName(spaces, prefs.filter.value)
+			: prefs.filter.kind === "tag"
+				? `#${prefs.filter.value}`
 				: "All tasks";
 
 	const focusTask = (task: Item) => {
@@ -259,14 +271,14 @@ export function TasksView() {
 
 						<div className="flex flex-wrap items-center gap-2">
 							<TaskFilterMenu
-								filter={ui.filter}
+								filter={prefs.filter}
 								label={activeFilterLabel}
-								onFilter={(filter) => dispatchUi({ type: "filter", filter })}
+								onFilter={setFilter}
 								spaces={spaces}
 								tasks={allTaskItems}
 								tags={taskTags}
 							/>
-							<Tabs value={ui.layoutMode} onValueChange={(value) => dispatchUi({ type: "layout", layoutMode: value as LayoutMode })}>
+							<Tabs value={prefs.layoutMode} onValueChange={(value) => setLayout(value as LayoutMode)}>
 								<TabsList className="rounded-[8px] bg-fill p-1">
 									{(["columns", "stacked"] as LayoutMode[]).map((mode) => (
 										<TabsTrigger
@@ -282,7 +294,7 @@ export function TasksView() {
 							<Button
 								type="button"
 								variant="ghost"
-								onClick={() => dispatchUi({ type: "doneOpen", open: !ui.doneOpen })}
+								onClick={() => setDoneOpen(!prefs.doneOpen)}
 								className="h-9 rounded-[7px] border border-line bg-surface px-3 text-ink-3 hover:text-white"
 							>
 								<Icons.check className="size-4" />
@@ -292,12 +304,12 @@ export function TasksView() {
 						</div>
 					</div>
 
-					{ui.filter.kind !== "all" ? (
+					{prefs.filter.kind !== "all" ? (
 						<div className="mt-5 flex flex-wrap items-center gap-2 text-sm">
 							<span className="text-ink-dim">Filtered by</span>
 							<button
 								type="button"
-								onClick={() => dispatchUi({ type: "filter", filter: { kind: "all", value: "all" } })}
+								onClick={() => setFilter({ kind: "all", value: "all" })}
 								className="flex items-center gap-2 rounded-[999px] border border-line bg-surface px-3 py-1.5 font-semibold text-ink-2 hover:border-line-strong"
 							>
 								{activeFilterLabel}
@@ -349,17 +361,20 @@ export function TasksView() {
 						<div
 							className={cn(
 								"mt-6 gap-4",
-								ui.layoutMode === "columns"
+								prefs.layoutMode === "columns"
 									? "grid min-w-[780px] grid-cols-3"
 									: "grid grid-cols-1",
 							)}
 						>
-							{(ui.layoutMode === "stacked" ? SECTIONS.toReversed() : SECTIONS).map((section) => (
+							{(prefs.layoutMode === "stacked" ? SECTIONS.toReversed() : SECTIONS).map((section) => (
 								<TaskSection
 									key={section.id}
 									section={section}
 									tasks={tasksBySection.get(section.id) ?? []}
 									spaces={spaces}
+									layoutMode={prefs.layoutMode}
+									collapsed={prefs.collapsed[section.id as PlanningSectionId] ?? false}
+									onToggleCollapse={() => toggleSection(section.id as PlanningSectionId)}
 									onToggleDone={toggleDone}
 									onQueue={setTaskQueue}
 									onOpen={openDetail}
@@ -376,8 +391,8 @@ export function TasksView() {
 						spaces={spaces}
 						onToggleDone={toggleDone}
 						onOpen={openDetail}
-						open={ui.doneOpen}
-						onOpenChange={(open) => dispatchUi({ type: "doneOpen", open })}
+						open={prefs.doneOpen}
+						onOpenChange={setDoneOpen}
 					/>
 				</div>
 			</div>
@@ -481,6 +496,9 @@ function TaskSection({
 	section,
 	tasks,
 	spaces,
+	layoutMode,
+	collapsed,
+	onToggleCollapse,
 	onToggleDone,
 	onQueue,
 	onOpen,
@@ -491,6 +509,9 @@ function TaskSection({
 	section: { id: SectionId; label: string; hint: string };
 	tasks: Item[];
 	spaces: Space[];
+	layoutMode: LayoutMode;
+	collapsed: boolean;
+	onToggleCollapse: () => void;
 	onToggleDone: (id: string) => void;
 	onQueue: (id: string, queue: TaskQueue) => void;
 	onOpen: (id: string) => void;
@@ -504,18 +525,34 @@ function TaskSection({
 		<section
 			ref={setNodeRef}
 			className={cn(
-				"flex max-h-[calc(100vh-330px)] min-h-[300px] flex-col overflow-hidden rounded-[9px] border bg-base",
+				"flex flex-col overflow-hidden rounded-[9px] border bg-base",
+				collapsed ? "max-h-none" : "max-h-[calc(100vh-330px)] min-h-[300px]",
 				isOver ? "border-brand bg-brand-surface" : "border-fill",
 			)}
 		>
 			<header className="shrink-0 border-fill border-b px-4 py-3">
 				<div className="flex items-center justify-between gap-3">
-					<div className="min-w-0">
-						<h3 className="truncate font-bold text-ink text-lg">{section.label}</h3>
-						<p className="mt-0.5 truncate text-ink-faint text-xs">{section.hint}</p>
-					</div>
-					<div className="flex items-center gap-2">
-						{onOpenBlitz ? (
+					<button
+						type="button"
+						onClick={onToggleCollapse}
+						aria-expanded={!collapsed}
+						className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+					>
+						<Icons.chevronRight
+							className={cn(
+								"size-4 shrink-0 text-ink-faint transition-transform",
+								!collapsed && "rotate-90",
+							)}
+						/>
+						<span className="min-w-0">
+							<span className="block truncate font-bold text-ink text-lg">{section.label}</span>
+							{!collapsed ? (
+								<span className="mt-0.5 block truncate text-ink-faint text-xs">{section.hint}</span>
+							) : null}
+						</span>
+					</button>
+					<div className="flex shrink-0 items-center gap-2">
+						{onOpenBlitz && !collapsed ? (
 							<Button
 								type="button"
 								size="sm"
@@ -530,28 +567,35 @@ function TaskSection({
 					</div>
 				</div>
 			</header>
-			<SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
-				<div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
-					{tasks.length === 0 ? (
-						<div className="rounded-[7px] border border-dashed border-line-2 px-3 py-8 text-center text-ink-ghost text-sm">
-							Drop tasks here
-						</div>
-					) : (
-						tasks.map((task) => (
-							<SortableTaskCard
-								key={task.id}
-								task={task}
-								groupName={spaceName(spaces, task.spaceId)}
-								onToggleDone={onToggleDone}
-								onQueue={onQueue}
-								onOpen={() => onOpen(task.id)}
-								onFocus={() => onFocus(task)}
-								focused={focusedTaskId === task.id}
-							/>
-						))
-					)}
-				</div>
-			</SortableContext>
+			{collapsed ? null : (
+				<SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
+					<div
+						className={cn(
+							"min-h-0 flex-1 space-y-2 overflow-y-auto p-3",
+							layoutMode === "stacked" && "max-h-[60vh]",
+						)}
+					>
+						{tasks.length === 0 ? (
+							<div className="rounded-[7px] border border-dashed border-line-2 px-3 py-8 text-center text-ink-ghost text-sm">
+								Drop tasks here
+							</div>
+						) : (
+							tasks.map((task) => (
+								<SortableTaskCard
+									key={task.id}
+									task={task}
+									groupName={spaceName(spaces, task.spaceId)}
+									onToggleDone={onToggleDone}
+									onQueue={onQueue}
+									onOpen={() => onOpen(task.id)}
+									onFocus={() => onFocus(task)}
+									focused={focusedTaskId === task.id}
+								/>
+							))
+						)}
+					</div>
+				</SortableContext>
+			)}
 		</section>
 	);
 }
