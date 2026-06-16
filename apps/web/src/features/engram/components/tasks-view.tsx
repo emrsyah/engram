@@ -32,7 +32,6 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useReducer, useState } from "react";
 
-import { taskQueueOf } from "../projections";
 import { useEngramStore } from "../store";
 import type { Item, Space, TaskQueue } from "../types";
 import { useUIStore } from "../ui-store";
@@ -119,10 +118,31 @@ function sortTasks(tasks: Item[]) {
 	});
 }
 
+function startOfDay(date: Date) {
+	const copy = new Date(date);
+	copy.setHours(0, 0, 0, 0);
+	return copy;
+}
+
+/** Where a task's due date places it: today/overdue → Today, any later date → This week. */
+function dateBucket(dueAt?: string): PlanningSectionId | undefined {
+	if (!dueAt) return undefined;
+	const due = startOfDay(new Date(dueAt)).getTime();
+	const today = startOfDay(new Date()).getTime();
+	return due <= today ? "now" : "next";
+}
+
+/**
+ * Section resolution, in precedence order:
+ *  1. An explicit "now"/"next" queue (set by drag or the lane buttons) wins.
+ *  2. Otherwise the due date decides (today → Today, later → This week).
+ *  3. Dateless tasks fall to Backlog.
+ */
 function sectionOf(task: Item): SectionId {
-	const queue = taskQueueOf(task);
 	if (task.done) return "done";
-	return queue === "waiting" ? "later" : (queue as PlanningSectionId);
+	if (task.taskQueue === "now") return "now";
+	if (task.taskQueue === "next") return "next";
+	return dateBucket(task.dueAt) ?? "later";
 }
 
 function sectionLabel(id: SectionId) {
@@ -279,13 +299,14 @@ export function TasksView() {
 								tags={taskTags}
 							/>
 							<Tabs value={prefs.layoutMode} onValueChange={(value) => setLayout(value as LayoutMode)}>
-								<TabsList className="rounded-[8px] bg-fill p-1">
+								<TabsList className="h-9 gap-1 rounded-[8px] border border-line-2 bg-sunken p-1">
 									{(["columns", "stacked"] as LayoutMode[]).map((mode) => (
 										<TabsTrigger
 											key={mode}
 											value={mode}
-											className="h-8 rounded-[6px] px-3 capitalize text-ink-muted data-active:bg-raise data-active:text-white"
+											className="h-7 gap-1.5 rounded-[6px] px-2.5 font-medium text-ink-muted capitalize data-active:bg-brand-surface data-active:text-brand-soft"
 										>
+											<Icons.layout className="size-3.5" />
 											{mode}
 										</TabsTrigger>
 									))}
@@ -295,7 +316,12 @@ export function TasksView() {
 								type="button"
 								variant="ghost"
 								onClick={() => setDoneOpen(!prefs.doneOpen)}
-								className="h-9 rounded-[7px] border border-line bg-surface px-3 text-ink-3 hover:text-white"
+								className={cn(
+									"h-9 gap-2 rounded-[8px] border px-3",
+									prefs.doneOpen
+										? "border-brand bg-brand-surface text-brand-soft"
+										: "border-line-2 bg-sunken text-ink-muted hover:text-ink-2",
+								)}
 							>
 								<Icons.check className="size-4" />
 								Done
@@ -318,7 +344,7 @@ export function TasksView() {
 						</div>
 					) : null}
 
-					<div className="mt-6 flex gap-2 rounded-[12px] border border-line bg-surface p-2">
+					<div className="mt-6 flex gap-2 rounded-[12px] border border-line-2 bg-sunken p-2 focus-within:border-line-strong">
 						<Input
 							value={ui.newTask}
 							onChange={(event) => dispatchUi({ type: "newTask", newTask: event.target.value })}
@@ -326,12 +352,12 @@ export function TasksView() {
 								if (event.key === "Enter") addTask();
 							}}
 							placeholder="Add to Backlog..."
-							className="h-10 border-0 bg-transparent text-ink-bright placeholder:text-ink-faint focus-visible:ring-0"
+							className="h-10 border-0 bg-transparent text-ink-bright placeholder:text-ink-dim focus-visible:ring-0"
 						/>
 						<Button
 							type="button"
 							onClick={addTask}
-							className="h-10 rounded-[7px] bg-brand px-4 font-bold text-brand-ink hover:bg-brand-bright"
+							className="h-10 gap-2 rounded-[8px] bg-brand px-4 font-semibold text-brand-ink hover:bg-brand-bright"
 						>
 							<Icons.plus className="size-4" />
 							Add
@@ -431,7 +457,7 @@ function TaskFilterMenu({
 					<Button
 						type="button"
 						variant="ghost"
-						className="h-9 rounded-[7px] border border-line bg-surface px-3 text-ink-2 hover:text-white"
+						className="h-9 gap-2 rounded-[8px] border border-line-2 bg-sunken px-3 text-ink-2 hover:text-white"
 					/>
 				}
 			>
@@ -557,7 +583,7 @@ function TaskSection({
 								type="button"
 								size="sm"
 								onClick={onOpenBlitz}
-								className="h-8 rounded-[7px] bg-brand px-3 font-bold text-brand-ink hover:bg-brand-bright"
+								className="h-8 gap-2 rounded-[8px] bg-brand px-3 font-semibold text-brand-ink hover:bg-brand-bright"
 							>
 								<Icons.target className="size-4" />
 								Blitz
@@ -843,6 +869,7 @@ function SortableTaskCard({
 		id: task.id,
 		disabled: task.done,
 	});
+	const section = sectionOf(task);
 
 	return (
 		<article
@@ -899,33 +926,36 @@ function SortableTaskCard({
 				<div
 					onPointerDown={(event) => event.stopPropagation()}
 					onClick={(event) => event.stopPropagation()}
-					className="mt-2 flex flex-wrap gap-1"
+					className="mt-2.5 flex items-center gap-2"
 				>
-					{ACTIVE_SECTIONS.map((queue) => (
-						<button
-							key={queue}
-							type="button"
-							onClick={() => onQueue(task.id, queue)}
-							className={cn(
-								"rounded-[5px] px-2 py-0.5 font-semibold text-[10px]",
-								taskQueueOf(task) === queue
-									? "bg-brand text-brand-ink"
-									: "bg-line text-ink-dim hover:text-ink-2",
-							)}
-						>
-							{sectionLabel(queue)}
-						</button>
-					))}
+					<div className="inline-flex items-center gap-0.5 rounded-[8px] border border-line-2 bg-sunken p-0.5">
+						{ACTIVE_SECTIONS.map((queue) => (
+							<button
+								key={queue}
+								type="button"
+								onClick={() => onQueue(task.id, queue)}
+								className={cn(
+									"rounded-[6px] px-2.5 py-1 font-medium text-[11px] transition-colors",
+									section === queue
+										? "bg-brand text-brand-ink"
+										: "text-ink-muted hover:bg-fill hover:text-ink-2",
+								)}
+							>
+								{sectionLabel(queue)}
+							</button>
+						))}
+					</div>
 					<button
 						type="button"
 						onClick={onFocus}
 						className={cn(
-							"ml-auto rounded-[5px] px-2 py-0.5 font-semibold text-[10px]",
+							"ml-auto inline-flex items-center gap-1.5 rounded-[8px] border px-2.5 py-1 font-medium text-[11px] transition-colors",
 							focused
-								? "bg-brand-soft text-brand-ink"
-								: "bg-brand-surface text-brand-soft hover:text-white",
+								? "border-brand bg-brand text-brand-ink"
+								: "border-line-2 text-brand-soft hover:bg-fill",
 						)}
 					>
+						<Icons.target className="size-3" />
 						Focus
 					</button>
 				</div>
