@@ -1,5 +1,4 @@
 import type { AppRouter } from "@alphonse/api/routers/index";
-import { env } from "@alphonse/env/web";
 import { QueryCache, QueryClient } from "@tanstack/react-query";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
@@ -23,7 +22,8 @@ export const queryClient = new QueryClient({
 const trpcClient = createTRPCClient<AppRouter>({
   links: [
     httpBatchLink({
-      url: `${env.NEXT_PUBLIC_SERVER_URL}/trpc`,
+      // Same-origin API mounted in this app under /api/trpc.
+      url: "/api/trpc",
       fetch(url, options) {
         return fetch(url, {
           ...options,

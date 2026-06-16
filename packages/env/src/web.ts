@@ -3,7 +3,9 @@ import { z } from "zod";
 
 export const env = createEnv({
   client: {
-    NEXT_PUBLIC_SERVER_URL: z.url(),
+    // Deprecated: API now lives in this app at a relative /api path. Kept
+    // optional so any lingering reference doesn't fail validation.
+    NEXT_PUBLIC_SERVER_URL: z.url().optional(),
   },
   runtimeEnv: {
     NEXT_PUBLIC_SERVER_URL: process.env.NEXT_PUBLIC_SERVER_URL,

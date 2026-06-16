@@ -1,6 +1,5 @@
-import { env } from "@alphonse/env/web";
 import { createAuthClient } from "better-auth/react";
 
-export const authClient = createAuthClient({
-  baseURL: env.NEXT_PUBLIC_SERVER_URL,
-});
+// Auth lives in this same Next.js app (under /api/auth), so no baseURL is
+// needed — the client targets the current origin by default.
+export const authClient = createAuthClient();

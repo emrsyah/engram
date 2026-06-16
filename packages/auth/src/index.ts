@@ -66,9 +66,12 @@ export function createAuth() {
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
     advanced: {
+      // Web and auth share one origin now, so cookies can use the stricter
+      // `lax` policy. `secure` is gated on production so http://localhost dev
+      // still stores the session.
       defaultCookieAttributes: {
-        sameSite: "none",
-        secure: true,
+        sameSite: "lax",
+        secure: env.NODE_ENV === "production",
         httpOnly: true,
       },
     },
