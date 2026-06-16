@@ -8,6 +8,8 @@
  * transparency) at apps/web/assets/logo-source.png — or pass a path — then
  * run the script. Every file Next.js serves is rebuilt from that one source.
  */
+import { existsSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import pngToIco from "png-to-ico";
@@ -32,7 +34,7 @@ const PNG_TARGETS: Array<[string, number]> = [
 const ICO_SIZES = [16, 32, 48];
 
 async function main() {
-  if (!(await Bun.file(source).exists())) {
+  if (!existsSync(source)) {
     console.error(`✗ Source image not found: ${source}`);
     console.error(`  Place your logo there, or pass a path: bun run gen:favicons ./my-logo.png`);
     process.exit(1);
@@ -63,7 +65,7 @@ async function main() {
     ),
   );
   const ico = await pngToIco(icoBuffers);
-  await Bun.write(resolve(appDir, "favicon.ico"), ico);
+  await writeFile(resolve(appDir, "favicon.ico"), ico);
   console.log(`✓ favicon.ico (${ICO_SIZES.join(", ")})`);
 
   console.log("\nDone — all favicon assets regenerated from", source);
