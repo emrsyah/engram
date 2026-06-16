@@ -11,7 +11,6 @@ import {
 	DropdownMenuTrigger,
 } from "@alphonse/ui/components/dropdown-menu";
 import { Input } from "@alphonse/ui/components/input";
-import { PopoverContent, PopoverRoot, PopoverTrigger } from "@alphonse/ui/components/popover";
 import { Tabs, TabsList, TabsTrigger } from "@alphonse/ui/components/tabs";
 import { cn } from "@alphonse/ui/lib/utils";
 import {
@@ -996,25 +995,31 @@ function BlitzSettings({
 	onSetBreakMinutes: (minutes: number) => void;
 	onSetPrefs: (patch: Partial<BlitzPrefs>) => void;
 }) {
+	const [open, setOpen] = useState(false);
+
 	return (
-		<PopoverRoot>
-			<PopoverTrigger
-				render={
-					<Button
-						type="button"
-						variant="ghost"
-						className="size-9 rounded-[8px] border border-white/10 bg-white/[0.03] p-0 text-ink-3 hover:text-white"
-					/>
-				}
+		<div className="relative">
+			<Button
+				type="button"
+				variant="ghost"
+				onClick={() => setOpen((value) => !value)}
+				className="size-9 rounded-[8px] border border-white/10 bg-white/[0.03] p-0 text-ink-3 hover:text-white"
 			>
 				<Icons.settings className="size-4" />
 				<span className="sr-only">Customize Blitz</span>
-			</PopoverTrigger>
-			<PopoverContent
-				side="bottom"
-				className="w-72 rounded-[12px] border-line-2 bg-panel p-4 text-white shadow-[0_8px_24px_-6px_rgba(0,0,0,0.5)]"
-			>
-				<div className="space-y-4">
+			</Button>
+			{open ? (
+				<>
+					{/* Outside-click catcher (kept within the dialog DOM so it isn't inert). */}
+					<button
+						type="button"
+						aria-hidden
+						tabIndex={-1}
+						onClick={() => setOpen(false)}
+						className="fixed inset-0 z-[60] cursor-default"
+					/>
+					<div className="absolute top-[calc(100%+8px)] right-0 z-[70] w-72 rounded-[12px] border border-line-2 bg-panel p-4 text-white shadow-[0_8px_24px_-6px_rgba(0,0,0,0.5)]">
+						<div className="space-y-4">
 					<div>
 						<p className="mb-2 font-semibold text-ink-dim text-[11px] uppercase tracking-[0.08em]">
 							Focus length
@@ -1064,8 +1069,10 @@ function BlitzSettings({
 						onChange={(value) => onSetPrefs({ chime: value })}
 					/>
 				</div>
-			</PopoverContent>
-		</PopoverRoot>
+					</div>
+				</>
+			) : null}
+		</div>
 	);
 }
 
