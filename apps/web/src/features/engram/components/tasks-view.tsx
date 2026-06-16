@@ -11,7 +11,6 @@ import {
 	DropdownMenuTrigger,
 } from "@alphonse/ui/components/dropdown-menu";
 import { Input } from "@alphonse/ui/components/input";
-import { Tabs, TabsList, TabsTrigger } from "@alphonse/ui/components/tabs";
 import { cn } from "@alphonse/ui/lib/utils";
 import {
 	closestCenter,
@@ -45,16 +44,25 @@ type TaskFilter =
 	| { kind: "tag"; value: string };
 
 type LayoutMode = "columns" | "stacked";
+type SortMode = "manual" | "due" | "priority" | "recent";
 type PlanningSectionId = "later" | "next" | "now";
 type SectionId = PlanningSectionId | "done";
 
 /** Durable view preferences — persisted across navigation and reload. */
 type TasksPrefs = {
 	filter: TaskFilter;
+	sort: SortMode;
 	layoutMode: LayoutMode;
 	collapsed: Record<PlanningSectionId, boolean>;
 	doneOpen: boolean;
 };
+
+const SORT_OPTIONS: { id: SortMode; label: string; hint: string }[] = [
+	{ id: "manual", label: "Manual order", hint: "Your drag-and-drop order" },
+	{ id: "due", label: "Due date", hint: "Soonest due first" },
+	{ id: "priority", label: "Priority", hint: "P1 → P3" },
+	{ id: "recent", label: "Recently added", hint: "Newest first" },
+];
 
 /** Ephemeral, per-visit state — fine to reset when leaving the page. */
 type TasksUiState = {
@@ -76,6 +84,7 @@ const ACTIVE_SECTIONS: PlanningSectionId[] = ["later", "next", "now"];
 const TASKS_PREFS_KEY = "engram.tasks.prefs.v1";
 const DEFAULT_TASKS_PREFS: TasksPrefs = {
 	filter: { kind: "all", value: "all" },
+	sort: "manual",
 	layoutMode: "stacked",
 	collapsed: { later: false, next: false, now: false },
 	doneOpen: false,
@@ -104,6 +113,30 @@ export function sortTasks(tasks: Item[]) {
 		const orderA = a.taskSortOrder ?? Number.MAX_SAFE_INTEGER;
 		const orderB = b.taskSortOrder ?? Number.MAX_SAFE_INTEGER;
 		if (orderA !== orderB) return orderA - orderB;
+		return a.createdAt.localeCompare(b.createdAt);
+	});
+}
+
+/**
+ * Sort within a section. "manual" keeps the drag order (taskSortOrder); the
+ * others sort by a single field, with done tasks always sinking to the bottom.
+ */
+export function sortTasksBy(tasks: Item[], mode: SortMode) {
+	if (mode === "manual") return sortTasks(tasks);
+	return tasks.toSorted((a, b) => {
+		if (a.done !== b.done) return a.done ? 1 : -1;
+		if (mode === "due") {
+			const dueA = a.dueAt ? new Date(a.dueAt).getTime() : Number.MAX_SAFE_INTEGER;
+			const dueB = b.dueAt ? new Date(b.dueAt).getTime() : Number.MAX_SAFE_INTEGER;
+			if (dueA !== dueB) return dueA - dueB;
+		} else if (mode === "priority") {
+			const prioA = a.priority ?? Number.MAX_SAFE_INTEGER;
+			const prioB = b.priority ?? Number.MAX_SAFE_INTEGER;
+			if (prioA !== prioB) return prioA - prioB;
+		} else if (mode === "recent") {
+			const cmp = b.createdAt.localeCompare(a.createdAt);
+			if (cmp !== 0) return cmp;
+		}
 		return a.createdAt.localeCompare(b.createdAt);
 	});
 }
@@ -165,6 +198,7 @@ export function TasksView() {
 	const [prefs, setPrefs] = usePersistentState<TasksPrefs>(TASKS_PREFS_KEY, DEFAULT_TASKS_PREFS);
 
 	const setFilter = (filter: TaskFilter) => setPrefs((p) => ({ ...p, filter }));
+	const setSort = (sort: SortMode) => setPrefs((p) => ({ ...p, sort }));
 	const setLayout = (layoutMode: LayoutMode) => setPrefs((p) => ({ ...p, layoutMode }));
 	const setDoneOpen = (doneOpen: boolean) => setPrefs((p) => ({ ...p, doneOpen }));
 	const toggleSection = (id: PlanningSectionId) =>
@@ -193,7 +227,7 @@ export function TasksView() {
 		const key = sectionOf(task);
 		tasksBySection.get(key)?.push(task);
 	}
-	for (const [key, tasks] of tasksBySection) tasksBySection.set(key, sortTasks(tasks));
+	for (const [key, tasks] of tasksBySection) tasksBySection.set(key, sortTasksBy(tasks, prefs.sort));
 
 	const addTask = () => {
 		const title = ui.newTask.trim();
@@ -284,35 +318,14 @@ export function TasksView() {
 								tasks={allTaskItems}
 								tags={taskTags}
 							/>
-							<Tabs value={prefs.layoutMode} onValueChange={(value) => setLayout(value as LayoutMode)}>
-								<TabsList className="h-9 gap-1 rounded-[8px] border border-line-2 bg-sunken p-1">
-									{(["columns", "stacked"] as LayoutMode[]).map((mode) => (
-										<TabsTrigger
-											key={mode}
-											value={mode}
-											className="h-7 gap-1.5 rounded-[6px] px-2.5 font-medium text-ink-muted capitalize data-active:bg-brand-surface data-active:text-brand-soft"
-										>
-											<Icons.layout className="size-3.5" />
-											{mode}
-										</TabsTrigger>
-									))}
-								</TabsList>
-							</Tabs>
-							<Button
-								type="button"
-								variant="ghost"
-								onClick={() => setDoneOpen(!prefs.doneOpen)}
-								className={cn(
-									"h-9 gap-2 rounded-[8px] border px-3",
-									prefs.doneOpen
-										? "border-brand bg-brand-surface text-brand-soft"
-										: "border-line-2 bg-sunken text-ink-muted hover:text-ink-2",
-								)}
-							>
-								<Icons.check className="size-4" />
-								Done
-								<CountBadge count={tasksBySection.get("done")?.length ?? 0} />
-							</Button>
+							<TaskSortMenu sort={prefs.sort} onSort={setSort} />
+							<TaskViewMenu
+								layoutMode={prefs.layoutMode}
+								onLayout={setLayout}
+								doneOpen={prefs.doneOpen}
+								onDoneOpen={setDoneOpen}
+								doneCount={tasksBySection.get("done")?.length ?? 0}
+							/>
 						</div>
 					</div>
 
@@ -438,8 +451,11 @@ function TaskFilterMenu({
 					/>
 				}
 			>
-				<Icons.search className="size-4 text-brand" />
-				<span className="max-w-[160px] truncate">{label}</span>
+				<Icons.list className="size-4 text-brand" />
+				<span className="text-ink-dim">Filter</span>
+				{filter.kind !== "all" ? (
+					<span className="max-w-[140px] truncate font-semibold text-ink">{label}</span>
+				) : null}
 				<Icons.chevronRight className="size-4 rotate-90 text-ink-dim" />
 			</DropdownMenuTrigger>
 			<DropdownMenuContent
@@ -490,6 +506,113 @@ function TaskFilterMenu({
 						</DropdownMenuItem>
 					))
 				)}
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+function TaskSortMenu({ sort, onSort }: { sort: SortMode; onSort: (sort: SortMode) => void }) {
+	const active = SORT_OPTIONS.find((option) => option.id === sort) ?? SORT_OPTIONS[0];
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={
+					<Button
+						type="button"
+						variant="ghost"
+						className="h-9 gap-2 rounded-[8px] border border-line-2 bg-sunken px-3 text-ink-2 hover:text-white"
+					/>
+				}
+			>
+				<Icons.list className="size-4 text-brand" />
+				<span className="text-ink-dim">Sort</span>
+				{sort !== "manual" ? (
+					<span className="max-w-[140px] truncate font-semibold text-ink">{active.label}</span>
+				) : null}
+				<Icons.chevronRight className="size-4 rotate-90 text-ink-dim" />
+			</DropdownMenuTrigger>
+			<DropdownMenuContent
+				align="end"
+				className="w-[240px] border border-line-2 bg-panel p-1 text-ink-2"
+			>
+				{SORT_OPTIONS.map((option) => (
+					<DropdownMenuItem
+						key={option.id}
+						onClick={() => onSort(option.id)}
+						className={cn("flex-col items-start gap-0.5", sort === option.id && "bg-fill text-white")}
+					>
+						<span className="font-semibold">{option.label}</span>
+						<span className="text-ink-dim text-xs">{option.hint}</span>
+					</DropdownMenuItem>
+				))}
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+function TaskViewMenu({
+	layoutMode,
+	onLayout,
+	doneOpen,
+	onDoneOpen,
+	doneCount,
+}: {
+	layoutMode: LayoutMode;
+	onLayout: (mode: LayoutMode) => void;
+	doneOpen: boolean;
+	onDoneOpen: (open: boolean) => void;
+	doneCount: number;
+}) {
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={
+					<Button
+						type="button"
+						variant="ghost"
+						className="h-9 gap-2 rounded-[8px] border border-line-2 bg-sunken px-3 text-ink-2 hover:text-white"
+					/>
+				}
+			>
+				<Icons.settings className="size-4 text-brand" />
+				<span className="text-ink-dim">View</span>
+				<Icons.chevronRight className="size-4 rotate-90 text-ink-dim" />
+			</DropdownMenuTrigger>
+			<DropdownMenuContent
+				align="end"
+				className="w-[240px] border border-line-2 bg-panel p-1 text-ink-2"
+			>
+				<DropdownLabel>Layout</DropdownLabel>
+				{(["stacked", "columns"] as LayoutMode[]).map((mode) => (
+					<DropdownMenuItem
+						key={mode}
+						onClick={() => onLayout(mode)}
+						className={cn(
+							"justify-between capitalize",
+							layoutMode === mode && "bg-fill text-white",
+						)}
+					>
+						<span className="flex items-center gap-2">
+							<Icons.layout className="size-4" />
+							{mode}
+						</span>
+						{layoutMode === mode ? <Icons.check className="size-4 text-brand" /> : null}
+					</DropdownMenuItem>
+				))}
+				<DropdownMenuSeparator className="my-1 bg-line" />
+				<DropdownMenuItem
+					onClick={(event) => {
+						event.preventDefault();
+						onDoneOpen(!doneOpen);
+					}}
+					className="justify-between"
+				>
+					<span className="flex items-center gap-2">
+						<Icons.check className="size-4" />
+						Show done
+					</span>
+					<CountBadge count={doneCount} />
+				</DropdownMenuItem>
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);
