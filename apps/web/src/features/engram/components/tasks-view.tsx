@@ -95,7 +95,7 @@ function tasksUiReducer(state: TasksUiState, action: TasksUiAction): TasksUiStat
 	}
 }
 
-function taskTitle(task: Item) {
+export function taskTitle(task: Item) {
 	return task.title ?? task.text ?? "Untitled task";
 }
 
@@ -152,7 +152,7 @@ function sectionFromColumnId(id: string): SectionId | undefined {
 	return id.startsWith("section-") ? (id.replace("section-", "") as SectionId) : undefined;
 }
 
-function formatBlitzSeconds(seconds: number) {
+export function formatBlitzSeconds(seconds: number) {
 	const mins = Math.floor(seconds / 60).toString().padStart(2, "0");
 	const secs = (seconds % 60).toString().padStart(2, "0");
 	return `${mins}:${secs}`;
@@ -682,7 +682,8 @@ const BREAK_PRESETS = [5, 10, 15, 20];
 
 export function BlitzDialog({
 	open,
-	onClose,
+	onMinimize,
+	onEnd,
 	tasks,
 	secondsLeft,
 	running,
@@ -699,7 +700,8 @@ export function BlitzDialog({
 	onSetPrefs,
 }: {
 	open: boolean;
-	onClose: () => void;
+	onMinimize: () => void;
+	onEnd: () => void;
 	tasks: Item[];
 	secondsLeft: number;
 	running: boolean;
@@ -730,7 +732,7 @@ export function BlitzDialog({
 	};
 
 	return (
-		<Dialog open={open} onOpenChange={(value) => (value ? undefined : onClose())}>
+		<Dialog open={open} onOpenChange={(value) => (value ? undefined : onMinimize())}>
 			<DialogContent
 				showCloseButton={false}
 				className="inset-0 top-0 left-0 max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 bg-void p-0 text-white ring-0 sm:max-w-none"
@@ -755,13 +757,22 @@ export function BlitzDialog({
 							<Button
 								type="button"
 								variant="ghost"
-								onClick={onClose}
+								onClick={onMinimize}
 								className="h-9 rounded-[8px] border border-white/10 bg-white/[0.03] px-3 text-ink-3 hover:text-white"
 							>
-								Exit
+								<Icons.minimize className="size-4" />
+								Minimize
 								<span className="rounded-[5px] border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-ink-dim">
 									ESC
 								</span>
+							</Button>
+							<Button
+								type="button"
+								variant="ghost"
+								onClick={onEnd}
+								className="h-9 rounded-[8px] border border-coral/30 bg-coral/10 px-3 text-coral hover:bg-coral/20 hover:text-coral"
+							>
+								End
 							</Button>
 						</div>
 					</header>
@@ -847,6 +858,70 @@ export function BlitzDialog({
 				</div>
 			</DialogContent>
 		</Dialog>
+	);
+}
+
+export function BlitzBanner({
+	phase,
+	secondsLeft,
+	running,
+	label,
+	onToggleRun,
+	onExpand,
+	onEnd,
+}: {
+	phase: BlitzPhase;
+	secondsLeft: number;
+	running: boolean;
+	label: string;
+	onToggleRun: () => void;
+	onExpand: () => void;
+	onEnd: () => void;
+}) {
+	const isBreak = phase === "break";
+	return (
+		<div className="flex items-center gap-3 border-line border-b bg-surface px-4 py-2">
+			<span className={cn("size-2 shrink-0 rounded-full", isBreak ? "bg-teal" : "bg-brand", running && "animate-pulse")} />
+			<button
+				type="button"
+				onClick={onExpand}
+				className="flex min-w-0 flex-1 items-center gap-3 text-left"
+			>
+				<span className="font-mono text-ink-bright text-sm tabular-nums">
+					{formatBlitzSeconds(secondsLeft)}
+				</span>
+				<span className="text-ink-faint">·</span>
+				<span className="min-w-0 flex-1 truncate text-ink-2 text-sm">
+					{isBreak ? "Break" : label}
+				</span>
+			</button>
+			<div className="flex shrink-0 items-center gap-1">
+				<button
+					type="button"
+					onClick={onToggleRun}
+					title={running ? "Pause" : "Resume"}
+					className="grid size-7 place-items-center rounded-[7px] text-ink-muted transition-colors hover:bg-fill hover:text-ink"
+				>
+					{running ? <Icons.pause className="size-4" /> : <Icons.play className="size-4" />}
+				</button>
+				<button
+					type="button"
+					onClick={onExpand}
+					title="Expand"
+					className="grid size-7 place-items-center rounded-[7px] text-ink-muted transition-colors hover:bg-fill hover:text-ink"
+				>
+					<Icons.maximize className="size-4" />
+				</button>
+				<button
+					type="button"
+					onClick={onEnd}
+					title="End session"
+					className="grid size-7 place-items-center rounded-[7px] text-ink-muted transition-colors hover:bg-fill hover:text-coral"
+				>
+					<Icons.x className="size-4" />
+				</button>
+			</div>
+		</div>
 	);
 }
 

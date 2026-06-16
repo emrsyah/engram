@@ -61,6 +61,7 @@ type UIStore = {
   // Blitz focus mode — lives here (above the page) so the timer keeps running
   // while navigating between views.
   blitzOpen: boolean;
+  blitzExpanded: boolean;
   blitzRunning: boolean;
   blitzSecondsLeft: number;
   blitzActiveIndex: number;
@@ -69,6 +70,8 @@ type UIStore = {
   blitzPrefs: BlitzPrefs;
   openBlitz: () => void;
   closeBlitz: () => void;
+  minimizeBlitz: () => void;
+  expandBlitz: () => void;
   toggleBlitzRunning: () => void;
   resetBlitz: () => void;
   advanceBlitz: () => void;
@@ -151,6 +154,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
     DEFAULT_BLITZ_PREFS,
   );
   const [blitzOpen, setBlitzOpen] = useState(false);
+  const [blitzExpanded, setBlitzExpanded] = useState(false);
   const [blitzRunning, setBlitzRunning] = useState(false);
   const [blitzPhase, setBlitzPhase] = useState<BlitzPhase>("work");
   const [blitzPhaseDuration, setBlitzPhaseDuration] = useState(DEFAULT_BLITZ_PREFS.workMinutes * 60);
@@ -168,12 +172,18 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const openBlitz = useCallback(() => {
     setBlitzActiveIndex(0);
     startSegment("work", blitzPrefs.workMinutes * 60, false);
+    setBlitzExpanded(true);
     setBlitzOpen(true);
   }, [blitzPrefs.workMinutes, startSegment]);
+  // Full exit: stop the timer and tear down the session.
   const closeBlitz = useCallback(() => {
     setBlitzOpen(false);
+    setBlitzExpanded(false);
     setBlitzRunning(false);
   }, []);
+  // Collapse the fullscreen view to the running banner (timer keeps going).
+  const minimizeBlitz = useCallback(() => setBlitzExpanded(false), []);
+  const expandBlitz = useCallback(() => setBlitzExpanded(true), []);
   const toggleBlitzRunning = useCallback(() => {
     setBlitzRunning((running) => {
       // Pressing play on a finished segment restarts it from the top.
@@ -295,6 +305,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         scratchpadOpen,
         focusTasksOpen,
         blitzOpen,
+        blitzExpanded,
         blitzRunning,
         blitzSecondsLeft,
         blitzActiveIndex,
@@ -303,6 +314,8 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         blitzPrefs,
         openBlitz,
         closeBlitz,
+        minimizeBlitz,
+        expandBlitz,
         toggleBlitzRunning,
         resetBlitz,
         advanceBlitz,

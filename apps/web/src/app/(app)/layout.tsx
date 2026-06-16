@@ -1,6 +1,6 @@
 import { AuthGuard } from "@/components/auth-guard";
 import { AppSidebar } from "@/features/engram/components/app-sidebar";
-import { BlitzContainer } from "@/features/engram/components/blitz-container";
+import { BlitzBannerSlot, BlitzContainer } from "@/features/engram/components/blitz-container";
 
 import { Hotkeys } from "@/features/engram/components/hotkeys";
 import { ItemDetailPanel } from "@/features/engram/components/item-detail-panel";
@@ -25,6 +25,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <AppSidebar />
             <main className="engram-main">
               <TopBar />
+              <BlitzBannerSlot />
               <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
               <SearchDialog />
               <ShortcutsDialog />
