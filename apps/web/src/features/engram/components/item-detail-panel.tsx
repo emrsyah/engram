@@ -149,7 +149,7 @@ export function ItemDetailPanel() {
       <div
         className={cn(
           "fixed top-0 right-0 z-50 flex h-full w-[min(420px,92vw)] flex-col",
-          "border-l border-[#252118] bg-[#141210] shadow-2xl shadow-black/50",
+          "border-l border-surface bg-base shadow-2xl shadow-black/50",
           "transition-transform duration-200 ease-out",
           isOpen ? "translate-x-0" : "translate-x-full",
         )}
@@ -157,9 +157,9 @@ export function ItemDetailPanel() {
         {item && (
           <>
             {/* Header */}
-            <div className="flex items-start justify-between border-b border-[#252118] px-5 py-4">
+            <div className="flex items-start justify-between border-b border-surface px-5 py-4">
               <div className="min-w-0 flex-1 pr-3">
-                <p className="font-mono text-[#5c554d] text-[10px] uppercase tracking-widest">
+                <p className="font-mono text-ink-ghost text-[10px] uppercase tracking-widest">
                   {item.type}
                 </p>
                 {item.type === "task" ? (
@@ -167,15 +167,15 @@ export function ItemDetailPanel() {
                     value={item.title ?? ""}
                     onChange={(event) => updateItem(item.id, { title: event.target.value })}
                     placeholder="Untitled task"
-                    className="mt-2 w-full rounded-[6px] border border-transparent bg-transparent px-0 py-0 font-semibold text-[#f0ebe3] text-lg leading-snug outline-none placeholder:text-[#3d3830] focus:border-[#302c27] focus:bg-[#100e0c] focus:px-2 focus:py-1"
+                    className="mt-2 w-full rounded-[6px] border border-transparent bg-transparent px-0 py-0 font-semibold text-ink text-lg leading-snug outline-none placeholder:text-line-strong focus:border-line-2 focus:bg-sunken focus:px-2 focus:py-1"
                   />
                 ) : (
-                  <p className="mt-2 break-words font-semibold text-[#f0ebe3] text-lg leading-snug">
+                  <p className="mt-2 break-words font-semibold text-ink text-lg leading-snug">
                     {title}
                   </p>
                 )}
                 {item.type === "task" && (
-                  <div className="mt-3 flex flex-wrap items-center gap-2 font-mono text-[10px] text-[#6b6258] uppercase tracking-wider">
+                  <div className="mt-3 flex flex-wrap items-center gap-2 font-mono text-[10px] text-done uppercase tracking-wider">
                     <span>{item.done ? "Done" : "Open"}</span>
                     {checklist.length > 0 && <span>{doneCount}/{checklist.length} checklist</span>}
                   </div>
@@ -186,7 +186,7 @@ export function ItemDetailPanel() {
                 onClick={closeDetail}
                 className={cn(
                   "mt-0.5 grid size-7 shrink-0 place-items-center rounded-[5px]",
-                  "text-[#5c554d] hover:bg-[#211e1a] hover:text-[#c8bfb2]",
+                  "text-ink-ghost hover:bg-surface hover:text-ink-2",
                   "transition-colors duration-100",
                 )}
               >
@@ -198,15 +198,15 @@ export function ItemDetailPanel() {
             <div className="flex-1 overflow-y-auto px-5 py-5">
               {item.type === "task" && (
                 <>
-                  <section className="mb-5 rounded-[7px] border border-[#252118] bg-[#100e0c] px-4 py-3">
-                    <p className="mb-2 font-mono text-[#5c554d] text-[10px] uppercase tracking-widest">
+                  <section className="mb-5 rounded-[7px] border border-surface bg-sunken px-4 py-3">
+                    <p className="mb-2 font-mono text-ink-ghost text-[10px] uppercase tracking-widest">
                       Detail
                     </p>
                     <textarea
                       value={item.text ?? ""}
                       onChange={(event) => updateItem(item.id, { text: event.target.value })}
                       placeholder="Add task notes..."
-                      className="min-h-20 w-full resize-none bg-transparent text-[#d8d2ca] text-sm leading-6 outline-none placeholder:text-[#3d3830]"
+                      className="min-h-20 w-full resize-none bg-transparent text-ink-2 text-sm leading-6 outline-none placeholder:text-line-strong"
                     />
                   </section>
 
@@ -214,8 +214,8 @@ export function ItemDetailPanel() {
                     texts={[item.title, item.text, ...checklist.map((ci) => ci.text)]}
                   />
 
-                  <section className="mb-5 rounded-[7px] border border-[#252118] bg-[#100e0c] p-4">
-                    <p className="mb-3 font-mono text-[#5c554d] text-[10px] uppercase tracking-widest">
+                  <section className="mb-5 rounded-[7px] border border-surface bg-sunken p-4">
+                    <p className="mb-3 font-mono text-ink-ghost text-[10px] uppercase tracking-widest">
                       Schedule
                     </p>
                     <div className="flex flex-wrap items-center gap-2">
@@ -230,8 +230,8 @@ export function ItemDetailPanel() {
                     </div>
                   </section>
 
-                  <section className="mb-5 rounded-[7px] border border-[#252118] bg-[#100e0c] p-4">
-                    <p className="mb-3 font-mono text-[#5c554d] text-[10px] uppercase tracking-widest">Tags</p>
+                  <section className="mb-5 rounded-[7px] border border-surface bg-sunken p-4">
+                    <p className="mb-3 font-mono text-ink-ghost text-[10px] uppercase tracking-widest">Tags</p>
                     <div className="flex flex-wrap gap-1.5">
                       {(item.tags ?? []).map((tag) => (
                         <TagChip key={tag} tag={tag} onRemove={() => removeItemTag(item.id, tag)} />
@@ -260,10 +260,10 @@ export function ItemDetailPanel() {
                           }
                           if (e.key === "Escape") { setNewTag(""); setTagSuggestions([]); }
                         }}
-                        className="w-full rounded-[6px] border border-[#252118] bg-[#1c1916] px-3 py-1.5 text-sm text-[#f0ebe3] placeholder:text-[#3d3830] focus:border-[#403b35] focus:outline-none"
+                        className="w-full rounded-[6px] border border-surface bg-clay px-3 py-1.5 text-sm text-ink placeholder:text-line-strong focus:border-line-strong focus:outline-none"
                       />
                       {tagSuggestions.length > 0 && (
-                        <div className="absolute left-0 right-0 top-full z-10 mt-1 rounded-[6px] border border-[#252118] bg-[#1c1916] py-1 shadow-lg">
+                        <div className="absolute left-0 right-0 top-full z-10 mt-1 rounded-[6px] border border-surface bg-clay py-1 shadow-lg">
                           {tagSuggestions.map((tag) => (
                             <button
                               key={tag}
@@ -274,7 +274,7 @@ export function ItemDetailPanel() {
                                 setTagSuggestions([]);
                                 tagInputRef.current?.focus();
                               }}
-                              className="flex w-full items-center gap-2 px-3 py-1.5 text-[#4aa5c8] text-sm hover:bg-[#252118]"
+                              className="flex w-full items-center gap-2 px-3 py-1.5 text-blue text-sm hover:bg-surface"
                             >
                               <span className="opacity-60">#</span>{tag}
                             </button>
@@ -284,20 +284,20 @@ export function ItemDetailPanel() {
                     </div>
                   </section>
 
-                  <div className="mb-4 rounded-[7px] border border-[#252118] bg-[#100e0c] p-4">
+                  <div className="mb-4 rounded-[7px] border border-surface bg-sunken p-4">
                     <div className="mb-3 flex items-center justify-between">
-                      <p className="font-mono text-[#5c554d] text-[10px] uppercase tracking-widest">
+                      <p className="font-mono text-ink-ghost text-[10px] uppercase tracking-widest">
                         Checklist
                       </p>
                       {checklist.length > 0 && (
-                        <span className="font-mono text-[#5c554d] text-[10px]">
+                        <span className="font-mono text-ink-ghost text-[10px]">
                           {progress}%
                         </span>
                       )}
                     </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-[#211e1a]">
+                    <div className="h-1.5 overflow-hidden rounded-full bg-surface">
                       <div
-                        className="h-full rounded-full bg-[#d7b238] transition-[width] duration-200"
+                        className="h-full rounded-full bg-amber transition-[width] duration-200"
                         style={{ width: `${progress}%` }}
                       />
                     </div>
@@ -320,7 +320,7 @@ export function ItemDetailPanel() {
                   </DndContext>
 
                   {checklist.length === 0 && (
-                    <p className="rounded-[7px] border border-dashed border-[#252118] px-3 py-4 text-[#5c554d] text-sm">
+                    <p className="rounded-[7px] border border-dashed border-surface px-3 py-4 text-ink-ghost text-sm">
                       No checklist items yet.
                     </p>
                   )}
@@ -334,10 +334,10 @@ export function ItemDetailPanel() {
                       onKeyDown={handleKeyDown}
                       placeholder="Add item…"
                       className={cn(
-                        "flex-1 rounded-[6px] border border-[#252118] bg-[#1c1916]",
-                        "px-3 py-1.5 text-sm text-[#f0ebe3]",
-                        "placeholder:text-[#3d3830]",
-                        "focus:border-[#403b35] focus:outline-none",
+                        "flex-1 rounded-[6px] border border-surface bg-clay",
+                        "px-3 py-1.5 text-sm text-ink",
+                        "placeholder:text-line-strong",
+                        "focus:border-line-strong focus:outline-none",
                         "transition-colors duration-100",
                       )}
                     />
@@ -347,7 +347,7 @@ export function ItemDetailPanel() {
                       variant="outline"
                       onClick={handleAdd}
                       disabled={!newText.trim()}
-                      className="border-[#302c27] bg-[#1c1916] text-[#c8bfb2] hover:bg-[#272421] disabled:opacity-40"
+                      className="border-line-2 bg-clay text-ink-2 hover:bg-fill disabled:opacity-40"
                     >
                       Add
                     </Button>
@@ -358,16 +358,16 @@ export function ItemDetailPanel() {
               {item.type === "thought" && (
                 <div className="space-y-4">
                   {body ? (
-                    <section className="rounded-[7px] border border-[#252118] bg-[#100e0c] px-4 py-3">
-                      <p className="mb-2 font-mono text-[#5c554d] text-[10px] uppercase tracking-widest">
+                    <section className="rounded-[7px] border border-surface bg-sunken px-4 py-3">
+                      <p className="mb-2 font-mono text-ink-ghost text-[10px] uppercase tracking-widest">
                         Content
                       </p>
-                      <p className="whitespace-pre-wrap text-[#d8d2ca] text-sm leading-6">
+                      <p className="whitespace-pre-wrap text-ink-2 text-sm leading-6">
                         <LinkifiedText text={body} />
                       </p>
                     </section>
                   ) : (
-                    <p className="rounded-[7px] border border-dashed border-[#252118] px-3 py-4 text-[#5c554d] text-sm">
+                    <p className="rounded-[7px] border border-dashed border-surface px-3 py-4 text-ink-ghost text-sm">
                       No content yet.
                     </p>
                   )}
@@ -375,7 +375,7 @@ export function ItemDetailPanel() {
                     type="button"
                     variant="outline"
                     onClick={() => openNoteEditor(item.id)}
-                    className="w-full border-[#302c27] bg-[#1c1916] text-[#c8bfb2] hover:bg-[#272421]"
+                    className="w-full border-line-2 bg-clay text-ink-2 hover:bg-fill"
                   >
                     <Icons.book className="size-3.5" />
                     Open editor
@@ -390,13 +390,13 @@ export function ItemDetailPanel() {
                       href={item.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block truncate text-[#53b9a8] text-sm hover:underline"
+                      className="block truncate text-teal text-sm hover:underline"
                     >
                       {item.url}
                     </a>
                   )}
                   {item.text && (
-                    <p className="mt-3 text-sm text-[#d8d2ca] leading-6">
+                    <p className="mt-3 text-sm text-ink-2 leading-6">
                       <LinkifiedText text={item.text} />
                     </p>
                   )}
@@ -404,8 +404,8 @@ export function ItemDetailPanel() {
               )}
 
               {/* Connections section — shown for all item types */}
-              <section className="mt-5 rounded-[7px] border border-[#252118] bg-[#100e0c] p-4">
-                <p className="mb-3 font-mono text-[#5c554d] text-[10px] uppercase tracking-widest">
+              <section className="mt-5 rounded-[7px] border border-surface bg-sunken p-4">
+                <p className="mb-3 font-mono text-ink-ghost text-[10px] uppercase tracking-widest">
                   Connections
                 </p>
 
@@ -417,14 +417,14 @@ export function ItemDetailPanel() {
                       return (
                         <span
                           key={linked.id}
-                          className="flex items-center gap-1 rounded-[5px] border border-[#3a3252] bg-[#241f3a] py-0.5 pr-1 pl-2 text-[11px] text-[#cfc7ff]"
+                          className="flex items-center gap-1 rounded-[5px] border border-line-max bg-brand-surface py-0.5 pr-1 pl-2 text-[11px] text-brand-soft"
                         >
-                          <Icons.link className="size-2.5 shrink-0 text-[#9b88ff]" />
+                          <Icons.link className="size-2.5 shrink-0 text-brand-glow" />
                           <span className="max-w-[160px] truncate">{label}</span>
                           <button
                             type="button"
                             onClick={() => handleRemoveConnection(linked.id)}
-                            className="ml-0.5 flex size-4 items-center justify-center rounded-[3px] text-[#9087b8] hover:bg-[#322a52] hover:text-white"
+                            className="ml-0.5 flex size-4 items-center justify-center rounded-[3px] text-brand hover:bg-p3 hover:text-white"
                             aria-label={`Remove link to ${label}`}
                           >
                             <Icons.x className="size-2.5" />
@@ -436,7 +436,7 @@ export function ItemDetailPanel() {
                 )}
 
                 {linkedItems.length === 0 && (
-                  <p className="mb-3 text-[#4c463e] text-xs">No connections yet.</p>
+                  <p className="mb-3 text-line-max text-xs">No connections yet.</p>
                 )}
 
                 {/* Add connection — searchable dropdown */}
@@ -453,10 +453,10 @@ export function ItemDetailPanel() {
                       }}
                       onFocus={() => setConnDropdownOpen(true)}
                       onBlur={() => requestAnimationFrame(() => setConnDropdownOpen(false))}
-                      className="w-full rounded-[6px] border border-[#252118] bg-[#1c1916] px-3 py-1.5 text-sm text-[#f0ebe3] placeholder:text-[#3d3830] focus:border-[#403b35] focus:outline-none"
+                      className="w-full rounded-[6px] border border-surface bg-clay px-3 py-1.5 text-sm text-ink placeholder:text-line-strong focus:border-line-strong focus:outline-none"
                     />
                     {connDropdownOpen && filteredCandidates.length > 0 && (
-                      <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-48 overflow-y-auto rounded-[6px] border border-[#252118] bg-[#1c1916] py-1 shadow-lg">
+                      <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-48 overflow-y-auto rounded-[6px] border border-surface bg-clay py-1 shadow-lg">
                         {filteredCandidates.slice(0, 8).map((candidate) => {
                           const label = candidate.title?.trim() || candidate.text?.trim() || candidate.url || "Untitled";
                           return (
@@ -464,11 +464,11 @@ export function ItemDetailPanel() {
                               key={candidate.id}
                               type="button"
                               onMouseDown={(e) => { e.preventDefault(); handleAddConnection(candidate); }}
-                              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[#c8bfb2] hover:bg-[#252118]"
+                              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-ink-2 hover:bg-surface"
                             >
-                              <Icons.link className="size-3 shrink-0 text-[#6b6258]" />
+                              <Icons.link className="size-3 shrink-0 text-done" />
                               <span className="min-w-0 flex-1 truncate">{label}</span>
-                              <span className="shrink-0 font-mono text-[10px] text-[#5c554d] uppercase">{candidate.type}</span>
+                              <span className="shrink-0 font-mono text-[10px] text-ink-ghost uppercase">{candidate.type}</span>
                             </button>
                           );
                         })}
@@ -478,20 +478,20 @@ export function ItemDetailPanel() {
                 )}
 
                 {connCandidates.length === 0 && (
-                  <p className="text-[#3d3830] text-xs">All items in this space are already linked.</p>
+                  <p className="text-line-strong text-xs">All items in this space are already linked.</p>
                 )}
               </section>
             </div>
 
             {/* Footer */}
-            <div className="border-t border-[#252118] px-5 py-4">
+            <div className="border-t border-surface px-5 py-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={handleDelete}
                 className={cn(
-                  "w-full border-[#3d2020] bg-[#1a1212] text-[#e06b6b]",
-                  "hover:border-[#5c2e2e] hover:bg-[#1f1515]",
+                  "w-full border-line-2 bg-panel text-p1-ink",
+                  "hover:border-p1 hover:bg-clay",
                 )}
               >
                 <Icons.trash className="size-3.5" />
@@ -510,8 +510,8 @@ function ExtractedLinks({ texts }: { texts: Array<string | undefined> }) {
   if (links.length === 0) return null;
 
   return (
-    <section className="mb-5 rounded-[7px] border border-[#252118] bg-[#100e0c] px-4 py-3">
-      <p className="mb-2 font-mono text-[#5c554d] text-[10px] uppercase tracking-widest">
+    <section className="mb-5 rounded-[7px] border border-surface bg-sunken px-4 py-3">
+      <p className="mb-2 font-mono text-ink-ghost text-[10px] uppercase tracking-widest">
         Links
       </p>
       <div className="space-y-1.5">
@@ -523,7 +523,7 @@ function ExtractedLinks({ texts }: { texts: Array<string | undefined> }) {
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              className="block truncate text-[#53b9a8] text-sm underline decoration-[#53b9a8]/35 underline-offset-2 hover:text-[#7bd4c6]"
+              className="block truncate text-teal text-sm underline decoration-teal/35 underline-offset-2 hover:text-p3-ink"
             >
               {link}
             </a>
@@ -555,8 +555,8 @@ function DetailPriorityButtons({
           className={cn(
             "h-7 rounded-[6px] border px-2 font-bold text-[11px] transition-colors",
             priority === p
-              ? "border-[#4c463e] bg-[#2a2621] text-[#f0ebe3]"
-              : "border-[#2f2a25] bg-[#181511] text-[#6b6258] hover:text-[#c8bfb2]",
+              ? "border-line-max bg-line text-ink"
+              : "border-line-soft bg-base text-done hover:text-ink-2",
           )}
         >
           P{p}
@@ -586,15 +586,15 @@ function SortableChecklistRow({
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
-        "group flex items-start gap-2 rounded-[6px] border border-transparent px-2 py-2 hover:border-[#252118] hover:bg-[#1c1916]",
-        isDragging && "border-[#4c463e] bg-[#211e1a] shadow-lg",
+        "group flex items-start gap-2 rounded-[6px] border border-transparent px-2 py-2 hover:border-surface hover:bg-clay",
+        isDragging && "border-line-max bg-surface shadow-lg",
       )}
     >
       <button
         type="button"
         {...attributes}
         {...listeners}
-        className="mt-0.5 grid size-5 shrink-0 cursor-grab place-items-center rounded-[4px] text-[#4c463e] hover:text-[#8d857b] active:cursor-grabbing"
+        className="mt-0.5 grid size-5 shrink-0 cursor-grab place-items-center rounded-[4px] text-line-max hover:text-ink-muted active:cursor-grabbing"
         aria-label="Reorder checklist item"
       >
         <GripIcon />
@@ -608,8 +608,8 @@ function SortableChecklistRow({
         value={item.text}
         onChange={(event) => onTextChange(event.target.value)}
         className={cn(
-          "min-w-0 flex-1 rounded-[5px] border border-transparent bg-transparent px-1 py-0 text-sm text-[#d8d2ca] outline-none focus:border-[#302c27] focus:bg-[#100e0c]",
-          item.done && "text-[#4e4840] line-through",
+          "min-w-0 flex-1 rounded-[5px] border border-transparent bg-transparent px-1 py-0 text-sm text-ink-2 outline-none focus:border-line-2 focus:bg-sunken",
+          item.done && "text-line-max line-through",
         )}
       />
       <button
@@ -617,7 +617,7 @@ function SortableChecklistRow({
         onClick={onRemove}
         className={cn(
           "invisible grid size-5 place-items-center rounded-[4px]",
-          "text-[#3d3830] hover:text-[#9b8880]",
+          "text-line-strong hover:text-ink-muted",
           "group-hover:visible",
         )}
       >
@@ -659,8 +659,8 @@ function DetailDueButton({
             className={cn(
               "flex h-7 items-center gap-1.5 rounded-[6px] border px-2 font-mono font-bold text-[11px] transition-colors",
               dueAt
-                ? "border-[#3a3327] bg-[#3a3327] text-[#d6a93a]"
-                : "border-[#2f2a25] bg-[#181511] text-[#6b6258] hover:text-[#c8bfb2]",
+                ? "border-line-strong bg-line-strong text-honey"
+                : "border-line-soft bg-base text-done hover:text-ink-2",
             )}
           />
         }
@@ -686,8 +686,8 @@ function DetailDueButton({
             onChange(toDateInputValue(next));
           }}
         />
-        <div className="border-[#252118] border-t px-3 py-2">
-          <label className="flex items-center justify-between gap-3 text-[#8d857b] text-xs">
+        <div className="border-surface border-t px-3 py-2">
+          <label className="flex items-center justify-between gap-3 text-ink-muted text-xs">
             <span>Time</span>
             <input
               type="time"
@@ -702,16 +702,16 @@ function DetailDueButton({
                 next.setHours(hours ?? 0, minutes ?? 0, 0, 0);
                 onChange(next.toISOString());
               }}
-              className="h-7 rounded-[5px] border border-[#302c27] bg-[#181511] px-2 font-mono text-[#f0ebe3] text-xs outline-none focus:border-[#4c463e]"
+              className="h-7 rounded-[5px] border border-line-2 bg-base px-2 font-mono text-ink text-xs outline-none focus:border-line-max"
             />
           </label>
-          <p className="mt-1.5 text-[#5c554d] text-[10px]">Indonesia time (WIB)</p>
+          <p className="mt-1.5 text-ink-ghost text-[10px]">Indonesia time (WIB)</p>
           <div className="mt-2 flex gap-2">
             <button
               type="button"
               disabled={!dueDate || !dueHasTime}
               onClick={() => dueDate && onChange(toDateInputValue(dueDate))}
-              className="text-[#8d857b] text-xs hover:text-[#c8bfb2] disabled:text-[#3d3830]"
+              className="text-ink-muted text-xs hover:text-ink-2 disabled:text-line-strong"
             >
               Clear time
             </button>
@@ -719,7 +719,7 @@ function DetailDueButton({
               type="button"
               disabled={!dueAt}
               onClick={() => onChange(undefined)}
-              className="text-[#8d857b] text-xs hover:text-[#c8bfb2] disabled:text-[#3d3830]"
+              className="text-ink-muted text-xs hover:text-ink-2 disabled:text-line-strong"
             >
               Clear due
             </button>

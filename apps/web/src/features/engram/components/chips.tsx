@@ -5,11 +5,11 @@ import { CancelIcon as X } from "./icons";
 import type { Accent, Item, Priority } from "../types";
 
 const accentClasses: Record<Accent, string> = {
-  violet: "bg-[#8f7cf7] text-[#f5f2ff]",
-  gold: "bg-[#d9a82f] text-[#1d1608]",
-  teal: "bg-[#43b6a6] text-[#061f1c]",
-  red: "bg-[#e46f50] text-[#210b05]",
-  blue: "bg-[#4aa5c8] text-[#041820]",
+  violet: "bg-brand text-ink-bright",
+  gold: "bg-amber text-base",
+  teal: "bg-teal text-brand-ink",
+  red: "bg-coral text-base",
+  blue: "bg-blue text-brand-ink",
 };
 
 const priorityLabels: Record<Priority, string> = {
@@ -24,7 +24,7 @@ export function Dot({ accent, className }: { accent: Accent; className?: string 
 
 export function TypeLabel({ item }: { item: Item }) {
   return (
-    <div className="flex items-center gap-2 text-[10px] font-bold tracking-[0.12em] text-[#7a746d] uppercase">
+    <div className="flex items-center gap-2 text-[10px] font-bold tracking-[0.12em] text-ink-dim uppercase">
       <Dot accent={item.accent} />
       {item.type === "task" ? "Task" : item.type}
     </div>
@@ -38,10 +38,10 @@ export function PriorityChip({ priority }: { priority?: Priority }) {
 
   const color =
     priority === 1
-      ? "bg-[#5a2a20] text-[#f07d5e]"
+      ? "bg-p1 text-p1-ink"
       : priority === 2
-        ? "bg-[#514017] text-[#e5b83d]"
-        : "bg-[#183d4b] text-[#58b8d8]";
+        ? "bg-p2 text-p2-ink"
+        : "bg-p3 text-p3-ink";
 
   return (
     <Badge variant="secondary" className={cn("h-6 gap-1 rounded-[5px] px-2 font-bold", color)}>
@@ -71,7 +71,7 @@ export function DueChip({ dueAt }: { dueAt?: string }) {
   return (
     <Badge
       variant="secondary"
-      className="h-6 rounded-[5px] bg-[#3a3327] px-2 font-mono font-bold text-[#d6a93a]"
+      className="h-6 rounded-[5px] bg-line-strong px-2 font-mono font-bold text-honey"
     >
       {label}
     </Badge>
@@ -82,7 +82,7 @@ export function SomedayChip() {
   return (
     <Badge
       variant="secondary"
-      className="h-6 rounded-[5px] bg-[#2a2433] px-2 font-mono font-bold text-[#b3a4ff]"
+      className="h-6 rounded-[5px] bg-brand-surface px-2 font-mono font-bold text-brand-soft"
     >
       Someday
     </Badge>
@@ -93,7 +93,7 @@ export function TagChip({ tag, onRemove }: { tag: string; onRemove?: () => void 
   return (
     <Badge
       variant="secondary"
-      className="h-5 gap-0.5 rounded-[4px] bg-[#1e2a30] px-1.5 font-mono text-[10px] text-[#4aa5c8]"
+      className="h-5 gap-0.5 rounded-[4px] bg-brand-surface px-1.5 font-mono text-[10px] text-blue"
     >
       <span className="opacity-60">#</span>{tag}
       {onRemove && (

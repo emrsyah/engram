@@ -113,16 +113,16 @@ export function LibraryView() {
 	};
 
 	return (
-		<section className="flex h-full bg-[#151310] text-white">
+		<section className="flex h-full bg-base text-white">
 			<div className="min-w-0 flex-1 overflow-y-auto px-6 py-8 lg:px-10">
 				<div className="mx-auto max-w-[920px]">
 					<div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
 						<div>
 							<h2 className="flex items-center gap-3 font-bold text-3xl">
-								<Icons.book className="size-7 text-[#9b88ff]" />
+								<Icons.book className="size-7 text-brand-glow" />
 								Library
 							</h2>
-							<p className="mt-2 max-w-2xl text-[#a99f93] text-sm">
+							<p className="mt-2 max-w-2xl text-ink-3 text-sm">
 								Capture ideas and links, then filter them by type, group, or tag.
 							</p>
 						</div>
@@ -137,12 +137,12 @@ export function LibraryView() {
 								tags={libraryTags}
 							/>
 							<Tabs value={groupBy} onValueChange={(value) => setGroupBy(value as LibraryGroupBy)}>
-								<TabsList className="rounded-[8px] bg-[#23201d] p-1">
+								<TabsList className="rounded-[8px] bg-fill p-1">
 									{(["type", "group", "tag"] as LibraryGroupBy[]).map((value) => (
 										<TabsTrigger
 											key={value}
 											value={value}
-											className="h-8 rounded-[6px] px-3 capitalize text-[#948c82] data-active:bg-[#312d28] data-active:text-white"
+											className="h-8 rounded-[6px] px-3 capitalize text-ink-muted data-active:bg-raise data-active:text-white"
 										>
 											{value}
 										</TabsTrigger>
@@ -154,19 +154,19 @@ export function LibraryView() {
 
 					{filter.kind !== "all" ? (
 						<div className="mt-5 flex flex-wrap items-center gap-2 text-sm">
-							<span className="text-[#736c63]">Filtered by</span>
+							<span className="text-ink-faint">Filtered by</span>
 							<button
 								type="button"
 								onClick={() => setFilter({ kind: "all", value: "all" })}
-								className="flex items-center gap-2 rounded-[999px] border border-[#2d2924] bg-[#201d19] px-3 py-1.5 font-semibold text-[#d7cec4] hover:border-[#3a3530]"
+								className="flex items-center gap-2 rounded-[999px] border border-line-soft bg-surface px-3 py-1.5 font-semibold text-ink-2 hover:border-line-strong"
 							>
 								{activeFilterLabel}
-								<Icons.x className="size-3.5 text-[#82786e]" />
+								<Icons.x className="size-3.5 text-ink-dim" />
 							</button>
 						</div>
 					) : null}
 
-					<div className="mt-7 flex gap-2 rounded-[9px] border border-[#2a2621] bg-[#1b1815] p-2">
+					<div className="mt-7 flex gap-2 rounded-[9px] border border-line bg-panel p-2">
 						<Input
 							value={text}
 							onChange={(event) => setText(event.target.value)}
@@ -174,12 +174,12 @@ export function LibraryView() {
 								if (event.key === "Enter") addLibraryItem();
 							}}
 							placeholder="Capture an idea or paste a link..."
-							className="h-10 border-0 bg-transparent text-[#f0ebe3] placeholder:text-[#6b6460] focus-visible:ring-0"
+							className="h-10 border-0 bg-transparent text-ink placeholder:text-ink-faint focus-visible:ring-0"
 						/>
 						<Button
 							type="button"
 							onClick={addLibraryItem}
-							className="h-10 rounded-[7px] bg-[#907ce8] px-4 font-bold text-[#17131f] hover:bg-[#a08ef2]"
+							className="h-10 rounded-[7px] bg-brand px-4 font-bold text-brand-ink hover:bg-brand-bright"
 						>
 							<Icons.plus className="size-4" />
 							Add
@@ -188,9 +188,9 @@ export function LibraryView() {
 
 					<div className="mt-7 space-y-4">
 						{visibleItems.length === 0 ? (
-							<div className="rounded-[9px] border border-dashed border-[#34302b] px-6 py-14 text-center">
-								<Icons.book className="mx-auto size-8 text-[#4c463e]" />
-								<p className="mt-3 font-semibold text-[#c8bfb2]">Nothing saved here yet</p>
+							<div className="rounded-[9px] border border-dashed border-raise px-6 py-14 text-center">
+								<Icons.book className="mx-auto size-8 text-line-max" />
+								<p className="mt-3 font-semibold text-ink-2">Nothing saved here yet</p>
 							</div>
 						) : (
 							groupedItems.map((group) => (
@@ -232,29 +232,29 @@ function LibraryFilterMenu({
 					<Button
 						type="button"
 						variant="ghost"
-						className="h-9 rounded-[7px] border border-[#2a2621] bg-[#1b1815] px-3 text-[#d7cec4] hover:text-white"
+						className="h-9 rounded-[7px] border border-line bg-panel px-3 text-ink-2 hover:text-white"
 					/>
 				}
 			>
-				<Icons.search className="size-4 text-[#907ce8]" />
+				<Icons.search className="size-4 text-brand" />
 				<span className="max-w-[160px] truncate">{label}</span>
-				<Icons.chevronRight className="size-4 rotate-90 text-[#736c63]" />
+				<Icons.chevronRight className="size-4 rotate-90 text-ink-faint" />
 			</DropdownMenuTrigger>
 			<DropdownMenuContent
 				align="end"
-				className="w-[280px] border border-[#302c27] bg-[#181613] p-1 text-[#d7cec4]"
+				className="w-[280px] border border-line-2 bg-panel p-1 text-ink-2"
 			>
 				<DropdownMenuItem
 					onClick={() => onFilter({ kind: "all", value: "all" })}
-					className={cn("justify-between", filter.kind === "all" && "bg-[#25211d] text-white")}
+					className={cn("justify-between", filter.kind === "all" && "bg-fill text-white")}
 				>
 					<span className="flex items-center gap-2">
-						<Icons.book className="size-4 text-[#907ce8]" />
+						<Icons.book className="size-4 text-brand" />
 						All library
 					</span>
 					<CountBadge count={items.length} />
 				</DropdownMenuItem>
-				<DropdownMenuSeparator className="my-1 bg-[#2a2621]" />
+				<DropdownMenuSeparator className="my-1 bg-line" />
 				<DropdownLabel>Types</DropdownLabel>
 				{LIBRARY_TYPES.map((type) => (
 					<DropdownMenuItem
@@ -262,7 +262,7 @@ function LibraryFilterMenu({
 						onClick={() => onFilter({ kind: "type", value: type.id })}
 						className={cn(
 							"justify-between",
-							filter.kind === "type" && filter.value === type.id && "bg-[#25211d] text-white",
+							filter.kind === "type" && filter.value === type.id && "bg-fill text-white",
 						)}
 					>
 						<span className="flex items-center gap-2">
@@ -272,7 +272,7 @@ function LibraryFilterMenu({
 						<CountBadge count={items.filter((item) => item.type === type.id).length} />
 					</DropdownMenuItem>
 				))}
-				<DropdownMenuSeparator className="my-1 bg-[#2a2621]" />
+				<DropdownMenuSeparator className="my-1 bg-line" />
 				<DropdownLabel>Groups</DropdownLabel>
 				{spaces.map((space) => (
 					<DropdownMenuItem
@@ -280,17 +280,17 @@ function LibraryFilterMenu({
 						onClick={() => onFilter({ kind: "group", value: space.id })}
 						className={cn(
 							"justify-between",
-							filter.kind === "group" && filter.value === space.id && "bg-[#25211d] text-white",
+							filter.kind === "group" && filter.value === space.id && "bg-fill text-white",
 						)}
 					>
 						<span className="truncate">{space.name}</span>
 						<CountBadge count={items.filter((item) => item.spaceId === space.id).length} />
 					</DropdownMenuItem>
 				))}
-				<DropdownMenuSeparator className="my-1 bg-[#2a2621]" />
+				<DropdownMenuSeparator className="my-1 bg-line" />
 				<DropdownLabel>Tags</DropdownLabel>
 				{tags.length === 0 ? (
-					<div className="px-2 py-2 text-[#5f574f] text-xs">No library tags yet</div>
+					<div className="px-2 py-2 text-ink-ghost text-xs">No library tags yet</div>
 				) : (
 					tags.map((tag) => (
 						<DropdownMenuItem
@@ -298,7 +298,7 @@ function LibraryFilterMenu({
 							onClick={() => onFilter({ kind: "tag", value: tag })}
 							className={cn(
 								"justify-between",
-								filter.kind === "tag" && filter.value === tag && "bg-[#25211d] text-white",
+								filter.kind === "tag" && filter.value === tag && "bg-fill text-white",
 							)}
 						>
 							<span className="truncate">#{tag}</span>
@@ -313,14 +313,14 @@ function LibraryFilterMenu({
 
 function CountBadge({ count }: { count: number }) {
 	return (
-		<span className="rounded-[5px] bg-[#252220] px-1.5 py-0.5 font-mono text-[#82786e] text-[11px]">
+		<span className="rounded-[5px] bg-fill px-1.5 py-0.5 font-mono text-ink-dim text-[11px]">
 			{count}
 		</span>
 	);
 }
 
 function DropdownLabel({ children }: { children: React.ReactNode }) {
-	return <div className="px-2 py-2 text-[#736c63] text-xs">{children}</div>;
+	return <div className="px-2 py-2 text-ink-faint text-xs">{children}</div>;
 }
 
 function buildLibraryGroups(items: Item[], groupBy: LibraryGroupBy, spaces: Space[]) {
@@ -373,10 +373,10 @@ function LibraryGroup({
 	onOpen: (id: string) => void;
 }) {
 	return (
-		<div className="overflow-hidden rounded-[9px] border border-[#26221e] bg-[#1b1815]">
-			<div className="flex items-center justify-between border-[#26221e] border-b px-4 py-3">
-				<h3 className="font-bold text-[#efe9df]">{title}</h3>
-				<span className="rounded-[5px] bg-[#252220] px-1.5 py-0.5 font-mono text-[#82786e] text-[11px]">
+		<div className="overflow-hidden rounded-[9px] border border-fill bg-panel">
+			<div className="flex items-center justify-between border-fill border-b px-4 py-3">
+				<h3 className="font-bold text-ink">{title}</h3>
+				<span className="rounded-[5px] bg-fill px-1.5 py-0.5 font-mono text-ink-dim text-[11px]">
 					{items.length}
 				</span>
 			</div>
@@ -400,26 +400,26 @@ function LibraryCard({ item, groupName, onOpen }: { item: Item; groupName: strin
 		<button
 			type="button"
 			onClick={onOpen}
-			className="min-w-0 rounded-[8px] border border-[#2a2621] bg-[#181511] p-4 text-left transition-colors hover:border-[#3a3530] hover:bg-[#1f1c17]"
+			className="min-w-0 rounded-[8px] border border-line bg-base p-4 text-left transition-colors hover:border-line-strong hover:bg-surface"
 		>
 			<div className="mb-3 flex items-center gap-2">
 				{item.type === "link" ? (
-					<Icons.link className="size-4 text-[#4aa5c8]" />
+					<Icons.link className="size-4 text-blue" />
 				) : (
-					<Icons.sparkles className="size-4 text-[#907ce8]" />
+					<Icons.sparkles className="size-4 text-brand" />
 				)}
-				<span className="rounded-[5px] bg-[#252220] px-1.5 py-0.5 text-[#82786e] text-[11px]">
+				<span className="rounded-[5px] bg-fill px-1.5 py-0.5 text-ink-dim text-[11px]">
 					{groupName}
 				</span>
 			</div>
-			<h4 className="line-clamp-2 font-bold text-[#f0ebe3]">{itemTitle(item)}</h4>
+			<h4 className="line-clamp-2 font-bold text-ink">{itemTitle(item)}</h4>
 			{body ? (
-				<p className="mt-2 line-clamp-3 break-words text-[#9f9588] text-sm leading-5">{body}</p>
+				<p className="mt-2 line-clamp-3 break-words text-ink-muted text-sm leading-5">{body}</p>
 			) : null}
 			{item.tags?.length ? (
 				<div className="mt-3 flex flex-wrap gap-1.5">
 					{item.tags.map((tag) => (
-						<span key={tag} className="rounded-[5px] bg-[#242036] px-1.5 py-0.5 text-[#c7bcff] text-[11px]">
+						<span key={tag} className="rounded-[5px] bg-brand-surface px-1.5 py-0.5 text-brand-soft text-[11px]">
 							#{tag}
 						</span>
 					))}

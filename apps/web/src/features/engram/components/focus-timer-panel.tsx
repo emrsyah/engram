@@ -30,14 +30,14 @@ export function FocusTimerPanel({ onClose }: { onClose: () => void }) {
 	} = usePomodoro(25, 5);
 
 	return (
-		<div className="absolute top-[calc(100%+8px)] right-0 z-50 w-[280px] rounded-[12px] border border-[#2e2b26] bg-[#1a1714] shadow-2xl">
-			<div className="flex items-center justify-between border-[#2e2b26] border-b px-4 py-3">
+		<div className="absolute top-[calc(100%+8px)] right-0 z-50 w-[280px] rounded-[12px] border border-line-soft bg-panel shadow-2xl">
+			<div className="flex items-center justify-between border-line-soft border-b px-4 py-3">
 				<div className="flex items-center gap-2">
 					<span className="font-bold text-white text-xs uppercase tracking-widest">
 						Pomodoro
 					</span>
 					{sessions > 0 && (
-						<span className="font-mono text-[#6b6560] text-[10px]">
+						<span className="font-mono text-ink-faint text-[10px]">
 							{sessions} done
 						</span>
 					)}
@@ -46,7 +46,7 @@ export function FocusTimerPanel({ onClose }: { onClose: () => void }) {
 					variant="ghost"
 					size="icon-xs"
 					onClick={onClose}
-					className="size-6 text-[#706a62] hover:text-white"
+					className="size-6 text-ink-faint hover:text-white"
 				>
 					<X className="size-3.5" />
 				</Button>
@@ -65,7 +65,7 @@ export function FocusTimerPanel({ onClose }: { onClose: () => void }) {
 							cy="50"
 							r="44"
 							fill="none"
-							stroke="#252220"
+							stroke="var(--color-fill)"
 							strokeWidth="5"
 						/>
 						<circle
@@ -90,7 +90,7 @@ export function FocusTimerPanel({ onClose }: { onClose: () => void }) {
 						<span
 							className={cn(
 								"font-semibold text-[11px] uppercase tracking-wider",
-								phase === "break" ? "text-[#43b6a6]" : "text-[#907ce8]",
+								phase === "break" ? "text-teal" : "text-brand",
 							)}
 						>
 							{phase === "idle"
@@ -109,7 +109,7 @@ export function FocusTimerPanel({ onClose }: { onClose: () => void }) {
 							variant="outline"
 							size="sm"
 							onClick={pause}
-							className="h-8 gap-2 rounded-[8px] border-[#3a3530] bg-[#252220] px-4 text-[#c8bfb2] hover:bg-[#2e2b26]"
+							className="h-8 gap-2 rounded-[8px] border-line-strong bg-fill px-4 text-ink-2 hover:bg-line-soft"
 						>
 							<Pause className="size-3.5" />
 							Pause
@@ -121,8 +121,8 @@ export function FocusTimerPanel({ onClose }: { onClose: () => void }) {
 							className="h-8 gap-2 rounded-[8px] px-4"
 							style={{ backgroundColor: accent }}
 						>
-							<Play className="size-3.5 text-[#0e0c0a]" />
-							<span className="font-bold text-[#0e0c0a]">
+							<Play className="size-3.5 text-void" />
+							<span className="font-bold text-void">
 								{phase === "idle" ? "Start" : "Resume"}
 							</span>
 						</Button>
@@ -131,7 +131,7 @@ export function FocusTimerPanel({ onClose }: { onClose: () => void }) {
 						variant="ghost"
 						size="icon-xs"
 						onClick={reset}
-						className="size-8 text-[#706a62] hover:text-white"
+						className="size-8 text-ink-faint hover:text-white"
 						title="Reset"
 					>
 						<RotateCcw className="size-3.5" />
@@ -140,7 +140,7 @@ export function FocusTimerPanel({ onClose }: { onClose: () => void }) {
 
 				{/* Phase toggle */}
 				<div className="flex w-full items-center gap-2">
-					<div className="flex flex-1 gap-1 rounded-[7px] bg-[#151310] p-1">
+					<div className="flex flex-1 gap-1 rounded-[7px] bg-base p-1">
 						{(["work", "break"] as const).map((p) => {
 							const isActive =
 								p === "work"
@@ -161,9 +161,9 @@ export function FocusTimerPanel({ onClose }: { onClose: () => void }) {
 										"active:scale-[0.96]",
 										isActive
 											? p === "work"
-												? "bg-[#251f38] text-[#c4b5fd]"
-												: "bg-[#1a2e2a] text-[#7dd4c6]"
-											: "text-[#6b6560] hover:text-[#9a9088]",
+												? "bg-brand-surface text-brand-soft"
+												: "bg-fill text-p3-ink"
+											: "text-ink-faint hover:text-ink-muted",
 										running && "pointer-events-none",
 									)}
 								>
@@ -193,8 +193,8 @@ export function FocusTimerPanel({ onClose }: { onClose: () => void }) {
 								"transition-[background-color,color,transform] duration-150",
 								"active:scale-[0.95]",
 								workMins === m
-									? "bg-[#251f38] text-[#c4b5fd]"
-									: "text-[#4a4540] hover:text-[#9a9088]",
+									? "bg-brand-surface text-brand-soft"
+									: "text-line-max hover:text-ink-muted",
 								running && "pointer-events-none opacity-40",
 							)}
 						>
@@ -208,7 +208,7 @@ export function FocusTimerPanel({ onClose }: { onClose: () => void }) {
 					<div className="flex items-center gap-2">
 						<div className="flex gap-1">
 							{Array.from({ length: Math.min(sessions, 6) }).map((_, i) => (
-								<span key={i} className="size-1.5 rounded-full bg-[#907ce8]" />
+								<span key={i} className="size-1.5 rounded-full bg-brand" />
 							))}
 						</div>
 					</div>

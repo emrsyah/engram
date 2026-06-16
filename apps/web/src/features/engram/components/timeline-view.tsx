@@ -74,7 +74,7 @@ export function TimelineView() {
 
   return (
     <DndContext id="timeline-dnd" sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <section className="h-full overflow-y-auto bg-[#151310] px-8 py-10 text-white md:px-16 lg:px-28">
+      <section className="h-full overflow-y-auto bg-base px-8 py-10 text-white md:px-16 lg:px-28">
         <div className="mx-auto max-w-[1160px]">
           <Tabs defaultValue="list" className="gap-0">
             <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
@@ -83,11 +83,11 @@ export function TimelineView() {
                   className="stagger-item flex items-center gap-3 font-bold text-3xl"
                   style={{ animationDelay: "0ms" }}
                 >
-                  <Icons.calendar className="size-7 text-[#9b88ff]" />
+                  <Icons.calendar className="size-7 text-brand-glow" />
                   Timeline
                 </h2>
                 <p
-                  className="stagger-item mt-3 max-w-2xl text-[#b0a69a]"
+                  className="stagger-item mt-3 max-w-2xl text-ink-3"
                   style={{ animationDelay: "40ms" }}
                 >
                   Every scheduled task, flowing across the week. Drag to reschedule, or click to jump to
@@ -96,20 +96,20 @@ export function TimelineView() {
               </div>
 
               <div className="flex shrink-0 items-center gap-3">
-                <span className="rounded-[6px] border border-[#302c27] bg-[#211e1a] px-2.5 py-1 font-mono text-[#9f9588] text-xs">
+                <span className="rounded-[6px] border border-line-2 bg-surface px-2.5 py-1 font-mono text-ink-muted text-xs">
                   {scheduledTasks.length} task{scheduledTasks.length === 1 ? "" : "s"}
                 </span>
-                <TabsList className="rounded-[8px] bg-[#23201d] p-1">
+                <TabsList className="rounded-[8px] bg-fill p-1">
                 <TabsTrigger
                   value="list"
-                  className="h-8 rounded-[6px] px-3 text-[#948c82] data-active:bg-[#312d28] data-active:text-white"
+                  className="h-8 rounded-[6px] px-3 text-ink-muted data-active:bg-raise data-active:text-white"
                 >
                   <ListIcon className="size-3.5" />
                   List
                 </TabsTrigger>
                 <TabsTrigger
                   value="calendar"
-                  className="h-8 rounded-[6px] px-3 text-[#948c82] data-active:bg-[#312d28] data-active:text-white"
+                  className="h-8 rounded-[6px] px-3 text-ink-muted data-active:bg-raise data-active:text-white"
                 >
                   <CalendarDaysIcon className="size-3.5" />
                   Calendar
@@ -166,7 +166,7 @@ function CalendarTimelineView({
 }) {
   return (
     <div className="grid gap-5 lg:grid-cols-[360px_1fr]">
-      <div className="rounded-[8px] border border-[#302c27] bg-[#211e1a] p-3">
+      <div className="rounded-[8px] border border-line-2 bg-surface p-3">
         <Calendar
           mode="single"
           selected={selectedDate}
@@ -175,35 +175,35 @@ function CalendarTimelineView({
           }}
           modifiers={{ scheduled: scheduledDates }}
           modifiersClassNames={{
-            scheduled: "[&>button]:after:absolute [&>button]:after:right-1 [&>button]:after:top-1 [&>button]:after:size-1.5 [&>button]:after:rounded-full [&>button]:after:bg-[#d7b238]",
+            scheduled: "[&>button]:after:absolute [&>button]:after:right-1 [&>button]:after:top-1 [&>button]:after:size-1.5 [&>button]:after:rounded-full [&>button]:after:bg-amber",
           }}
           className="w-full p-1"
           classNames={{
             month_grid: "w-full border-collapse",
             weekdays: "grid grid-cols-7",
             week: "grid grid-cols-7 mt-1",
-            weekday: "text-center text-[11px] font-medium text-[#5a5450] pb-1",
+            weekday: "text-center text-[11px] font-medium text-ink-ghost pb-1",
             day: "relative h-11 p-0 text-center",
             day_button: cn(
-              "relative h-11 w-full rounded-[6px] text-sm text-[#c8bfb2] transition-colors",
-              "hover:bg-[#2e2a24] hover:text-white",
-              "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#907ce8]",
+              "relative h-11 w-full rounded-[6px] text-sm text-ink-2 transition-colors",
+              "hover:bg-line-soft hover:text-white",
+              "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand",
             ),
           }}
         />
       </div>
 
-      <div className="min-h-[360px] rounded-[8px] border border-[#302c27] bg-[#211e1a] p-5">
+      <div className="min-h-[360px] rounded-[8px] border border-line-2 bg-surface p-5">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <p className="font-mono text-[#82786e] text-xs uppercase tracking-widest">
+            <p className="font-mono text-ink-dim text-xs uppercase tracking-widest">
               {isSameLocalDay(selectedDate, new Date()) ? "Today" : selectedDate.toLocaleDateString("en-US", { weekday: "long" })}
             </p>
             <h3 className="mt-1 font-bold text-2xl text-white">
               {selectedDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })}
             </h3>
           </div>
-          <span className="rounded-[6px] border border-[#302c27] bg-[#181511] px-2 py-1 font-mono text-[#82786e] text-xs">
+          <span className="rounded-[6px] border border-line-2 bg-base px-2 py-1 font-mono text-ink-dim text-xs">
             {selectedTasks.length} tasks
           </span>
         </div>
@@ -214,7 +214,7 @@ function CalendarTimelineView({
               <TimelineTask key={task.id} task={task} onJump={onJump} index={index} />
             ))
           ) : (
-            <div className="rounded-[8px] border border-dashed border-[#34302b] px-4 py-8 text-center text-[#82786e] text-sm">
+            <div className="rounded-[8px] border border-dashed border-raise px-4 py-8 text-center text-ink-dim text-sm">
               Nothing scheduled for this day.
             </div>
           )}
@@ -254,15 +254,15 @@ function TimelineDay({
       style={{ animationDelay: `${80 + index * 35}ms` }}
     >
       <div className="relative pb-8 text-right">
-        <div className="absolute top-2 right-[-15px] size-2 rounded-full bg-[#403b35]" />
-        <div className="absolute top-5 right-[-12px] h-full w-px bg-[#302c27]" />
-        <p className="font-mono text-[#82786e] text-xs uppercase">{label}</p>
+        <div className="absolute top-2 right-[-15px] size-2 rounded-full bg-line-strong" />
+        <div className="absolute top-5 right-[-12px] h-full w-px bg-line-2" />
+        <p className="font-mono text-ink-dim text-xs uppercase">{label}</p>
         {datePrefix !== "someday" && (
           <>
-            <p className={cn("font-bold text-3xl", isToday ? "text-[#9b88ff]" : "text-white")}>
+            <p className={cn("font-bold text-3xl", isToday ? "text-brand-glow" : "text-white")}>
               {day}
             </p>
-            <p className="font-mono text-[#82786e] text-xs">{month}</p>
+            <p className="font-mono text-ink-dim text-xs">{month}</p>
           </>
         )}
       </div>
@@ -273,7 +273,7 @@ function TimelineDay({
           "min-h-[56px] space-y-3 rounded-[8px] pb-8 px-2 -mx-2",
           "transition-[background-color,box-shadow] duration-150",
           isOver
-            ? "bg-[#1e1c18] shadow-[inset_0_0_0_1px_#4c463e]"
+            ? "bg-surface shadow-[inset_0_0_0_1px_var(--color-line-max)]"
             : "bg-transparent shadow-none",
         )}
       >
@@ -282,7 +282,7 @@ function TimelineDay({
             <TimelineTask key={task.id} task={task} onJump={onJump} index={ti} />
           ))
         ) : (
-          <p className={cn("py-3 text-[#82786e] text-sm transition-opacity duration-150", isOver && "opacity-0")}>
+          <p className={cn("py-3 text-ink-dim text-sm transition-opacity duration-150", isOver && "opacity-0")}>
             Nothing scheduled
           </p>
         )}
@@ -315,10 +315,10 @@ function TimelineTask({
         onClick={() => onJump(task.id)}
         className={cn(
           "h-auto min-h-14 w-full justify-start gap-4 rounded-[8px]",
-          "border-[#302c27] bg-[#211e1a] px-4 text-left font-normal",
+          "border-line-2 bg-surface px-4 text-left font-normal",
           "transition-[background-color,border-color,transform] duration-150",
-          "hover:border-[#4c463e] hover:bg-[#272421]",
-          "active:scale-[0.99] active:bg-[#2a2620]",
+          "hover:border-line-max hover:bg-fill",
+          "active:scale-[0.99] active:bg-line",
         )}
       >
         <span
@@ -326,9 +326,9 @@ function TimelineTask({
           {...attributes}
           onClick={(e) => e.stopPropagation()}
           className={cn(
-            "cursor-grab touch-none text-[#4c463e]",
+            "cursor-grab touch-none text-line-max",
             "transition-colors duration-150",
-            "hover:text-[#7a7068]",
+            "hover:text-ink-dim",
             "active:cursor-grabbing",
           )}
           aria-label="Drag to reschedule"
@@ -336,7 +336,7 @@ function TimelineTask({
           <GripIcon />
         </span>
 
-        <span className="w-20 font-mono text-[#9f9588] text-sm">
+        <span className="w-20 font-mono text-ink-muted text-sm">
           {task.dueAt
             ? new Date(task.dueAt).toLocaleTimeString("en-US", {
                 hour: "numeric",
@@ -353,7 +353,7 @@ function TimelineTask({
           />
         </span>
 
-        <span className={cn("flex-1 font-semibold", task.done && "text-[#655e56] line-through")}>
+        <span className={cn("flex-1 font-semibold", task.done && "text-done line-through")}>
           {task.title}
         </span>
         <PriorityChip priority={task.priority} />
@@ -364,9 +364,9 @@ function TimelineTask({
 
 function TaskDragPreview({ task }: { task: Item }) {
   return (
-    <div className="flex h-14 w-[560px] items-center gap-4 rounded-[8px] border border-[#9b88ff]/40 bg-[#211e1a] px-4 shadow-2xl ring-1 ring-[#9b88ff]/20 rotate-1 scale-[1.02]">
-      <GripIcon className="text-[#9b88ff]" />
-      <span className="w-20 font-mono text-[#9f9588] text-sm">
+    <div className="flex h-14 w-[560px] items-center gap-4 rounded-[8px] border border-brand-glow/40 bg-surface px-4 shadow-2xl ring-1 ring-brand-glow/20 rotate-1 scale-[1.02]">
+      <GripIcon className="text-brand-glow" />
+      <span className="w-20 font-mono text-ink-muted text-sm">
         {task.dueAt
           ? new Date(task.dueAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
           : "—"}

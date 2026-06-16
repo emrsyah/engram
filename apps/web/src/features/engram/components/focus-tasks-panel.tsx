@@ -60,7 +60,7 @@ function CelebrationBurst({
 
 	useEffect(() => {
 		if (!origin) return;
-		const colors = ["#907ce8", "#d9a82f", "#43b6a6", "#e46f50", "#4aa5c8"];
+		const colors = ["var(--color-brand)", "var(--color-honey)", "var(--color-teal)", "var(--color-coral)", "var(--color-blue)"];
 		const next: Particle[] = Array.from({ length: 16 }, (_, i) => ({
 			id: ++countRef.current,
 			x: origin.x,
@@ -137,7 +137,7 @@ function SortableTaskRow({
 			ref={setNodeRef}
 			style={style}
 			className={cn(
-				"group flex items-start gap-2 rounded-[7px] px-2 py-2 transition-colors hover:bg-[#211e1a]",
+				"group flex items-start gap-2 rounded-[7px] px-2 py-2 transition-colors hover:bg-surface",
 				isDragging && "opacity-40",
 				task.done && "opacity-55",
 			)}
@@ -147,7 +147,7 @@ function SortableTaskRow({
 				{...attributes}
 				{...listeners}
 				tabIndex={-1}
-				className="mt-0.5 cursor-grab touch-none text-[#3e3a35] opacity-0 transition-opacity active:cursor-grabbing group-hover:opacity-100"
+				className="mt-0.5 cursor-grab touch-none text-line-strong opacity-0 transition-opacity active:cursor-grabbing group-hover:opacity-100"
 			>
 				<GripVertical className="size-3.5" />
 			</button>
@@ -156,15 +156,15 @@ function SortableTaskRow({
 				checked={task.done}
 				onCheckedChange={handleCheck}
 				className={cn(
-					"mt-0.5 shrink-0 rounded-[4px] border-[#4a4540]",
-					task.done && "border-[#907ce8] bg-[#907ce8]",
+					"mt-0.5 shrink-0 rounded-[4px] border-line-max",
+					task.done && "border-brand bg-brand",
 				)}
 			/>
 			<div className="min-w-0 flex-1">
 				<p
 					className={cn(
-						"text-[#e0d8cf] text-sm leading-snug",
-						task.done && "text-[#6b6560] line-through",
+						"text-ink-2 text-sm leading-snug",
+						task.done && "text-ink-faint line-through",
 					)}
 				>
 					{task.title ?? task.text ?? "Untitled task"}
@@ -186,16 +186,16 @@ function SortableTaskRow({
 							>
 								<span
 									className={cn(
-										"flex size-3.5 shrink-0 items-center justify-center rounded-[3px] border border-[#4a4540] transition-colors",
-										ci.done && "border-[#907ce8] bg-[#907ce8]",
+										"flex size-3.5 shrink-0 items-center justify-center rounded-[3px] border border-line-max transition-colors",
+										ci.done && "border-brand bg-brand",
 									)}
 								>
 									{ci.done && <Check className="size-2.5 text-white" />}
 								</span>
 								<span
 									className={cn(
-										"text-[#b0a99f] text-xs leading-snug",
-										ci.done && "text-[#5a5450] line-through",
+										"text-ink-3 text-xs leading-snug",
+										ci.done && "text-ink-ghost line-through",
 									)}
 								>
 									{ci.text}
@@ -209,7 +209,7 @@ function SortableTaskRow({
 				type="button"
 				onClick={() => onUnpin(task.id)}
 				title="Remove from focus"
-				className="mt-0.5 shrink-0 text-[#3e3a35] opacity-0 transition-opacity hover:text-[#e46f50] group-hover:opacity-100"
+				className="mt-0.5 shrink-0 text-line-strong opacity-0 transition-opacity hover:text-coral group-hover:opacity-100"
 			>
 				<PinOff className="size-3.5" />
 			</button>
@@ -226,21 +226,21 @@ function TodayUnpinnedSection() {
 	if (todayUnpinnedTasks.length === 0) return null;
 
 	return (
-		<div className="border-[#252220] border-t pt-3">
+		<div className="border-fill border-t pt-3">
 			<button
 				type="button"
 				onClick={() => setExpanded((v) => !v)}
 				className="mb-2 flex w-full items-center gap-1.5 px-2 text-left"
 			>
 				{expanded ? (
-					<ChevronDown className="size-3 text-[#6b6560]" />
+					<ChevronDown className="size-3 text-ink-faint" />
 				) : (
-					<ChevronRight className="size-3 text-[#6b6560]" />
+					<ChevronRight className="size-3 text-ink-faint" />
 				)}
-				<span className="font-bold text-[#6b6560] text-[11px] uppercase tracking-widest">
+				<span className="font-bold text-ink-faint text-[11px] uppercase tracking-widest">
 					Due today
 				</span>
-				<span className="ml-auto rounded-full bg-[#252220] px-1.5 py-0.5 font-mono text-[#8a8378] text-[10px]">
+				<span className="ml-auto rounded-full bg-fill px-1.5 py-0.5 font-mono text-ink-muted text-[10px]">
 					{todayUnpinnedTasks.length}
 				</span>
 			</button>
@@ -249,10 +249,10 @@ function TodayUnpinnedSection() {
 					{todayUnpinnedTasks.map((task) => (
 						<div
 							key={task.id}
-							className="group flex items-start gap-2 rounded-[7px] px-2 py-2 hover:bg-[#211e1a]"
+							className="group flex items-start gap-2 rounded-[7px] px-2 py-2 hover:bg-surface"
 						>
 							<div className="min-w-0 flex-1">
-								<p className="text-[#b0a99f] text-sm leading-snug">
+								<p className="text-ink-3 text-sm leading-snug">
 									{task.title ?? task.text ?? "Untitled task"}
 								</p>
 								{(task.priority || task.dueAt) && (
@@ -266,7 +266,7 @@ function TodayUnpinnedSection() {
 								type="button"
 								onClick={() => pinToFocus(task.id)}
 								title="Add to focus"
-								className="mt-0.5 shrink-0 text-[#3e3a35] opacity-0 transition-opacity hover:text-[#907ce8] group-hover:opacity-100"
+								className="mt-0.5 shrink-0 text-line-strong opacity-0 transition-opacity hover:text-brand group-hover:opacity-100"
 							>
 								<Pin className="size-3.5" />
 							</button>
@@ -375,15 +375,15 @@ export function FocusTasksPanel({ onClose }: { onClose: () => void }) {
       `}</style>
 			<CelebrationBurst origin={burst} />
 
-			<div className="absolute top-[calc(100%+8px)] right-0 z-50 flex w-[360px] flex-col rounded-[12px] border border-[#2e2b26] bg-[#1a1714] shadow-2xl">
+			<div className="absolute top-[calc(100%+8px)] right-0 z-50 flex w-[360px] flex-col rounded-[12px] border border-line-soft bg-panel shadow-2xl">
 				{/* Header */}
-				<div className="flex shrink-0 items-center justify-between border-[#2e2b26] border-b px-4 py-3">
+				<div className="flex shrink-0 items-center justify-between border-line-soft border-b px-4 py-3">
 					<div className="flex items-center gap-3">
 						<span className="font-bold text-white text-xs uppercase tracking-widest">
 							Focus Tasks
 						</span>
 						{totalCount > 0 && (
-							<span className="font-mono text-[#6b6560] text-xs">
+							<span className="font-mono text-ink-faint text-xs">
 								{doneCount}/{totalCount}
 							</span>
 						)}
@@ -392,7 +392,7 @@ export function FocusTasksPanel({ onClose }: { onClose: () => void }) {
 						variant="ghost"
 						size="icon-xs"
 						onClick={onClose}
-						className="size-6 text-[#706a62] hover:text-white"
+						className="size-6 text-ink-faint hover:text-white"
 					>
 						<X className="size-3.5" />
 					</Button>
@@ -401,9 +401,9 @@ export function FocusTasksPanel({ onClose }: { onClose: () => void }) {
 				{/* Progress bar */}
 				{totalCount > 0 && (
 					<div className="shrink-0 px-4 pt-3">
-						<div className="h-1 w-full overflow-hidden rounded-full bg-[#252220]">
+						<div className="h-1 w-full overflow-hidden rounded-full bg-fill">
 							<div
-								className="h-full rounded-full bg-[#907ce8] transition-all duration-500"
+								className="h-full rounded-full bg-brand transition-all duration-500"
 								style={{
 									width: `${totalCount > 0 ? (doneCount / totalCount) * 100 : 0}%`,
 								}}
@@ -438,9 +438,9 @@ export function FocusTasksPanel({ onClose }: { onClose: () => void }) {
 
 							{doneItems.length > 0 && pendingItems.length > 0 && (
 								<div className="my-2 flex items-center gap-2 px-2">
-									<div className="h-px flex-1 bg-[#252220]" />
-									<span className="text-[#4a4540] text-[10px]">done</span>
-									<div className="h-px flex-1 bg-[#252220]" />
+									<div className="h-px flex-1 bg-fill" />
+									<span className="text-line-max text-[10px]">done</span>
+									<div className="h-px flex-1 bg-fill" />
 								</div>
 							)}
 
@@ -459,7 +459,7 @@ export function FocusTasksPanel({ onClose }: { onClose: () => void }) {
 							</SortableContext>
 
 							{orderedItems.length === 0 && (
-								<div className="py-6 text-center text-[#4a4540] text-sm">
+								<div className="py-6 text-center text-line-max text-sm">
 									No tasks in focus yet.
 									<br />
 									Add one or pin tasks from the canvas.
@@ -469,8 +469,8 @@ export function FocusTasksPanel({ onClose }: { onClose: () => void }) {
 
 						<DragOverlay>
 							{activeTask && (
-								<div className="rounded-[7px] border border-[#907ce8]/30 bg-[#1c1916] px-3 py-2 shadow-xl">
-									<p className="text-[#e0d8cf] text-sm">
+								<div className="rounded-[7px] border border-brand/30 bg-clay px-3 py-2 shadow-xl">
+									<p className="text-ink-2 text-sm">
 										{activeTask.title ?? activeTask.text ?? "Untitled task"}
 									</p>
 								</div>
@@ -481,7 +481,7 @@ export function FocusTasksPanel({ onClose }: { onClose: () => void }) {
 					{/* Add task */}
 					<div className="mt-2 px-2">
 						{addingTask ? (
-							<div className="flex items-center gap-2 rounded-[7px] border border-[#907ce8]/40 bg-[#211e1a] px-2.5 py-2">
+							<div className="flex items-center gap-2 rounded-[7px] border border-brand/40 bg-surface px-2.5 py-2">
 								<input
 									ref={inputRef}
 									value={newTaskText}
@@ -494,12 +494,12 @@ export function FocusTasksPanel({ onClose }: { onClose: () => void }) {
 										}
 									}}
 									placeholder="Task title…"
-									className="flex-1 bg-transparent text-[#e0d8cf] text-sm placeholder:text-[#4a4540] focus:outline-none"
+									className="flex-1 bg-transparent text-ink-2 text-sm placeholder:text-line-max focus:outline-none"
 								/>
 								<button
 									type="button"
 									onClick={handleAddTask}
-									className="shrink-0 font-semibold text-[#907ce8] text-xs hover:text-[#a08ef2]"
+									className="shrink-0 font-semibold text-brand text-xs hover:text-brand-bright"
 								>
 									Add
 								</button>
@@ -508,7 +508,7 @@ export function FocusTasksPanel({ onClose }: { onClose: () => void }) {
 							<button
 								type="button"
 								onClick={() => setAddingTask(true)}
-								className="flex w-full items-center gap-2 rounded-[7px] border border-[#2e2b26] border-dashed px-2.5 py-2 text-[#4a4540] text-sm transition-colors hover:border-[#907ce8]/40 hover:text-[#907ce8]"
+								className="flex w-full items-center gap-2 rounded-[7px] border border-line-soft border-dashed px-2.5 py-2 text-line-max text-sm transition-colors hover:border-brand/40 hover:text-brand"
 							>
 								<Plus className="size-4" />
 								Add to focus

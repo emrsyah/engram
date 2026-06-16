@@ -20,7 +20,7 @@ export function FocusScratchpadInline() {
 	return (
 		<div className="flex h-full flex-col">
 			{/* ── Header ── */}
-			<div className="shrink-0 border-[#2e2b26] border-b px-4 py-3">
+			<div className="shrink-0 border-line-soft border-b px-4 py-3">
 				<div className="flex items-center justify-between">
 					<div className="flex items-center gap-2">
 						<span className="font-bold text-white text-xs uppercase tracking-widest">
@@ -29,7 +29,7 @@ export function FocusScratchpadInline() {
 						<SaveStateIndicator state={saveState} />
 					</div>
 				</div>
-				<p className="mt-1 text-[#6b6560] text-[11px]">{today}</p>
+				<p className="mt-1 text-ink-faint text-[11px]">{today}</p>
 			</div>
 
 			{/* ── Editor ── */}
@@ -44,16 +44,16 @@ export function FocusScratchpadInline() {
 							"Start writing…\n\n· What's the intention for today?\n· Key thoughts or reflections\n· Quick capture anything on your mind\n\n⌘+B bold · ⌘+I italic · Tab indents"
 						}
 						rows={12}
-						className="w-full resize-none border-0 bg-transparent text-[#d4ccc4] text-sm leading-relaxed placeholder:text-[#3d3830] placeholder:leading-relaxed focus-visible:ring-0"
+						className="w-full resize-none border-0 bg-transparent text-ink-2 text-sm leading-relaxed placeholder:text-line-strong placeholder:leading-relaxed focus-visible:ring-0"
 						spellCheck
 					/>
 				</div>
 			</ScrollArea>
 
 			{/* ── Footer ── */}
-			<div className="shrink-0 border-[#2e2b26] border-t px-4 py-2">
+			<div className="shrink-0 border-line-soft border-t px-4 py-2">
 				<div className="flex items-center justify-between">
-					<div className="flex items-center gap-3 font-mono text-[#4a4540] text-[10px]">
+					<div className="flex items-center gap-3 font-mono text-line-max text-[10px]">
 						<span className="flex items-center gap-1">
 							<Hash className="size-2.5" />
 							{wordCount} {wordCount === 1 ? "word" : "words"}
@@ -62,7 +62,7 @@ export function FocusScratchpadInline() {
 							{lineCount} {lineCount === 1 ? "line" : "lines"}
 						</span>
 					</div>
-					<span className="text-[#3d3830] text-[10px]">Auto-saved</span>
+					<span className="text-line-strong text-[10px]">Auto-saved</span>
 				</div>
 			</div>
 		</div>

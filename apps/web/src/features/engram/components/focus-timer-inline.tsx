@@ -77,18 +77,18 @@ export function FocusTimerInline() {
 	return (
 		<div className="flex h-full flex-col">
 			{/* ── Header ── */}
-			<div className="shrink-0 border-[#2e2b26] border-b px-4 py-3">
+			<div className="shrink-0 border-line-soft border-b px-4 py-3">
 				<div className="flex items-center justify-between">
 					<span className="font-bold text-white text-xs uppercase tracking-widest">
 						Pomodoro
 					</span>
 					{sessions > 0 && (
-						<span className="font-mono text-[#6b6560] text-[10px]">
+						<span className="font-mono text-ink-faint text-[10px]">
 							{sessions} {sessions === 1 ? "session" : "sessions"}
 						</span>
 					)}
 				</div>
-				<p className="mt-1 text-[#6b6560] text-[11px]">{statusLine}</p>
+				<p className="mt-1 text-ink-faint text-[11px]">{statusLine}</p>
 			</div>
 
 			{/* ── Timer body ── */}
@@ -105,7 +105,7 @@ export function FocusTimerInline() {
 						cy="50"
 						r="44"
 						fill="none"
-						stroke="#252220"
+						stroke="var(--color-fill)"
 						strokeWidth="5"
 					/>
 					<circle
@@ -130,7 +130,7 @@ export function FocusTimerInline() {
 					<span
 						className={cn(
 							"font-semibold text-[11px] uppercase tracking-wider",
-							phase === "break" ? "text-[#43b6a6]" : "text-[#907ce8]",
+							phase === "break" ? "text-teal" : "text-brand",
 						)}
 					>
 						{phase === "idle"
@@ -140,7 +140,7 @@ export function FocusTimerInline() {
 								: "Break"}
 					</span>
 					{activeMins !== (phase === "break" ? 5 : 25) && phase !== "idle" && (
-						<span className="font-mono text-[#4a4540] text-[10px]">
+						<span className="font-mono text-line-max text-[10px]">
 							{activeMins}m session
 						</span>
 					)}
@@ -154,7 +154,7 @@ export function FocusTimerInline() {
 						variant="outline"
 						size="sm"
 						onClick={pause}
-						className="h-9 gap-2 rounded-[8px] border-[#3a3530] bg-[#252220] px-4 text-[#c8bfb2] transition-colors duration-150 hover:bg-[#2e2b26] active:scale-[0.97]"
+						className="h-9 gap-2 rounded-[8px] border-line-strong bg-fill px-4 text-ink-2 transition-colors duration-150 hover:bg-line-soft active:scale-[0.97]"
 					>
 						<Pause className="size-4" />
 						Pause
@@ -166,8 +166,8 @@ export function FocusTimerInline() {
 						className="h-9 gap-2 rounded-[8px] px-5 transition-transform duration-150 active:scale-[0.97]"
 						style={{ backgroundColor: accent }}
 					>
-						<Play className="size-4 text-[#0e0c0a]" />
-						<span className="font-bold text-[#0e0c0a]">
+						<Play className="size-4 text-void" />
+						<span className="font-bold text-void">
 							{phase === "idle" ? "Start" : "Resume"}
 						</span>
 					</Button>
@@ -176,7 +176,7 @@ export function FocusTimerInline() {
 					variant="ghost"
 					size="icon-xs"
 					onClick={reset}
-					className="size-9 text-[#706a62] transition-colors duration-150 hover:text-white active:scale-[0.95]"
+					className="size-9 text-ink-faint transition-colors duration-150 hover:text-white active:scale-[0.95]"
 					title="Reset"
 				>
 					<RotateCcw className="size-4" />
@@ -190,7 +190,7 @@ export function FocusTimerInline() {
 					onValueChange={(v: string[]) => {
 						if (v[0]) switchPhase(v[0] as "work" | "break");
 					}}
-					className="flex-1 rounded-[8px] bg-[#1a1714] p-1"
+					className="flex-1 rounded-[8px] bg-panel p-1"
 				>
 					<ToggleGroupItem
 						value="work"
@@ -199,8 +199,8 @@ export function FocusTimerInline() {
 							"transition-[background-color,color,transform] duration-150",
 							"active:scale-[0.96]",
 							(phase === "work" || phase === "idle")
-								? "bg-[#251f38] text-[#c4b5fd]"
-								: "text-[#6b6560] hover:text-[#9a9088]",
+								? "bg-brand-surface text-brand-soft"
+								: "text-ink-faint hover:text-ink-muted",
 						)}
 					>
 						<Clock className="size-3" />
@@ -213,8 +213,8 @@ export function FocusTimerInline() {
 							"transition-[background-color,color,transform] duration-150",
 							"active:scale-[0.96]",
 							phase === "break"
-								? "bg-[#1a2e2a] text-[#7dd4c6]"
-								: "text-[#6b6560] hover:text-[#9a9088]",
+								? "bg-fill text-p3-ink"
+								: "text-ink-faint hover:text-ink-muted",
 						)}
 					>
 						<Clock className="size-3" />
@@ -230,7 +230,7 @@ export function FocusTimerInline() {
 								type="button"
 								variant="ghost"
 								size="icon-xs"
-								className="size-7 text-[#5a5450] transition-colors duration-150 hover:text-[#c8bfb2] active:scale-[0.95]"
+								className="size-7 text-ink-ghost transition-colors duration-150 hover:text-ink-2 active:scale-[0.95]"
 								title="Custom duration"
 							/>
 						}
@@ -243,7 +243,7 @@ export function FocusTimerInline() {
 								Duration
 							</p>
 							<div className="space-y-2">
-								<label className="flex items-center justify-between gap-3 text-[#b0a99f] text-xs">
+								<label className="flex items-center justify-between gap-3 text-ink-3 text-xs">
 									Focus
 									<Input
 										type="number"
@@ -254,10 +254,10 @@ export function FocusTimerInline() {
 										onKeyDown={(e) => {
 											if (e.key === "Enter") applyCustom();
 										}}
-										className="h-7 w-16 rounded-[6px] border-[#302c27] bg-[#181511] px-2 text-center font-mono text-[#f0ebe3] text-xs focus:border-[#907ce8] focus-visible:ring-0"
+										className="h-7 w-16 rounded-[6px] border-line-2 bg-base px-2 text-center font-mono text-ink text-xs focus:border-brand focus-visible:ring-0"
 									/>
 								</label>
-								<label className="flex items-center justify-between gap-3 text-[#b0a99f] text-xs">
+								<label className="flex items-center justify-between gap-3 text-ink-3 text-xs">
 									Break
 									<Input
 										type="number"
@@ -268,7 +268,7 @@ export function FocusTimerInline() {
 										onKeyDown={(e) => {
 											if (e.key === "Enter") applyCustom();
 										}}
-										className="h-7 w-16 rounded-[6px] border-[#302c27] bg-[#181511] px-2 text-center font-mono text-[#f0ebe3] text-xs focus:border-[#43b6a6] focus-visible:ring-0"
+										className="h-7 w-16 rounded-[6px] border-line-2 bg-base px-2 text-center font-mono text-ink text-xs focus:border-teal focus-visible:ring-0"
 									/>
 								</label>
 							</div>
@@ -281,8 +281,8 @@ export function FocusTimerInline() {
 										className={cn(
 											"flex-1 rounded-[4px] py-1 font-mono text-[10px] transition-colors duration-150",
 											Number(customWork) === m
-												? "bg-[#251f38] text-[#c4b5fd]"
-												: "text-[#5a5450] hover:text-[#c8bfb2]",
+												? "bg-brand-surface text-brand-soft"
+												: "text-ink-ghost hover:text-ink-2",
 										)}
 									>
 										{m}
@@ -298,8 +298,8 @@ export function FocusTimerInline() {
 										className={cn(
 											"flex-1 rounded-[4px] py-1 font-mono text-[10px] transition-colors duration-150",
 											Number(customBreak) === m
-												? "bg-[#1a2e2a] text-[#7dd4c6]"
-												: "text-[#5a5450] hover:text-[#c8bfb2]",
+												? "bg-fill text-p3-ink"
+												: "text-ink-ghost hover:text-ink-2",
 										)}
 									>
 										{m}
@@ -309,7 +309,7 @@ export function FocusTimerInline() {
 							<Button
 								size="sm"
 								onClick={applyCustom}
-								className="h-7 w-full rounded-[6px] bg-[#907ce8] font-semibold text-[#17131f] transition-colors duration-150 hover:bg-[#a08ef2] active:scale-[0.97]"
+								className="h-7 w-full rounded-[6px] bg-brand font-semibold text-brand-ink transition-colors duration-150 hover:bg-brand-bright active:scale-[0.97]"
 							>
 								Apply
 							</Button>
@@ -336,8 +336,8 @@ export function FocusTimerInline() {
 							"flex-1 rounded-[5px] py-1 font-mono text-[11px] transition-[background-color,color,transform] duration-150",
 							"active:scale-[0.95]",
 							workMins === m
-								? "bg-[#251f38] text-[#c4b5fd]"
-								: "text-[#5a5450] hover:text-[#9a9088]",
+								? "bg-brand-surface text-brand-soft"
+								: "text-ink-ghost hover:text-ink-muted",
 							running && "pointer-events-none opacity-40",
 						)}
 					>
@@ -352,12 +352,12 @@ export function FocusTimerInline() {
 					{Array.from({ length: Math.min(sessions, 8) }).map((_, i) => (
 						<span
 							key={i}
-							className="size-2 rounded-full bg-[#907ce8] transition-transform duration-150"
+							className="size-2 rounded-full bg-brand transition-transform duration-150"
 							style={{ transitionDelay: `${i * 40}ms` }}
 						/>
 					))}
 					{sessions > 8 && (
-						<span className="font-mono text-[#6b6560] text-[10px]">
+						<span className="font-mono text-ink-faint text-[10px]">
 							+{sessions - 8}
 						</span>
 					)}

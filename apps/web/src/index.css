@@ -1,5 +1,65 @@
 @import "@alphonse/ui/globals.css";
 
+/* ──────────────────────────────────────────────────────────────────────
+   ENGRAM THEME TOKENS — single source of truth for the app's look.
+   Change a value here and it reflects everywhere that uses the token
+   (e.g. `bg-surface`, `text-ink`, `border-line`, `bg-brand/20`).
+   Values mirror docs/DESIGN.md; near-duplicate shades are collapsed.
+   ─────────────────────────────────────────────────────────────────────── */
+@theme {
+  /* Surfaces — darkest → lightest. Deeper + better separated for cleaner contrast. */
+  --color-void: #0a0908;     /* shell / outermost frame */
+  --color-base: #131110;     /* main content background */
+  --color-panel: #181513;    /* panels, popovers, dropdowns */
+  --color-clay: #1b1714;     /* capture bar, elevated surfaces */
+  --color-sunken: #0d0b0a;   /* nested / input-focus surfaces */
+  --color-surface: #1f1b17;  /* card & row backgrounds */
+  --color-fill: #272320;     /* subtle fills: tracks, badges, hovers */
+  --color-raise: #332e28;    /* card hover, drag-over target */
+
+  /* Lines / borders — soft → strong. A touch lighter so dividers read as intentional. */
+  --color-line: #2c2823;
+  --color-line-soft: #322d27;
+  --color-line-2: #38332c;
+  --color-line-strong: #443e36;
+  --color-line-max: #564e44;
+
+  /* Ink / text — bright → dim. Higher contrast at the top, cleaner mid-greys. */
+  --color-ink: #f3eee5;
+  --color-ink-bright: #f8f4ed;
+  --color-ink-2: #ddd4ca;
+  --color-ink-3: #b8afa3;
+  --color-ink-muted: #9a9085;
+  --color-ink-dim: #877c70;
+  --color-ink-faint: #6f685e;
+  --color-ink-ghost: #5e564c;
+  --color-done: #6a635a;
+
+  /* Primary brand accent (amethyst) + states. Slightly more vivid + modern.
+     Named `brand` (not `accent`) to avoid colliding with shadcn's --color-accent. */
+  --color-brand: #9784f2;
+  --color-brand-bright: #ab9af8;
+  --color-brand-glow: #a48fff;
+  --color-brand-soft: #ccc1ff;
+  --color-brand-ink: #15111d;        /* text on brand */
+  --color-brand-surface: #27203a;    /* violet-tinted surface */
+
+  /* Semantic accents — a hair cleaner/brighter. */
+  --color-amber: #dcb63f;
+  --color-honey: #dbae42;
+  --color-teal: #47beac;
+  --color-coral: #e9785a;
+  --color-blue: #50aed1;
+
+  /* Priority chips */
+  --color-p1: #5a2a20;
+  --color-p1-ink: #f07d5e;
+  --color-p2: #514017;
+  --color-p2-ink: #e5b83d;
+  --color-p3: #183d4b;
+  --color-p3-ink: #58b8d8;
+}
+
 /* ── Custom easing curves ──────────────────────────────────────────── */
 :root {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
@@ -20,8 +80,8 @@ body {
   height: 100svh;
   width: 100vw;
   overflow: hidden;
-  background: #0b0b0a;
-  color: #efe9df;
+  background: var(--color-void);
+  color: var(--color-ink);
 }
 
 .engram-main {
@@ -30,15 +90,15 @@ body {
   flex: 1;
   flex-direction: column;
   overflow: hidden;
-  background: #151310;
+  background: var(--color-base);
 }
 
 .engram-card {
-  border: 1px solid #34302b;
+  border: 1px solid var(--color-line-strong);
   border-radius: 8px;
-  background: #211e1a;
+  background: var(--color-surface);
   box-shadow: 0 16px 40px rgb(0 0 0 / 24%);
-  color: #efe9df;
+  color: var(--color-ink);
   transition:
     border-color 150ms var(--ease-out),
     box-shadow 150ms var(--ease-out),
@@ -48,23 +108,23 @@ body {
 
 @media (hover: hover) and (pointer: fine) {
   .engram-card:hover {
-    border-color: #4c463e;
+    border-color: var(--color-line-max);
   }
 }
 
 .engram-card[data-selected="true"] {
-  border-color: #d7b238;
+  border-color: var(--color-amber);
   box-shadow:
-    0 0 0 1px #d7b238,
+    0 0 0 1px var(--color-amber),
     0 0 24px -4px rgba(215, 178, 56, 0.3),
     0 12px 32px rgb(0 0 0 / 28%);
   transform: translateY(-1px);
 }
 
 .engram-card[data-link-source="true"] {
-  border-color: #9b88ff;
+  border-color: var(--color-brand-glow);
   box-shadow:
-    0 0 0 1px #9b88ff,
+    0 0 0 1px var(--color-brand-glow),
     0 0 24px -4px rgba(155, 136, 255, 0.3),
     0 12px 32px rgb(0 0 0 / 28%);
   transform: translateY(-1px);
@@ -113,7 +173,7 @@ body {
 }
 
 .engram-scrollbar {
-  scrollbar-color: #4a433b transparent;
+  scrollbar-color: var(--color-line-max) transparent;
   scrollbar-width: thin;
 }
 
@@ -124,7 +184,7 @@ body {
 
 .engram-scrollbar::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: #4a433b;
+  background: var(--color-line-max);
 }
 
 @keyframes toast-drain {

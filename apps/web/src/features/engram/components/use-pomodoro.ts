@@ -57,7 +57,7 @@ export function usePomodoro(defaultWork = 25, defaultBreak = 5) {
   const secs = (remaining % 60).toString().padStart(2, "0");
   const total = phase === "break" ? breakSecs : workSecs;
   const progress = total > 0 ? (total - remaining) / total : 0;
-  const accent = phase === "break" ? "#43b6a6" : "#907ce8";
+  const accent = phase === "break" ? "var(--color-teal)" : "var(--color-brand)";
 
   return {
     workMins,

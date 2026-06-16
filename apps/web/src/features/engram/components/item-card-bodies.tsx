@@ -26,22 +26,22 @@ export function ThoughtCard({ item }: { item: Item }) {
     <div className="flex h-full flex-col gap-3 p-4">
       <TypeLabel item={item} />
       {title && (
-        <p className="line-clamp-2 font-semibold text-[#f0ebe3] text-[15px] leading-5">
+        <p className="line-clamp-2 font-semibold text-ink text-[15px] leading-5">
           <LinkifiedText text={title} />
         </p>
       )}
       {body && (
         <p
           className={cn(
-            "text-[#d8d2ca] text-sm leading-5",
-            title ? "line-clamp-3" : "line-clamp-4 text-[15px] leading-6 text-[#e7e2da]",
+            "text-ink-2 text-sm leading-5",
+            title ? "line-clamp-3" : "line-clamp-4 text-[15px] leading-6 text-ink",
           )}
         >
           <LinkifiedText text={body} />
         </p>
       )}
       {!title && !body && (
-        <p className="text-[#5c554d] text-sm leading-5">Untitled thought</p>
+        <p className="text-ink-ghost text-sm leading-5">Untitled thought</p>
       )}
       {item.tags && item.tags.length > 0 && (
         <div className="flex flex-wrap gap-1">
@@ -69,9 +69,9 @@ export function TaskCard({ item, onToggle }: { item: Item; onToggle: () => void 
               100% { opacity: 0; transform: translateY(-34px) scale(1); }
             }
           `}</style>
-          <span className="pointer-events-none absolute top-5 right-8 size-1.5 rounded-full bg-[#a8e06b]" style={{ animation: "task-complete-pop 900ms ease-out forwards" }} />
-          <span className="pointer-events-none absolute top-8 right-12 size-1 rounded-full bg-[#d7b238]" style={{ animation: "task-complete-pop 900ms 80ms ease-out forwards" }} />
-          <span className="pointer-events-none absolute top-7 right-5 size-1 rounded-full bg-[#9b88ff]" style={{ animation: "task-complete-pop 900ms 140ms ease-out forwards" }} />
+          <span className="pointer-events-none absolute top-5 right-8 size-1.5 rounded-full bg-ink-3" style={{ animation: "task-complete-pop 900ms ease-out forwards" }} />
+          <span className="pointer-events-none absolute top-8 right-12 size-1 rounded-full bg-amber" style={{ animation: "task-complete-pop 900ms 80ms ease-out forwards" }} />
+          <span className="pointer-events-none absolute top-7 right-5 size-1 rounded-full bg-brand-glow" style={{ animation: "task-complete-pop 900ms 140ms ease-out forwards" }} />
         </>
       )}
       <div className="nodrag nopan pt-7" onClick={(event) => event.stopPropagation()}>
@@ -81,8 +81,8 @@ export function TaskCard({ item, onToggle }: { item: Item; onToggle: () => void 
         <TypeLabel item={item} />
         <p
           className={cn(
-            "mt-3 font-semibold text-[#f0ebe3]",
-            item.done && "text-[#756e65] line-through",
+            "mt-3 font-semibold text-ink",
+            item.done && "text-ink-faint line-through",
           )}
         >
           <LinkifiedText text={item.title ?? ""} />
@@ -92,7 +92,7 @@ export function TaskCard({ item, onToggle }: { item: Item; onToggle: () => void 
             className="nodrag nopan mt-3 space-y-1.5"
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="font-mono text-[#6b6258] text-[10px] uppercase tracking-wider">
+            <p className="font-mono text-done text-[10px] uppercase tracking-wider">
               {doneCount}/{checklist.length} done
             </p>
             {checklist.map((ci) => (
@@ -104,8 +104,8 @@ export function TaskCard({ item, onToggle }: { item: Item; onToggle: () => void 
                 />
                 <span
                   className={cn(
-                    "text-[#c8bfb2] text-xs leading-relaxed",
-                    ci.done && "text-[#655e56] line-through",
+                    "text-ink-2 text-xs leading-relaxed",
+                    ci.done && "text-done line-through",
                   )}
                 >
                   <LinkifiedText text={ci.text} />
@@ -152,8 +152,8 @@ function TaskPriorityButtons({
           className={cn(
             "h-6 rounded-[5px] border px-1.5 font-bold text-[10px] transition-colors",
             priority === p
-              ? "border-[#4c463e] bg-[#2a2621] text-[#f0ebe3]"
-              : "border-[#2f2a25] bg-[#181511] text-[#6b6258] hover:text-[#c8bfb2]",
+              ? "border-line-max bg-line text-ink"
+              : "border-line-soft bg-base text-done hover:text-ink-2",
           )}
         >
           P{p}
@@ -182,8 +182,8 @@ function TaskDueButton({
             className={cn(
               "flex h-6 items-center gap-1 rounded-[5px] border px-2 font-mono font-bold text-[10px] transition-colors",
               dueAt
-                ? "border-[#3a3327] bg-[#3a3327] text-[#d6a93a]"
-                : "border-[#2f2a25] bg-[#181511] text-[#6b6258] hover:text-[#c8bfb2]",
+                ? "border-line-strong bg-line-strong text-honey"
+                : "border-line-soft bg-base text-done hover:text-ink-2",
             )}
           />
         }
@@ -209,8 +209,8 @@ function TaskDueButton({
             onChange(toDateInputValue(next));
           }}
         />
-        <div className="border-[#252118] border-t px-3 py-2">
-          <label className="flex items-center justify-between gap-3 text-[#8d857b] text-xs">
+        <div className="border-surface border-t px-3 py-2">
+          <label className="flex items-center justify-between gap-3 text-ink-muted text-xs">
             <span>Time</span>
             <input
               type="time"
@@ -225,16 +225,16 @@ function TaskDueButton({
                 next.setHours(hours ?? 0, minutes ?? 0, 0, 0);
                 onChange(next.toISOString());
               }}
-              className="h-7 rounded-[5px] border border-[#302c27] bg-[#181511] px-2 font-mono text-[#f0ebe3] text-xs outline-none focus:border-[#4c463e]"
+              className="h-7 rounded-[5px] border border-line-2 bg-base px-2 font-mono text-ink text-xs outline-none focus:border-line-max"
             />
           </label>
-          <p className="mt-1.5 text-[#5c554d] text-[10px]">Indonesia time (WIB)</p>
+          <p className="mt-1.5 text-ink-ghost text-[10px]">Indonesia time (WIB)</p>
           <div className="mt-2 flex gap-2">
             <button
               type="button"
               disabled={!dueDate || !dueHasTime}
               onClick={() => dueDate && onChange(toDateInputValue(dueDate))}
-              className="text-[#8d857b] text-xs hover:text-[#c8bfb2] disabled:text-[#3d3830]"
+              className="text-ink-muted text-xs hover:text-ink-2 disabled:text-line-strong"
             >
               Clear time
             </button>
@@ -242,7 +242,7 @@ function TaskDueButton({
               type="button"
               disabled={!dueAt}
               onClick={() => onChange(undefined)}
-              className="text-[#8d857b] text-xs hover:text-[#c8bfb2] disabled:text-[#3d3830]"
+              className="text-ink-muted text-xs hover:text-ink-2 disabled:text-line-strong"
             >
               Clear due
             </button>
@@ -306,15 +306,15 @@ export function LinkCard({ item }: { item: Item }) {
     <div className="flex h-full flex-col gap-3 p-4">
       <TypeLabel item={item} />
       <div className="flex items-start gap-3">
-        <span className="grid size-7 shrink-0 place-items-center rounded-[5px] bg-[#7185d6] text-white">
+        <span className="grid size-7 shrink-0 place-items-center rounded-[5px] bg-brand text-white">
           <Icons.link className="size-4" />
         </span>
         <div className="min-w-0">
-          <p className="font-bold text-[#f0ebe3]">{item.title}</p>
-          <p className="mt-1 text-[#53b9a8] text-xs">{domain}</p>
+          <p className="font-bold text-ink">{item.title}</p>
+          <p className="mt-1 text-teal text-xs">{domain}</p>
         </div>
       </div>
-      <p className="text-[#a9a199] text-sm leading-5">{item.text}</p>
+      <p className="text-ink-3 text-sm leading-5">{item.text}</p>
     </div>
   );
 }
@@ -323,10 +323,10 @@ export function ImageCard({ item }: { item: Item }) {
   return (
     <div className="flex h-full flex-col gap-3 p-3">
       <TypeLabel item={item} />
-      <div className="grid h-[214px] place-items-center rounded-[7px] bg-linear-to-br from-[#1d4039] to-[#27223c] text-[#9da39f]">
+      <div className="grid h-[214px] place-items-center rounded-[7px] bg-linear-to-br from-p3 to-brand-surface text-ink-3">
         <Icons.image className="size-8" />
       </div>
-      <div className="flex items-center gap-2 font-mono text-[#8b8378] text-xs">
+      <div className="flex items-center gap-2 font-mono text-ink-muted text-xs">
         <Icons.file className="size-3.5" />
         {item.source}
       </div>
@@ -337,7 +337,7 @@ export function ImageCard({ item }: { item: Item }) {
 export function FileCard({ item }: { item: Item }) {
   return (
     <div className="flex items-center gap-3 p-4">
-      <Icons.file className="size-5 text-[#9b88ff]" />
+      <Icons.file className="size-5 text-brand-glow" />
       <div>
         <TypeLabel item={item} />
         <p className="mt-2 font-semibold">{item.title ?? item.source}</p>

@@ -129,9 +129,9 @@ function NoteEditorPanelContent({
         }
         .note-textarea::-webkit-scrollbar { width: 8px; }
         .note-textarea::-webkit-scrollbar-thumb {
-          background: #2a2621; border-radius: 4px;
+          background: var(--color-line); border-radius: 4px;
         }
-        .note-textarea::-webkit-scrollbar-thumb:hover { background: #3a3530; }
+        .note-textarea::-webkit-scrollbar-thumb:hover { background: var(--color-line-strong); }
       `}</style>
 
       <div
@@ -139,7 +139,7 @@ function NoteEditorPanelContent({
         data-open={isOpen}
         className={cn(
           "note-panel fixed top-0 right-0 z-40 flex h-full flex-col",
-          "border-l border-[#252118] bg-[#141210] shadow-2xl shadow-black/50",
+          "border-l border-surface bg-base shadow-2xl shadow-black/50",
           wide ? "w-[min(900px,75vw)]" : "w-[min(640px,55vw)]",
         )}
         style={{ transition: `transform 280ms ${EASE_DRAWER}, width 220ms ${EASE_OUT}` }}
@@ -147,11 +147,11 @@ function NoteEditorPanelContent({
         {item && (
           <>
             {/* ── Header ── */}
-            <div className="flex items-center gap-2 border-b border-[#252118] px-4 py-3">
-              <span className="rounded-[5px] bg-[#221f1b] px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-[#7f776d]">
+            <div className="flex items-center gap-2 border-b border-surface px-4 py-3">
+              <span className="rounded-[5px] bg-surface px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-ink-dim">
                 {item.type}
               </span>
-              <span className="font-mono text-[10px] text-[#3d3830]">
+              <span className="font-mono text-[10px] text-line-strong">
                 {format(new Date(item.createdAt), "MMM d, h:mm a")}
               </span>
 
@@ -171,7 +171,7 @@ function NoteEditorPanelContent({
             </div>
 
             {/* ── Title ── */}
-            <div className="border-b border-[#221f1b] px-6 pt-6 pb-3">
+            <div className="border-b border-surface px-6 pt-6 pb-3">
               <input
                 ref={titleRef}
                 value={title}
@@ -182,8 +182,8 @@ function NoteEditorPanelContent({
                 }}
                 placeholder="Untitled note"
                 className={cn(
-                  "w-full bg-transparent text-[26px] font-bold text-[#f0ebe3] outline-none",
-                  "placeholder:text-[#3d3830]",
+                  "w-full bg-transparent text-[26px] font-bold text-ink outline-none",
+                  "placeholder:text-line-strong",
                 )}
               />
             </div>
@@ -198,22 +198,22 @@ function NoteEditorPanelContent({
                 placeholder={"Start writing… markdown supported.\n\nTab indents · ⌘+B wraps in **bold** · ⌘+I in *italic*"}
                 className={cn(
                   "note-textarea h-full w-full resize-none bg-transparent px-6 py-5",
-                  "font-mono text-[14px] leading-7 text-[#d8d2ca]",
-                  "outline-none placeholder:text-[#3d3830]",
+                  "font-mono text-[14px] leading-7 text-ink-2",
+                  "outline-none placeholder:text-line-strong",
                 )}
                 spellCheck
               />
             </div>
 
             {/* ── Footer ── */}
-            <div className="flex items-center justify-between border-t border-[#221f1b] bg-[#100e0c] px-4 py-2.5">
-              <div className="flex items-center gap-3 font-mono text-[10px] text-[#5c554d]">
+            <div className="flex items-center justify-between border-t border-surface bg-sunken px-4 py-2.5">
+              <div className="flex items-center gap-3 font-mono text-[10px] text-ink-ghost">
                 <span className="flex items-center gap-1.5">
                   <HashIcon className="size-2.5" />
                   {wordCount} words · {charCount} chars
                 </span>
                 {saving && (
-                  <span className="text-[#7f6e3e]">Saving…</span>
+                  <span className="text-done">Saving…</span>
                 )}
               </div>
               <Button
@@ -222,8 +222,8 @@ function NoteEditorPanelContent({
                 size="sm"
                 onClick={handleDelete}
                 className={cn(
-                  "h-7 rounded-[6px] border-[#3d2020] bg-[#1a1212] text-[11px] text-[#e06b6b]",
-                  "hover:border-[#5c2e2e] hover:bg-[#1f1515]",
+                  "h-7 rounded-[6px] border-line-2 bg-panel text-[11px] text-p1-ink",
+                  "hover:border-p1 hover:bg-clay",
                 )}
               >
                 <Trash2Icon className="size-3" />
@@ -255,8 +255,8 @@ function IconBtn({
       onClick={onClick}
       style={{ transition: `background-color 150ms ${EASE_OUT}, color 150ms ${EASE_OUT}, transform 160ms ${EASE_OUT}` }}
       className={cn(
-        "flex size-7 items-center justify-center rounded-[5px] text-[#5c554d]",
-        "hover:bg-[#211e1a] hover:text-[#c8bfb2] transform-gpu",
+        "flex size-7 items-center justify-center rounded-[5px] text-ink-ghost",
+        "hover:bg-surface hover:text-ink-2 transform-gpu",
         "active:scale-[0.92] motion-reduce:active:scale-100",
       )}
     >

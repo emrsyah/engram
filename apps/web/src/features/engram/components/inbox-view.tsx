@@ -21,11 +21,11 @@ import type { Accent, Item, ItemType } from "../types";
 import { useUIStore } from "../ui-store";
 
 const ACCENT_DOT: Record<Accent, string> = {
-  violet: "bg-[#907ce8]",
-  gold: "bg-[#d9a82f]",
-  teal: "bg-[#43b6a6]",
-  red: "bg-[#e46f50]",
-  blue: "bg-[#4aa5c8]",
+  violet: "bg-brand",
+  gold: "bg-honey",
+  teal: "bg-teal",
+  red: "bg-coral",
+  blue: "bg-blue",
 };
 
 const TYPE_ICON: Record<ItemType, keyof typeof Icons> = {
@@ -195,7 +195,7 @@ export function InboxView() {
   ]);
 
   return (
-    <section className="h-full overflow-y-auto bg-[#151310] px-8 py-10 text-white md:px-16 lg:px-28">
+    <section className="h-full overflow-y-auto bg-base px-8 py-10 text-white md:px-16 lg:px-28">
       <div className="mx-auto max-w-[860px]">
         <div className="flex items-end justify-between gap-5">
           <div>
@@ -203,11 +203,11 @@ export function InboxView() {
               className="stagger-item flex items-center gap-3 font-bold text-3xl"
               style={{ animationDelay: "0ms" }}
             >
-              <Icons.inbox className="size-7 text-[#9b88ff]" />
+              <Icons.inbox className="size-7 text-brand-glow" />
               Inbox
             </h2>
             <p
-              className="stagger-item mt-3 max-w-2xl text-[#b0a69a]"
+              className="stagger-item mt-3 max-w-2xl text-ink-3"
               style={{ animationDelay: "40ms" }}
             >
               Untriaged captures. File each into a space when you're ready — nothing forces you to
@@ -222,31 +222,31 @@ export function InboxView() {
               className={cn(
                 "flex h-8 items-center gap-1.5 rounded-[7px] border px-3 font-semibold text-xs transition-colors",
                 triageMode
-                  ? "border-[#907ce8] bg-[#2a2440] text-[#cfc7ff]"
-                  : "border-[#302c27] bg-[#211e1a] text-[#9f9588] hover:border-[#3a352e] hover:text-[#d8d2ca]",
-                inboxItems.length === 0 && "cursor-not-allowed opacity-50 hover:border-[#302c27]",
+                  ? "border-brand bg-brand-surface text-brand-soft"
+                  : "border-line-2 bg-surface text-ink-muted hover:border-line-strong hover:text-ink-2",
+                inboxItems.length === 0 && "cursor-not-allowed opacity-50 hover:border-line-2",
               )}
             >
               <Icons.keyboard className="size-3.5" />
               Triage
             </button>
-            <span className="rounded-[6px] border border-[#302c27] bg-[#211e1a] px-2.5 py-1 font-mono text-[#9f9588] text-xs">
+            <span className="rounded-[6px] border border-line-2 bg-surface px-2.5 py-1 font-mono text-ink-muted text-xs">
               {inboxItems.length} item{inboxItems.length === 1 ? "" : "s"}
             </span>
           </div>
         </div>
 
         {triageMode && inboxItems.length > 0 && (
-          <div className="mt-6 rounded-[10px] border border-[#3a3252] bg-[#1e1b2a] px-4 py-3">
+          <div className="mt-6 rounded-[10px] border border-line-max bg-brand-surface px-4 py-3">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-              <span className="font-semibold text-[#cfc7ff]">
+              <span className="font-semibold text-brand-soft">
                 Triage {safeActiveIndex + 1} / {inboxItems.length}
               </span>
-              <span className="text-[#9087b8]">J/K move</span>
-              <span className="text-[#9087b8]">1-9 file</span>
-              <span className="text-[#9087b8]">Enter open</span>
-              <span className="text-[#9087b8]">D delete</span>
-              <span className="text-[#9087b8]">Esc exit</span>
+              <span className="text-brand">J/K move</span>
+              <span className="text-brand">1-9 file</span>
+              <span className="text-brand">Enter open</span>
+              <span className="text-brand">D delete</span>
+              <span className="text-brand">Esc exit</span>
             </div>
             {sortedSpaces.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
@@ -260,9 +260,9 @@ export function InboxView() {
                       key={space.id}
                       type="button"
                       onClick={() => fileActiveItem(index)}
-                      className="flex h-7 items-center gap-1.5 rounded-[6px] border border-[#3a3252] bg-[#241f3a] px-2 text-[12px] font-medium text-[#cfc7ff] hover:bg-[#2d2750] hover:text-white"
+                      className="flex h-7 items-center gap-1.5 rounded-[6px] border border-line-max bg-brand-surface px-2 text-[12px] font-medium text-brand-soft hover:bg-p3 hover:text-white"
                     >
-                      <span className="font-mono text-[#9087b8]">{index + 1}</span>
+                      <span className="font-mono text-brand">{index + 1}</span>
                       <SpaceIcon className="size-3.5" />
                       {space.name}
                     </button>
@@ -275,19 +275,19 @@ export function InboxView() {
 
         {/* Bulk action bar */}
         {someSelected && (
-          <div className="mt-6 flex items-center gap-3 rounded-[10px] border border-[#3a3252] bg-[#1e1b2a] px-4 py-2.5">
+          <div className="mt-6 flex items-center gap-3 rounded-[10px] border border-line-max bg-brand-surface px-4 py-2.5">
             <Checkbox
               checked={allSelected}
               onCheckedChange={allSelected ? deselectAll : selectAll}
-              className="rounded-[4px] border-[#5a546d]"
+              className="rounded-[4px] border-ink-faint"
             />
-            <span className="font-medium text-[#cfc7ff] text-sm">
+            <span className="font-medium text-brand-soft text-sm">
               {selected.size} selected
             </span>
             <button
               type="button"
               onClick={allSelected ? deselectAll : selectAll}
-              className="text-[#9087b8] text-xs hover:text-[#cfc7ff]"
+              className="text-brand text-xs hover:text-brand-soft"
             >
               {allSelected ? "Deselect all" : "Select all"}
             </button>
@@ -296,8 +296,8 @@ export function InboxView() {
               <DropdownMenu>
                 <DropdownMenuTrigger
                   className={cn(
-                    "flex h-7 items-center gap-1.5 rounded-[6px] border border-[#3a3252] bg-[#241f3a] px-2.5 text-[12px] font-medium text-[#cfc7ff]",
-                    "hover:bg-[#2d2750] hover:text-white",
+                    "flex h-7 items-center gap-1.5 rounded-[6px] border border-line-max bg-brand-surface px-2.5 text-[12px] font-medium text-brand-soft",
+                    "hover:bg-p3 hover:text-white",
                   )}
                 >
                   <Icons.cornerDownRight className="size-3.5" />
@@ -306,7 +306,7 @@ export function InboxView() {
                 <DropdownMenuContent
                   align="end"
                   sideOffset={6}
-                  className="min-w-[180px] rounded-[10px] border-[#2e2b26] bg-[#1a1714] text-[#efe9df]"
+                  className="min-w-[180px] rounded-[10px] border-line-soft bg-panel text-ink"
                 >
                   {sortedSpaces.map((space) => {
                     const iconKey = (space.icon in SPACE_ICONS
@@ -317,7 +317,7 @@ export function InboxView() {
                       <DropdownMenuItem
                         key={space.id}
                         onClick={() => handleBulkFile(space.id, space.name)}
-                        className="cursor-pointer text-[#b0a99f] focus:bg-[#22201f] focus:text-white"
+                        className="cursor-pointer text-ink-3 focus:bg-fill focus:text-white"
                       >
                         <SpaceIcon className="mr-1.5 size-4" />
                         {space.name}
@@ -330,7 +330,7 @@ export function InboxView() {
               <button
                 type="button"
                 onClick={handleBulkDelete}
-                className="flex h-7 items-center gap-1.5 rounded-[6px] px-2.5 text-[12px] font-medium text-[#6b6258] hover:bg-[#2a2220] hover:text-[#e46f50]"
+                className="flex h-7 items-center gap-1.5 rounded-[6px] px-2.5 text-[12px] font-medium text-done hover:bg-line hover:text-coral"
               >
                 <Icons.trash className="size-3.5" />
                 Delete
@@ -340,7 +340,7 @@ export function InboxView() {
                 type="button"
                 onClick={deselectAll}
                 aria-label="Clear selection"
-                className="grid size-7 place-items-center rounded-[6px] text-[#5a5450] hover:bg-[#252220] hover:text-[#c8bfb2]"
+                className="grid size-7 place-items-center rounded-[6px] text-ink-ghost hover:bg-fill hover:text-ink-2"
               >
                 <Icons.x className="size-3.5" />
               </button>
@@ -351,18 +351,18 @@ export function InboxView() {
         <div className="mt-9 space-y-2.5">
           {inboxItems.length === 0 ? (
             <div
-              className="stagger-item flex flex-col items-center gap-3 rounded-[10px] border border-dashed border-[#34302b] px-6 py-16 text-center"
+              className="stagger-item flex flex-col items-center gap-3 rounded-[10px] border border-dashed border-raise px-6 py-16 text-center"
               style={{ animationDelay: "80ms" }}
             >
-              <Icons.inbox className="size-8 text-[#4c463e]" />
-              <p className="font-semibold text-[#c8bfb2]">Inbox zero</p>
-              <p className="max-w-sm text-[#82786e] text-sm">
+              <Icons.inbox className="size-8 text-line-max" />
+              <p className="font-semibold text-ink-2">Inbox zero</p>
+              <p className="max-w-sm text-ink-dim text-sm">
                 Captures with no chosen space land here. Dump a thought or task and triage it later.
               </p>
               <Button
                 type="button"
                 onClick={() => expandQuickCapture()}
-                className="mt-1 h-8 gap-1.5 rounded-[7px] bg-[#907ce8] px-3 font-semibold text-[#17131f] hover:bg-[#a08ef2]"
+                className="mt-1 h-8 gap-1.5 rounded-[7px] bg-brand px-3 font-semibold text-brand-ink hover:bg-brand-bright"
               >
                 <Icons.plus className="size-3.5" />
                 Quick capture
@@ -395,7 +395,7 @@ export function InboxView() {
                   <button
                     type="button"
                     onClick={selectAll}
-                    className="text-[#5a5450] text-xs hover:text-[#9087b8]"
+                    className="text-ink-ghost text-xs hover:text-brand"
                   >
                     Select all {inboxItems.length} item{inboxItems.length === 1 ? "" : "s"}
                   </button>
@@ -442,12 +442,12 @@ const InboxRow = forwardRef<HTMLDivElement, {
     <div
       ref={ref}
       className={cn(
-        "stagger-item group flex items-start gap-3 rounded-[10px] border bg-[#1b1815] px-4 py-3",
+        "stagger-item group flex items-start gap-3 rounded-[10px] border bg-panel px-4 py-3",
         "transition-[border-color,background-color,box-shadow] duration-150",
         selected
-          ? "border-[#3a3252] bg-[#1e1b2a]"
-          : "border-[#2a2621] hover:border-[#3a352e] hover:bg-[#201d19]",
-        active && "border-[#907ce8] bg-[#211d2d] shadow-[0_0_0_1px_rgba(144,124,232,0.35)]",
+          ? "border-line-max bg-brand-surface"
+          : "border-line hover:border-line-strong hover:bg-surface",
+        active && "border-brand bg-brand-surface shadow-[0_0_0_1px_rgba(144,124,232,0.35)]",
       )}
       style={{ animationDelay: `${80 + index * 30}ms` }}
     >
@@ -462,24 +462,24 @@ const InboxRow = forwardRef<HTMLDivElement, {
         <Checkbox
           checked={selected}
           onCheckedChange={onSelect}
-          className="rounded-[4px] border-[#5a546d]"
+          className="rounded-[4px] border-ink-faint"
         />
       </span>
 
       <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
         <div className="flex items-center gap-2">
-          <TypeIcon className="size-3.5 shrink-0 text-[#6b6258]" />
+          <TypeIcon className="size-3.5 shrink-0 text-done" />
           <span
             className={cn(
-              "truncate font-semibold text-[#f0ebe3]",
-              item.done && "text-[#756e65] line-through",
+              "truncate font-semibold text-ink",
+              item.done && "text-ink-faint line-through",
             )}
           >
             <LinkifiedText text={label} />
           </span>
         </div>
         {secondary && (
-          <p className="mt-1 line-clamp-1 pl-[22px] text-[#8d857b] text-sm">{secondary}</p>
+          <p className="mt-1 line-clamp-1 pl-[22px] text-ink-muted text-sm">{secondary}</p>
         )}
         <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-[22px]">
           <PriorityChip priority={item.priority} />
@@ -495,7 +495,7 @@ const InboxRow = forwardRef<HTMLDivElement, {
             type="button"
             onClick={(e) => { e.stopPropagation(); onToggleDone(); }}
             aria-label={item.done ? "Mark undone" : "Mark done"}
-            className="grid size-7 place-items-center rounded-[6px] text-[#6b6258] hover:bg-[#252220] hover:text-[#907ce8]"
+            className="grid size-7 place-items-center rounded-[6px] text-done hover:bg-fill hover:text-brand"
           >
             <Icons.check className="size-3.5" />
           </button>
@@ -503,8 +503,8 @@ const InboxRow = forwardRef<HTMLDivElement, {
         <DropdownMenu>
           <DropdownMenuTrigger
             className={cn(
-              "flex h-7 items-center gap-1.5 rounded-[6px] border border-[#3a3252] bg-[#241f3a] px-2.5 text-[12px] font-medium text-[#cfc7ff]",
-              "hover:bg-[#2d2750] hover:text-white",
+              "flex h-7 items-center gap-1.5 rounded-[6px] border border-line-max bg-brand-surface px-2.5 text-[12px] font-medium text-brand-soft",
+              "hover:bg-p3 hover:text-white",
             )}
           >
             <Icons.cornerDownRight className="size-3.5" />
@@ -513,7 +513,7 @@ const InboxRow = forwardRef<HTMLDivElement, {
           <DropdownMenuContent
             align="end"
             sideOffset={6}
-            className="min-w-[180px] rounded-[10px] border-[#2e2b26] bg-[#1a1714] text-[#efe9df]"
+            className="min-w-[180px] rounded-[10px] border-line-soft bg-panel text-ink"
           >
             {spaces.map((space) => {
               const iconKey = (space.icon in SPACE_ICONS
@@ -524,7 +524,7 @@ const InboxRow = forwardRef<HTMLDivElement, {
                 <DropdownMenuItem
                   key={space.id}
                   onClick={() => onFile(space.id, space.name)}
-                  className="cursor-pointer text-[#b0a99f] focus:bg-[#22201f] focus:text-white"
+                  className="cursor-pointer text-ink-3 focus:bg-fill focus:text-white"
                 >
                   <SpaceIcon className="mr-1.5 size-4" />
                   {space.name}
@@ -538,7 +538,7 @@ const InboxRow = forwardRef<HTMLDivElement, {
           type="button"
           onClick={onDelete}
           aria-label="Delete"
-          className="grid size-7 place-items-center rounded-[6px] text-[#6b6258] hover:bg-[#252220] hover:text-[#e46f50]"
+          className="grid size-7 place-items-center rounded-[6px] text-done hover:bg-fill hover:text-coral"
         >
           <Icons.trash className="size-3.5" />
         </button>

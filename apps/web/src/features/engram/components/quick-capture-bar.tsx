@@ -458,15 +458,15 @@ export function QuickCaptureBar() {
         onClick={expand}
         style={{ transition: `transform 160ms ${EASE_OUT}, background-color 160ms ${EASE_OUT}, border-color 160ms ${EASE_OUT}, color 160ms ${EASE_OUT}` }}
         className={cn(
-          "group flex items-center gap-2.5 rounded-full border border-[#2a2621] bg-[#181511]/85 px-4 py-2.5 backdrop-blur-md",
-          "text-sm text-[#8d857b] hover:border-[#3a3530] hover:bg-[#1f1c17] hover:text-[#c8bfb2]",
+          "group flex items-center gap-2.5 rounded-full border border-line bg-base/85 px-4 py-2.5 backdrop-blur-md",
+          "text-sm text-ink-muted hover:border-line-strong hover:bg-surface hover:text-ink-2",
           "shadow-lg shadow-black/40 transform-gpu",
           "active:scale-[0.97] motion-reduce:active:scale-100 motion-reduce:transition-none",
         )}
       >
-        <SparklesIcon className="size-4 text-[#9b88ff] group-hover:text-[#b3a4ff]" style={{ transition: `color 160ms ${EASE_OUT}` }} />
+        <SparklesIcon className="size-4 text-brand-glow group-hover:text-brand-soft" style={{ transition: `color 160ms ${EASE_OUT}` }} />
         <span>Quick capture</span>
-        <span className="ml-1 rounded-[5px] bg-[#2b2722] px-1.5 py-0.5 font-mono text-[10px] text-[#6b6460]">N</span>
+        <span className="ml-1 rounded-[5px] bg-line px-1.5 py-0.5 font-mono text-[10px] text-ink-faint">N</span>
       </button>
     );
   }
@@ -503,12 +503,12 @@ export function QuickCaptureBar() {
       <div
         data-highlight={highlight}
         className={cn("qcb-card",
-          "w-[560px] max-w-[calc(100vw-2rem)] rounded-[14px] border border-[#332e28] bg-[#1c1916]/95 backdrop-blur-xl",
+          "w-[560px] max-w-[calc(100vw-2rem)] rounded-[14px] border border-raise bg-clay/95 backdrop-blur-xl",
           "transform-gpu",
         )}
       >
         {/* ── Mode selector ── */}
-        <div className="flex items-center gap-1 border-b border-[#2a2621] px-2 pt-2">
+        <div className="flex items-center gap-1 border-b border-line px-2 pt-2">
           <ToggleGroup
             value={[mode]}
             onValueChange={(v: string[]) => { if (v[0]) setMode(v[0] as Mode); }}
@@ -521,8 +521,8 @@ export function QuickCaptureBar() {
                 style={{ transition: `background-color 150ms ${EASE_OUT}, color 150ms ${EASE_OUT}, transform 160ms ${EASE_OUT}` }}
                 className={cn(
                   "h-8 gap-1.5 rounded-[7px] px-3 text-[13px] font-medium transform-gpu",
-                  "text-[#7f776d] hover:bg-[#252220] hover:text-[#c8bfb2]",
-                  "data-[pressed=true]:bg-[#2a2621] data-[pressed=true]:text-white",
+                  "text-ink-dim hover:bg-fill hover:text-ink-2",
+                  "data-[pressed=true]:bg-line data-[pressed=true]:text-white",
                   "active:scale-[0.96] motion-reduce:active:scale-100",
                   mode === m && accent,
                 )}
@@ -536,7 +536,7 @@ export function QuickCaptureBar() {
             type="button"
             onClick={collapse}
             style={{ transition: `background-color 150ms ${EASE_OUT}, color 150ms ${EASE_OUT}, transform 160ms ${EASE_OUT}` }}
-            className="mb-2 ml-1 flex size-7 items-center justify-center rounded-[6px] text-[#6b6460] hover:bg-[#252220] hover:text-[#c8bfb2] active:scale-[0.92] transform-gpu motion-reduce:active:scale-100"
+            className="mb-2 ml-1 flex size-7 items-center justify-center rounded-[6px] text-ink-faint hover:bg-fill hover:text-ink-2 active:scale-[0.92] transform-gpu motion-reduce:active:scale-100"
           >
             <XIcon className="size-3.5" />
           </button>
@@ -588,7 +588,7 @@ export function QuickCaptureBar() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <ActiveIcon className={cn("size-4 shrink-0", activeAccent)} />
-                      <span className="text-[12px] font-medium text-[#a09889]">Notes</span>
+                      <span className="text-[12px] font-medium text-ink-muted">Notes</span>
                     </div>
                     <button
                       type="button"
@@ -596,8 +596,8 @@ export function QuickCaptureBar() {
                       title="Open full editor"
                       style={{ transition: `background-color 150ms ${EASE_OUT}, color 150ms ${EASE_OUT}, transform 160ms ${EASE_OUT}` }}
                       className={cn(
-                        "flex items-center gap-1 rounded-[5px] border border-[#2a2621] bg-[#181511] px-1.5 py-0.5",
-                        "text-[10px] text-[#7f776d] hover:bg-[#252220] hover:text-[#c8bfb2]",
+                        "flex items-center gap-1 rounded-[5px] border border-line bg-base px-1.5 py-0.5",
+                        "text-[10px] text-ink-dim hover:bg-fill hover:text-ink-2",
                         "transform-gpu active:scale-[0.94] motion-reduce:active:scale-100",
                       )}
                     >
@@ -626,9 +626,9 @@ export function QuickCaptureBar() {
                     placeholder="Markdown supported · ⌘+Enter to save"
                     style={{ minHeight: 80 }}
                     className={cn(
-                      "w-full resize-none rounded-[8px] border border-[#2a2621] bg-[#181511] px-3 py-2.5",
-                      "font-mono text-[13px] leading-6 text-[#d8d2ca] placeholder:text-[#4a4540]",
-                      "outline-none focus:border-[#3a3530]",
+                      "w-full resize-none rounded-[8px] border border-line bg-base px-3 py-2.5",
+                      "font-mono text-[13px] leading-6 text-ink-2 placeholder:text-line-max",
+                      "outline-none focus:border-line-strong",
                     )}
                   />
                 </div>
@@ -744,10 +744,10 @@ export function QuickCaptureBar() {
                         token.kind === "priority"
                           ? "border-amber-400/30 bg-amber-400/15 text-amber-300"
                           : token.kind === "tag"
-                            ? "border-[#1e3a45] bg-[#1e2a30] text-[#4aa5c8]"
+                            ? "border-p3 bg-brand-surface text-blue"
                             : token.kind === "someday"
                               ? "border-violet-400/30 bg-violet-400/15 text-violet-300"
-                              : "border-[#3a3530] bg-[#252220] text-[#c8bfb2]",
+                              : "border-line-strong bg-fill text-ink-2",
                       )}
                     >
                       {token.kind === "priority" ? "Priority " : token.kind === "tag" || token.kind === "someday" ? "" : "Due "}{token.label}
@@ -771,7 +771,7 @@ export function QuickCaptureBar() {
                       style={{ transition: `background-color 150ms ${EASE_OUT}, color 150ms ${EASE_OUT}, border-color 150ms ${EASE_OUT}, transform 200ms ${EASE_OUT}` }}
                       className={cn(
                         "flex items-center gap-1 rounded-[6px] border px-2 py-0.5 text-[11px] font-semibold transform-gpu",
-                        selected ? `${cfg.color} ${cfg.bg} scale-[1.04]` : "border-transparent text-[#5a5450] hover:text-[#c8bfb2]",
+                        selected ? `${cfg.color} ${cfg.bg} scale-[1.04]` : "border-transparent text-ink-ghost hover:text-ink-2",
                         "active:scale-[0.94] motion-reduce:active:scale-100 motion-reduce:scale-100",
                       )}
                     >
@@ -781,7 +781,7 @@ export function QuickCaptureBar() {
                   );
                 })}
 
-                <div className="mx-1 h-3.5 w-px bg-[#2a2621]" />
+                <div className="mx-1 h-3.5 w-px bg-line" />
 
                 <PopoverRoot open={calendarOpen} onOpenChange={setCalendarOpen}>
                   <PopoverTrigger
@@ -792,7 +792,7 @@ export function QuickCaptureBar() {
                         className={cn(
                           "flex items-center gap-1.5 rounded-[6px] border px-2 py-0.5 text-[11px] font-medium transform-gpu",
                           "active:scale-[0.95] motion-reduce:active:scale-100",
-                          effectiveDueDate ? "border-[#332e28] bg-[#252220] text-[#c8bfb2]" : "border-transparent text-[#5a5450] hover:text-[#c8bfb2]",
+                          effectiveDueDate ? "border-raise bg-fill text-ink-2" : "border-transparent text-ink-ghost hover:text-ink-2",
                         )}
                       />
                     }
@@ -820,8 +820,8 @@ export function QuickCaptureBar() {
                       }}
                       disabled={{ before: startOfDay(new Date()) }}
                     />
-                    <div className="border-[#252118] border-t px-3 py-2">
-                      <label className="flex items-center justify-between gap-3 text-[#8d857b] text-xs">
+                    <div className="border-surface border-t px-3 py-2">
+                      <label className="flex items-center justify-between gap-3 text-ink-muted text-xs">
                         <span>Time</span>
                         <input
                           type="time"
@@ -837,16 +837,16 @@ export function QuickCaptureBar() {
                             setDueDate(next);
                             setDueHasTime(true);
                           }}
-                          className="h-7 rounded-[5px] border border-[#302c27] bg-[#181511] px-2 font-mono text-[#f0ebe3] text-xs outline-none focus:border-[#4c463e]"
+                          className="h-7 rounded-[5px] border border-line-2 bg-base px-2 font-mono text-ink text-xs outline-none focus:border-line-max"
                         />
                       </label>
-                      <p className="mt-1.5 text-[#5c554d] text-[10px]">Indonesia time (WIB)</p>
+                      <p className="mt-1.5 text-ink-ghost text-[10px]">Indonesia time (WIB)</p>
                       <div className="mt-2 flex gap-2">
                         <button
                           type="button"
                           disabled={!effectiveDueDate || !effectiveDueHasTime}
                           onClick={() => setDueHasTime(false)}
-                          className="text-[#8d857b] text-xs hover:text-[#c8bfb2] disabled:text-[#3d3830]"
+                          className="text-ink-muted text-xs hover:text-ink-2 disabled:text-line-strong"
                         >
                           Clear time
                         </button>
@@ -857,7 +857,7 @@ export function QuickCaptureBar() {
                             setDueDate(null);
                             setDueHasTime(false);
                           }}
-                          className="text-[#8d857b] text-xs hover:text-[#c8bfb2] disabled:text-[#3d3830]"
+                          className="text-ink-muted text-xs hover:text-ink-2 disabled:text-line-strong"
                         >
                           Clear due
                         </button>
@@ -874,14 +874,14 @@ export function QuickCaptureBar() {
                       setDueHasTime(false);
                     }}
                     style={{ transition: `background-color 150ms ${EASE_OUT}, color 150ms ${EASE_OUT}, transform 160ms ${EASE_OUT}` }}
-                    className="flex size-5 items-center justify-center rounded-[4px] text-[#5a5450] hover:bg-[#252220] hover:text-[#c8bfb2] active:scale-[0.9] transform-gpu motion-reduce:active:scale-100"
+                    className="flex size-5 items-center justify-center rounded-[4px] text-ink-ghost hover:bg-fill hover:text-ink-2 active:scale-[0.9] transform-gpu motion-reduce:active:scale-100"
                   >
                     <XIcon className="size-2.5" />
                   </button>
                 )}
 
                 {allTasks.length > 1 && (
-                  <span className="ml-auto font-mono text-[10px] text-[#5c554d]">
+                  <span className="ml-auto font-mono text-[10px] text-ink-ghost">
                     1 main + {allTasks.length - 1} sub
                   </span>
                 )}
@@ -901,18 +901,18 @@ export function QuickCaptureBar() {
                   onChange={(e) => setText(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") commit(); else handleArrowTabNav(e, mode, setMode); }}
                   placeholder="Paste a URL…"
-                  className="h-10 rounded-[7px] border-0 bg-transparent px-1 text-[15px] text-white placeholder:text-[#6b6460] focus-visible:ring-0"
+                  className="h-10 rounded-[7px] border-0 bg-transparent px-1 text-[15px] text-white placeholder:text-ink-faint focus-visible:ring-0"
                 />
               </div>
               {isValidUrl(text.trim()) && (
-                <div className="qcb-extra ml-7 flex items-center gap-2.5 rounded-[8px] border border-[#2a2621] bg-[#181511] px-2.5 py-1.5" key={`link-${extractDomain(text)}`}>
+                <div className="qcb-extra ml-7 flex items-center gap-2.5 rounded-[8px] border border-line bg-base px-2.5 py-1.5" key={`link-${extractDomain(text)}`}>
                   <img
                     src={`https://www.google.com/s2/favicons?domain=${extractDomain(text)}&sz=32`}
                     alt=""
                     className="size-4 rounded-[3px]"
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                   />
-                  <span className="truncate text-xs text-[#a09889]">{extractDomain(text)}</span>
+                  <span className="truncate text-xs text-ink-muted">{extractDomain(text)}</span>
                 </div>
               )}
             </>
@@ -933,8 +933,8 @@ export function QuickCaptureBar() {
         </div>
 
         {/* ── Footer ── */}
-        <div className="flex items-center justify-between rounded-b-[14px] border-t border-[#2a2621] bg-[#181511]/40 px-3 py-2">
-          <span className="text-[11px] text-[#5a5450]">
+        <div className="flex items-center justify-between rounded-b-[14px] border-t border-line bg-base/40 px-3 py-2">
+          <span className="text-[11px] text-ink-ghost">
             {mode === "thought" && (thoughtNotesMode ? "⌘+Enter to save · Esc to close" : "Enter to add · Shift+Enter for notes")}
             {mode === "task"    && (keepCaptureOpen ? "⌘+Enter saves and keeps task open" : pendingTasks.length > 0 ? "Enter chains · ⌘+Enter saves all" : "Enter chains tasks · ⌘+Enter saves")}
             {mode === "link"    && (keepCaptureOpen ? "Enter saves and keeps link open" : "Enter to add · Esc to close")}
@@ -949,7 +949,7 @@ export function QuickCaptureBar() {
           />
 
           {(mode === "thought" || mode === "task" || mode === "link" || mode === "attach") && (
-            <label className="ml-auto mr-2 flex items-center gap-2 rounded-[6px] px-1.5 py-1 text-[11px] text-[#8d857b]">
+            <label className="ml-auto mr-2 flex items-center gap-2 rounded-[6px] px-1.5 py-1 text-[11px] text-ink-muted">
               <Checkbox
                 checked={keepCaptureOpen}
                 onCheckedChange={(checked) => setKeepCaptureOpen(checked === true)}
@@ -965,7 +965,7 @@ export function QuickCaptureBar() {
             onClick={commit}
             style={{ transition: `background-color 160ms ${EASE_OUT}, opacity 160ms ${EASE_OUT}, transform 160ms ${EASE_OUT}` }}
             className={cn(
-              "h-7 gap-1.5 rounded-[6px] bg-[#907ce8] px-3 font-semibold text-[#17131f] hover:bg-[#a08ef2] disabled:opacity-30 transform-gpu",
+              "h-7 gap-1.5 rounded-[6px] bg-brand px-3 font-semibold text-brand-ink hover:bg-brand-bright disabled:opacity-30 transform-gpu",
               "active:scale-[0.96] motion-reduce:active:scale-100",
             )}
           >
@@ -1017,13 +1017,13 @@ function CaptureTargetSelector({
       <DropdownMenuTrigger
         title="Where this capture lands"
         className={cn(
-          "flex h-7 max-w-[140px] items-center gap-1.5 rounded-[6px] border border-[#2f2a25] bg-[#181511] px-2",
-          "text-[11px] font-medium text-[#9a9088] hover:border-[#3a3530] hover:text-[#c8bfb2]",
+          "flex h-7 max-w-[140px] items-center gap-1.5 rounded-[6px] border border-line-soft bg-base px-2",
+          "text-[11px] font-medium text-ink-muted hover:border-line-strong hover:text-ink-2",
           "transition-colors duration-150",
           className,
         )}
       >
-        <TriggerIcon className="size-3.5 shrink-0 text-[#9b88ff]" />
+        <TriggerIcon className="size-3.5 shrink-0 text-brand-glow" />
         <span className="truncate">{triggerLabel}</span>
         <Icons.chevronRight className="size-3 shrink-0 rotate-90 opacity-60" />
       </DropdownMenuTrigger>
@@ -1031,7 +1031,7 @@ function CaptureTargetSelector({
         side="top"
         align="start"
         sideOffset={6}
-        className="min-w-[180px] rounded-[10px] border-[#2e2b26] bg-[#1a1714] text-[#efe9df]"
+        className="min-w-[180px] rounded-[10px] border-line-soft bg-panel text-ink"
       >
         {sortedSpaces.map((space) => {
           const iconKey = (space.icon in SPACE_ICONS ? space.icon : "sparkles") as SpaceIconKey;
@@ -1040,7 +1040,7 @@ function CaptureTargetSelector({
             <DropdownMenuItem
               key={space.id}
               onClick={() => onChange(space.id)}
-              className="cursor-pointer text-[#b0a99f] focus:bg-[#22201f] focus:text-white"
+              className="cursor-pointer text-ink-3 focus:bg-fill focus:text-white"
             >
               <SpaceIcon className="mr-1.5 size-4" />
               {space.name}
@@ -1067,14 +1067,14 @@ function ConnectionChips({
       {connections.map((conn) => (
         <span
           key={conn.id}
-          className="flex items-center gap-1 rounded-[5px] border border-[#3a3252] bg-[#241f3a] py-0.5 pr-1 pl-2 text-[11px] text-[#cfc7ff]"
+          className="flex items-center gap-1 rounded-[5px] border border-line-max bg-brand-surface py-0.5 pr-1 pl-2 text-[11px] text-brand-soft"
         >
-          <LinkIcon className="size-2.5 shrink-0 text-[#9b88ff]" />
+          <LinkIcon className="size-2.5 shrink-0 text-brand-glow" />
           <span className="max-w-[160px] truncate">{conn.label}</span>
           <button
             type="button"
             onClick={() => onRemove(conn.id)}
-            className="ml-0.5 flex size-4 items-center justify-center rounded-[3px] text-[#9087b8] hover:bg-[#322a52] hover:text-white"
+            className="ml-0.5 flex size-4 items-center justify-center rounded-[3px] text-brand hover:bg-p3 hover:text-white"
             aria-label={`Remove link to ${conn.label}`}
           >
             <XIcon className="size-2.5" />
@@ -1103,14 +1103,14 @@ function PendingTaskRow({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 rounded-[6px] border bg-[#181511] py-1.5",
-        isMain ? "border-amber-300/30 px-2.5" : "ml-5 border-[#2a2621] px-2 py-1",
+        "flex items-center gap-2 rounded-[6px] border bg-base py-1.5",
+        isMain ? "border-amber-300/30 px-2.5" : "ml-5 border-line px-2 py-1",
       )}
     >
       {isMain ? (
         <CheckSquareIcon className="size-3.5 shrink-0 text-amber-300/80" />
       ) : (
-        dragHandle ?? <span className="ml-0.5 size-1 shrink-0 rounded-full bg-[#5a5450]" />
+        dragHandle ?? <span className="ml-0.5 size-1 shrink-0 rounded-full bg-ink-ghost" />
       )}
       <input
         value={value}
@@ -1123,11 +1123,11 @@ function PendingTaskRow({
         }}
         className={cn(
           "min-w-0 flex-1 bg-transparent outline-none",
-          isMain ? "text-[13px] font-semibold text-[#efe9df]" : "text-[12px] text-[#a09889]",
+          isMain ? "text-[13px] font-semibold text-ink" : "text-[12px] text-ink-muted",
         )}
       />
       {isMain && (
-        <span className="rounded-[4px] bg-[#221f1b] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-[#7f6e3e]">
+        <span className="rounded-[4px] bg-surface px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-done">
           Main
         </span>
       )}
@@ -1135,7 +1135,7 @@ function PendingTaskRow({
         type="button"
         onClick={onRemove}
         style={{ transition: `background-color 150ms ${EASE_OUT}, color 150ms ${EASE_OUT}, transform 160ms ${EASE_OUT}` }}
-        className="flex size-5 items-center justify-center rounded-[4px] text-[#5a5450] hover:bg-[#252220] hover:text-[#c8bfb2] active:scale-[0.9] transform-gpu motion-reduce:active:scale-100"
+        className="flex size-5 items-center justify-center rounded-[4px] text-ink-ghost hover:bg-fill hover:text-ink-2 active:scale-[0.9] transform-gpu motion-reduce:active:scale-100"
       >
         <XIcon className="size-2.5" />
       </button>
@@ -1174,7 +1174,7 @@ function SortablePendingTaskRow({
             type="button"
             {...attributes}
             {...listeners}
-            className="grid size-4 shrink-0 cursor-grab place-items-center text-[#4c463e] hover:text-[#8d857b] active:cursor-grabbing"
+            className="grid size-4 shrink-0 cursor-grab place-items-center text-line-max hover:text-ink-muted active:cursor-grabbing"
             aria-label="Reorder subtask"
           >
             <GripIcon />
@@ -1218,23 +1218,23 @@ function AttachBody({
   if (file) {
     const isImage = file.type.startsWith("image/");
     return (
-      <div className="qcb-extra flex items-center gap-3 rounded-[8px] border border-[#2a2621] bg-[#181511] px-2.5 py-2" key={file.name}>
+      <div className="qcb-extra flex items-center gap-3 rounded-[8px] border border-line bg-base px-2.5 py-2" key={file.name}>
         {isImage && file.previewUrl ? (
           <img src={file.previewUrl} alt="" className="size-10 shrink-0 rounded-[6px] object-cover" />
         ) : (
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-[6px] bg-[#252220]">
-            <FileIcon className="size-5 text-[#6b6460]" />
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-[6px] bg-fill">
+            <FileIcon className="size-5 text-ink-faint" />
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-[#efe9df]">{file.name}</p>
-          <p className="text-xs text-[#5a5450]">{formatBytes(file.size)}</p>
+          <p className="truncate text-sm font-medium text-ink">{file.name}</p>
+          <p className="text-xs text-ink-ghost">{formatBytes(file.size)}</p>
         </div>
         <button
           type="button"
           onClick={onClear}
           style={{ transition: `background-color 150ms ${EASE_OUT}, color 150ms ${EASE_OUT}, transform 160ms ${EASE_OUT}` }}
-          className="flex size-7 items-center justify-center rounded-[5px] text-[#6b6460] hover:bg-[#252220] hover:text-[#c8bfb2] active:scale-[0.9] transform-gpu motion-reduce:active:scale-100"
+          className="flex size-7 items-center justify-center rounded-[5px] text-ink-faint hover:bg-fill hover:text-ink-2 active:scale-[0.9] transform-gpu motion-reduce:active:scale-100"
         >
           <XIcon className="size-3.5" />
         </button>
@@ -1256,19 +1256,19 @@ function AttachBody({
       style={{ transition: `background-color 200ms ${EASE_OUT}, border-color 200ms ${EASE_OUT}, transform 220ms ${EASE_OUT}` }}
       className={cn(
         "flex cursor-pointer items-center gap-3 rounded-[8px] border-2 border-dashed px-3 py-3 transform-gpu",
-        dragging ? "border-[#907ce8]/60 bg-[#907ce8]/5 scale-[1.01]" : "border-[#332e28] bg-[#181511] hover:border-[#4a4540] hover:bg-[#1e1c18]",
+        dragging ? "border-brand/60 bg-brand/5 scale-[1.01]" : "border-raise bg-base hover:border-line-max hover:bg-surface",
         "motion-reduce:scale-100",
       )}
     >
       <div
         style={{ transition: `background-color 200ms ${EASE_OUT}, color 200ms ${EASE_OUT}` }}
-        className={cn("flex size-9 shrink-0 items-center justify-center rounded-[6px]", dragging ? "bg-[#907ce8]/15" : "bg-[#252220]")}
+        className={cn("flex size-9 shrink-0 items-center justify-center rounded-[6px]", dragging ? "bg-brand/15" : "bg-fill")}
       >
-        <ImageIcon className={cn("size-4", dragging ? "text-[#907ce8]" : "text-[#6b6460]")} style={{ transition: `color 200ms ${EASE_OUT}` }} />
+        <ImageIcon className={cn("size-4", dragging ? "text-brand" : "text-ink-faint")} style={{ transition: `color 200ms ${EASE_OUT}` }} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-[#c8bfb2]">Drop an image or file</p>
-        <p className="text-xs text-[#5a5450]">or click to browse</p>
+        <p className="text-sm font-medium text-ink-2">Drop an image or file</p>
+        <p className="text-xs text-ink-ghost">or click to browse</p>
       </div>
       <input
         ref={fileInputRef}

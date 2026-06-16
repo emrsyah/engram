@@ -28,7 +28,7 @@ export function TopBar() {
 	} = useUIStore();
 
 	return (
-		<header className="relative flex h-14 shrink-0 items-center justify-between border-[#292622] border-b bg-[#171512] px-5">
+		<header className="relative flex h-14 shrink-0 items-center justify-between border-line border-b bg-base px-5">
 			<div className="flex min-w-0 items-center gap-3">
 				{sidebarCollapsed && (
 					<Button
@@ -37,19 +37,19 @@ export function TopBar() {
 						size="icon-xs"
 						onClick={toggleSidebar}
 						title="Open sidebar  ["
-						className="mr-1 text-[#706a62] hover:text-[#c8bfb2]"
+						className="mr-1 text-ink-faint hover:text-ink-2"
 					>
 						<Icons.chevronRight className="size-4" />
 					</Button>
 				)}
-				<Icons.layout className="size-4 text-[#8a8378]" />
+				<Icons.layout className="size-4 text-ink-muted" />
 				<h1 className="truncate font-bold text-white">
 					{ROUTE_TITLES[pathname] ?? activeSpace?.name ?? "Mind"}
 				</h1>
 			</div>
 
 			<div className="flex items-center gap-4">
-				<div className="hidden rounded-[8px] bg-[#23201d] p-1 lg:flex">
+				<div className="hidden rounded-[8px] bg-fill p-1 lg:flex">
 					{NAV_VIEWS.map(({ href, label, icon }) => {
 						const Icon = Icons[icon];
 						const active = pathname === href;
@@ -64,8 +64,8 @@ export function TopBar() {
 									}),
 									"h-8 gap-2 rounded-[6px] px-3 font-semibold",
 									active
-										? "bg-[#312d28] text-white shadow-sm"
-										: "text-[#948c82] hover:text-white",
+										? "bg-raise text-white shadow-sm"
+										: "text-ink-muted hover:text-white",
 								)}
 							>
 								<Icon className="size-4" />
@@ -79,13 +79,13 @@ export function TopBar() {
 					type="button"
 					variant="outline"
 					onClick={openSearch}
-					className="hidden h-10 w-[260px] justify-between rounded-[8px] border-[#342f2a] bg-[#211f1c] px-3 text-[#8d857a] text-sm xl:flex"
+					className="hidden h-10 w-[260px] justify-between rounded-[8px] border-raise bg-surface px-3 text-ink-muted text-sm xl:flex"
 				>
 					<span className="flex items-center gap-2">
 						<Icons.search className="size-4" />
 						Search
 					</span>
-					<span className="rounded-[5px] bg-[#34302b] px-2 py-0.5 font-mono text-xs">
+					<span className="rounded-[5px] bg-raise px-2 py-0.5 font-mono text-xs">
 						Cmd+K
 					</span>
 				</Button>
@@ -96,7 +96,7 @@ export function TopBar() {
 					size="icon-xs"
 					onClick={openShortcuts}
 					title="Keyboard shortcuts  ?"
-					className="hidden size-8 text-[#706a62] hover:text-[#c8bfb2] lg:grid"
+					className="hidden size-8 text-ink-faint hover:text-ink-2 lg:grid"
 				>
 					<Icons.keyboard className="size-4" />
 				</Button>
@@ -106,7 +106,7 @@ export function TopBar() {
 					onClick={() =>
 						expandQuickCapture(pathname === "/library" ? "thought" : "task")
 					}
-					className="h-10 rounded-[8px] bg-[#907ce8] px-4 font-bold text-[#17131f] transition-transform duration-100 hover:bg-[#a08ef2] active:scale-[0.97]"
+					className="h-10 rounded-[8px] bg-brand px-4 font-bold text-brand-ink transition-transform duration-100 hover:bg-brand-bright active:scale-[0.97]"
 				>
 					<Icons.plus className="size-4" />
 					Capture

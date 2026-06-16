@@ -19,10 +19,10 @@ function BacklinksRow({ item, onOpenLinked }: { item: Item; onOpenLinked: (linke
 
   return (
     <div
-      className="flex flex-wrap items-center gap-1.5 border-t border-[#252118] px-3 py-2"
+      className="flex flex-wrap items-center gap-1.5 border-t border-surface px-3 py-2"
       onClick={(e) => e.stopPropagation()}
     >
-      <Icons.link className="size-3 shrink-0 text-[#4c463e]" />
+      <Icons.link className="size-3 shrink-0 text-line-max" />
       {linked.map((target) => {
         const label = target.title?.trim() || target.text?.trim() || target.url || "Untitled";
         return (
@@ -30,7 +30,7 @@ function BacklinksRow({ item, onOpenLinked }: { item: Item; onOpenLinked: (linke
             key={target.id}
             type="button"
             onClick={() => onOpenLinked(target)}
-            className="max-w-[120px] truncate rounded-[4px] bg-[#211e1a] px-1.5 py-0.5 font-mono text-[10px] text-[#8d857b] hover:bg-[#2a2621] hover:text-[#c8bfb2] transition-colors duration-100"
+            className="max-w-[120px] truncate rounded-[4px] bg-surface px-1.5 py-0.5 font-mono text-[10px] text-ink-muted hover:bg-line hover:text-ink-2 transition-colors duration-100"
           >
             {label}
           </button>
@@ -55,8 +55,8 @@ function ItemCard({
   return (
     <div
       className={cn(
-        "break-inside-avoid w-full rounded-[10px] border bg-[#1b1815]",
-        "border-[#2a2621] hover:border-[#3a352e] transition-[border-color] duration-150",
+        "break-inside-avoid w-full rounded-[10px] border bg-panel",
+        "border-line hover:border-line-strong transition-[border-color] duration-150",
       )}
     >
       <button
@@ -108,12 +108,12 @@ function ItemGroup({
         className="mb-3 flex items-center gap-2 text-left"
       >
         {expanded ? (
-          <ChevronDown className="size-3.5 text-[#6b6560]" />
+          <ChevronDown className="size-3.5 text-ink-faint" />
         ) : (
-          <ChevronRight className="size-3.5 text-[#6b6560]" />
+          <ChevronRight className="size-3.5 text-ink-faint" />
         )}
-        <span className="font-semibold text-[#c8bfb2] text-sm">{label}</span>
-        <span className="rounded-[5px] bg-[#252220] px-1.5 py-0.5 font-mono text-[#82786e] text-[10px]">
+        <span className="font-semibold text-ink-2 text-sm">{label}</span>
+        <span className="rounded-[5px] bg-fill px-1.5 py-0.5 font-mono text-ink-dim text-[10px]">
           {items.length}
         </span>
       </button>
@@ -140,10 +140,10 @@ function ItemGroup({
 
 function EmptyState() {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-[12px] border border-dashed border-[#34302b] px-6 py-20 text-center">
-      <Icons.layout className="size-10 text-[#4c463e]" />
-      <p className="font-semibold text-[#c8bfb2]">No items yet</p>
-      <p className="max-w-sm text-[#82786e] text-sm">
+    <div className="flex flex-col items-center gap-3 rounded-[12px] border border-dashed border-raise px-6 py-20 text-center">
+      <Icons.layout className="size-10 text-line-max" />
+      <p className="font-semibold text-ink-2">No items yet</p>
+      <p className="max-w-sm text-ink-dim text-sm">
         Use quick capture to add thoughts, tasks, links, and more to this space.
       </p>
     </div>
@@ -172,7 +172,7 @@ function RecentMode() {
 
   return (
     <div>
-      <p className="mb-4 font-bold text-[#6b6258] text-[11px] uppercase tracking-widest">
+      <p className="mb-4 font-bold text-done text-[11px] uppercase tracking-widest">
         Recent — {sorted.length} item{sorted.length !== 1 ? "s" : ""}
       </p>
       <div className="columns-1 gap-3 sm:columns-2 lg:columns-3" style={{ columnGap: "12px" }}>
@@ -291,7 +291,7 @@ export function BoardView() {
         : "All items sorted by last update.";
 
   return (
-    <section className="h-full overflow-y-auto bg-[#151310] px-8 py-10 text-white md:px-16 lg:px-24">
+    <section className="h-full overflow-y-auto bg-base px-8 py-10 text-white md:px-16 lg:px-24">
       <div className="mx-auto max-w-[1100px]">
         {/* ── Header ── */}
         <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
@@ -300,11 +300,11 @@ export function BoardView() {
               className="stagger-item flex items-center gap-3 font-bold text-3xl"
               style={{ animationDelay: "0ms" }}
             >
-              <Icons.layout className="size-7 text-[#9b88ff]" />
+              <Icons.layout className="size-7 text-brand-glow" />
               {activeSpace?.name ?? "Space"}
             </h2>
             <p
-              className="stagger-item mt-3 max-w-2xl text-[#b0a69a]"
+              className="stagger-item mt-3 max-w-2xl text-ink-3"
               style={{ animationDelay: "40ms" }}
             >
               {subtitle}
@@ -313,22 +313,22 @@ export function BoardView() {
 
           {/* View toggle */}
           <Tabs value={groupBy} onValueChange={(v) => setGroupBy(v as GroupByMode)}>
-            <TabsList className="rounded-[8px] bg-[#23201d] p-1">
+            <TabsList className="rounded-[8px] bg-fill p-1">
               <TabsTrigger
                 value="recent"
-                className="h-8 rounded-[6px] px-3 text-[#948c82] data-active:bg-[#312d28] data-active:text-white"
+                className="h-8 rounded-[6px] px-3 text-ink-muted data-active:bg-raise data-active:text-white"
               >
                 Recent
               </TabsTrigger>
               <TabsTrigger
                 value="type"
-                className="h-8 rounded-[6px] px-3 text-[#948c82] data-active:bg-[#312d28] data-active:text-white"
+                className="h-8 rounded-[6px] px-3 text-ink-muted data-active:bg-raise data-active:text-white"
               >
                 By type
               </TabsTrigger>
               <TabsTrigger
                 value="tag"
-                className="h-8 rounded-[6px] px-3 text-[#948c82] data-active:bg-[#312d28] data-active:text-white"
+                className="h-8 rounded-[6px] px-3 text-ink-muted data-active:bg-raise data-active:text-white"
               >
                 By tag
               </TabsTrigger>

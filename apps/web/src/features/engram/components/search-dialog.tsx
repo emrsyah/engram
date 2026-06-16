@@ -21,19 +21,19 @@ import { useUIStore } from "../ui-store";
 import { Icons } from "./icons";
 
 const ACCENT_DOT: Record<Accent, string> = {
-  violet: "bg-[#907ce8]",
-  gold: "bg-[#d9a82f]",
-  teal: "bg-[#43b6a6]",
-  red: "bg-[#e46f50]",
-  blue: "bg-[#4aa5c8]",
+  violet: "bg-brand",
+  gold: "bg-honey",
+  teal: "bg-teal",
+  red: "bg-coral",
+  blue: "bg-blue",
 };
 
 const TYPE_BADGE: Record<ItemType, { label: string; color: string }> = {
-  thought: { label: "Thought", color: "bg-[#907ce8]/20 text-[#c4b5fd]" },
-  task: { label: "Task", color: "bg-[#d9a82f]/20 text-[#e5b83d]" },
-  link: { label: "Link", color: "bg-[#4aa5c8]/20 text-[#58b8d8]" },
-  image: { label: "Image", color: "bg-[#43b6a6]/20 text-[#7dd4c6]" },
-  file: { label: "File", color: "bg-[#8d857b]/20 text-[#b0a99f]" },
+  thought: { label: "Thought", color: "bg-brand/20 text-brand-soft" },
+  task: { label: "Task", color: "bg-honey/20 text-p2-ink" },
+  link: { label: "Link", color: "bg-blue/20 text-p3-ink" },
+  image: { label: "Image", color: "bg-teal/20 text-p3-ink" },
+  file: { label: "File", color: "bg-ink-muted/20 text-ink-3" },
 };
 
 export function SearchDialog() {
@@ -89,11 +89,11 @@ export function SearchDialog() {
                       router.push(href as Route<string>);
                     }}
                   >
-                    <span className="grid size-5 place-items-center rounded-[5px] bg-[#9b88ff]/15">
-                      <Icon className="size-3 text-[#9b88ff]" />
+                    <span className="grid size-5 place-items-center rounded-[5px] bg-brand-glow/15">
+                      <Icon className="size-3 text-brand-glow" />
                     </span>
-                    <span className="flex-1 min-w-0 font-semibold text-[#f0ebe3]">{label}</span>
-                    <span className="ml-auto shrink-0 rounded-[4px] bg-[#9b88ff]/10 px-1.5 py-0.5 font-mono text-[10px] text-[#9b88ff]">
+                    <span className="flex-1 min-w-0 font-semibold text-ink">{label}</span>
+                    <span className="ml-auto shrink-0 rounded-[4px] bg-brand-glow/10 px-1.5 py-0.5 font-mono text-[10px] text-brand-glow">
                       View
                     </span>
                   </CommandItem>
@@ -120,12 +120,12 @@ export function SearchDialog() {
                       router.push("/tasks" as Route<string>);
                     }}
                   >
-                    <span className="grid size-5 place-items-center rounded-[5px] bg-[#2e2b26]">
-                      <Icon className="size-3 text-[#b0a99f]" />
+                    <span className="grid size-5 place-items-center rounded-[5px] bg-line-soft">
+                      <Icon className="size-3 text-ink-3" />
                     </span>
-                    <span className="flex-1 min-w-0 font-semibold text-[#f0ebe3]">{space.name}</span>
+                    <span className="flex-1 min-w-0 font-semibold text-ink">{space.name}</span>
                     <span className={cn("ml-1.5 size-2 shrink-0 rounded-full", dotColor)} />
-                    <span className="ml-auto shrink-0 rounded-[4px] bg-[#2e2b26] px-1.5 py-0.5 font-mono text-[10px] text-[#8d857b]">
+                    <span className="ml-auto shrink-0 rounded-[4px] bg-line-soft px-1.5 py-0.5 font-mono text-[10px] text-ink-muted">
                       Group
                     </span>
                   </CommandItem>
@@ -156,9 +156,9 @@ export function SearchDialog() {
                   >
                     <span className={cn("mt-0.5 size-2 shrink-0 rounded-[2px]", ACCENT_DOT[item.accent])} />
                     <span className="flex-1 min-w-0">
-                      <span className="block truncate font-semibold text-[#f0ebe3]">{label}</span>
+                      <span className="block truncate font-semibold text-ink">{label}</span>
                       {detail ? (
-                        <span className="mt-0.5 block truncate text-[#8d857b] text-xs">{detail}</span>
+                        <span className="mt-0.5 block truncate text-ink-muted text-xs">{detail}</span>
                       ) : null}
                     </span>
                     <span className={cn("ml-auto shrink-0 self-start rounded-[4px] px-1.5 py-0.5 text-[10px] font-medium", badge.color)}>

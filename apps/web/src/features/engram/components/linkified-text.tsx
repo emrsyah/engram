@@ -40,17 +40,17 @@ function PreviewLink({ href, label }: { href: string; label: string }) {
           });
         }}
         onMouseLeave={() => setPosition(null)}
-        className="nodrag nopan cursor-pointer text-[#53b9a8] underline decoration-[#53b9a8]/35 underline-offset-2 hover:text-[#7bd4c6]"
+        className="nodrag nopan cursor-pointer text-teal underline decoration-teal/35 underline-offset-2 hover:text-p3-ink"
       >
         {label}
       </a>
       {position &&
         createPortal(
           <div
-            className="pointer-events-none fixed z-[9999] w-[300px] overflow-hidden rounded-[8px] border border-[#302c27] bg-[#181511] shadow-2xl shadow-black/50"
+            className="pointer-events-none fixed z-[9999] w-[300px] overflow-hidden rounded-[8px] border border-line-2 bg-base shadow-2xl shadow-black/50"
             style={{ left: position.x, top: position.y }}
           >
-            <div className="h-[150px] overflow-hidden border-[#252118] border-b bg-[#100e0c]">
+            <div className="h-[150px] overflow-hidden border-surface border-b bg-sunken">
               <iframe
                 src={href}
                 title={domain}
@@ -66,8 +66,8 @@ function PreviewLink({ href, label }: { href: string; label: string }) {
                 className="size-4 rounded-[3px]"
               />
               <div className="min-w-0">
-                <div className="truncate font-semibold text-[#efe9df] text-xs">{domain}</div>
-                <div className="truncate text-[#8d857b] text-[11px]">{href}</div>
+                <div className="truncate font-semibold text-ink text-xs">{domain}</div>
+                <div className="truncate text-ink-muted text-[11px]">{href}</div>
               </div>
             </div>
           </div>,

@@ -19,7 +19,7 @@ import { Icons } from "./icons";
 const SAMPLE_TEXT = "Follow up with design tomorrow 3pm #client !p2 ~Work";
 
 const SEGMENT_CLASS: Record<Segment["kind"], string> = {
-	plain: "text-[#f3eee7]",
+	plain: "text-ink",
 	priority: "rounded-[3px] bg-amber-400/15 text-amber-300",
 	tag: "rounded-[3px] bg-sky-400/15 text-sky-300",
 	date: "rounded-[3px] bg-emerald-400/15 text-emerald-300",
@@ -148,16 +148,16 @@ export function CapturePage() {
 	};
 
 	return (
-		<section className="h-full overflow-y-auto bg-[#151310] px-6 py-8 text-white md:px-12 lg:px-20">
+		<section className="h-full overflow-y-auto bg-base px-6 py-8 text-white md:px-12 lg:px-20">
 			<div className="mx-auto grid max-w-[1180px] gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
 				<div className="min-w-0">
 					<div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
 						<div>
 							<h2 className="flex items-center gap-3 font-bold text-3xl">
-								<Icons.sparkles className="size-7 text-[#9b88ff]" />
+								<Icons.sparkles className="size-7 text-brand-glow" />
 								Capture
 							</h2>
-							<p className="mt-3 max-w-2xl text-[#b0a69a]">
+							<p className="mt-3 max-w-2xl text-ink-3">
 								Write one task per line. Dates, tags, priority, and spaces are
 								detected as you type.
 							</p>
@@ -167,16 +167,16 @@ export function CapturePage() {
 							type="button"
 							disabled={parsedLines.length === 0}
 							onClick={saveAll}
-							className="h-10 gap-2 rounded-[8px] bg-[#907ce8] px-4 font-bold text-[#17131f] hover:bg-[#a08ef2] disabled:opacity-35"
+							className="h-10 gap-2 rounded-[8px] bg-brand px-4 font-bold text-brand-ink hover:bg-brand-bright disabled:opacity-35"
 						>
 							<Icons.plus className="size-4" />
 							Save {parsedLines.length > 0 ? parsedLines.length : ""}
 						</Button>
 					</div>
 
-					<div className="mt-8 overflow-hidden rounded-[12px] border border-[#2d2823] bg-[#1b1815] shadow-2xl shadow-black/20">
-						<div className="flex items-center justify-between border-[#29241f] border-b px-4 py-3">
-							<div className="flex items-center gap-2 text-[#8d857b] text-sm">
+					<div className="mt-8 overflow-hidden rounded-[12px] border border-line bg-panel shadow-2xl shadow-black/20">
+						<div className="flex items-center justify-between border-line border-b px-4 py-3">
+							<div className="flex items-center gap-2 text-ink-muted text-sm">
 								<Icons.square className="size-4 text-amber-300" />
 								Task sheet
 							</div>
@@ -186,7 +186,7 @@ export function CapturePage() {
 									setValue(SAMPLE_TEXT);
 									requestAnimationFrame(() => textareaRef.current?.focus());
 								}}
-								className="rounded-[6px] px-2 py-1 text-[#6f685f] text-xs hover:bg-[#24201c] hover:text-[#c8bfb2]"
+								className="rounded-[6px] px-2 py-1 text-ink-faint text-xs hover:bg-fill hover:text-ink-2"
 							>
 								Insert example
 							</button>
@@ -198,7 +198,7 @@ export function CapturePage() {
 								className="pointer-events-none absolute inset-0 whitespace-pre-wrap break-words px-6 py-5 font-mono text-[15px] leading-7"
 							>
 								{segments.length === 0 ? (
-									<span className="text-[#5f574f]">
+									<span className="text-ink-ghost">
 										Plan launch tomorrow #work !p2 ~Ops
 									</span>
 								) : (
@@ -246,8 +246,8 @@ export function CapturePage() {
 				</div>
 
 				<aside className="space-y-4">
-					<div className="rounded-[12px] border border-[#2d2823] bg-[#1b1815] p-4">
-						<div className="mb-3 flex items-center gap-2 font-semibold text-[#f0ebe3] text-sm">
+					<div className="rounded-[12px] border border-line bg-panel p-4">
+						<div className="mb-3 flex items-center gap-2 font-semibold text-ink text-sm">
 							<Icons.clock className="size-4 text-emerald-300" />
 							Current line
 						</div>
@@ -255,18 +255,18 @@ export function CapturePage() {
 						{activeLine ? (
 							<PreviewLine line={activeLine} />
 						) : (
-							<p className="text-[#7d746a] text-sm">
+							<p className="text-ink-dim text-sm">
 								Move the cursor onto a task line to inspect it.
 							</p>
 						)}
 					</div>
 
-					<div className="rounded-[12px] border border-[#2d2823] bg-[#1b1815] p-4">
+					<div className="rounded-[12px] border border-line bg-panel p-4">
 						<div className="mb-3 flex items-center justify-between">
-							<span className="font-semibold text-[#f0ebe3] text-sm">
+							<span className="font-semibold text-ink text-sm">
 								Batch preview
 							</span>
-							<span className="rounded-[5px] bg-[#25211d] px-2 py-0.5 font-mono text-[#82786e] text-xs">
+							<span className="rounded-[5px] bg-fill px-2 py-0.5 font-mono text-ink-dim text-xs">
 								{parsedLines.length}
 							</span>
 						</div>
@@ -276,7 +276,7 @@ export function CapturePage() {
 									<PreviewLine key={line.id} line={line} compact />
 								))
 							) : (
-								<p className="text-[#7d746a] text-sm">
+								<p className="text-ink-dim text-sm">
 									Detected tasks will appear here.
 								</p>
 							)}
@@ -308,13 +308,13 @@ function PreviewLine({
 	return (
 		<div
 			className={cn(
-				"rounded-[8px] border border-[#29241f] bg-[#161310]",
+				"rounded-[8px] border border-line bg-base",
 				compact ? "p-3" : "p-4",
 			)}
 		>
 			<div className="flex min-w-0 items-start gap-2">
 				<Icons.square className="mt-0.5 size-4 shrink-0 text-amber-300" />
-				<p className="min-w-0 flex-1 break-words font-semibold text-[#f0ebe3] text-sm">
+				<p className="min-w-0 flex-1 break-words font-semibold text-ink text-sm">
 					{line.title}
 				</p>
 			</div>
@@ -325,7 +325,7 @@ function PreviewLine({
 				{line.tags.map((tag) => (
 					<TagChip key={tag} tag={tag} />
 				))}
-				<span className="inline-flex h-6 items-center gap-1.5 rounded-[5px] bg-[#1b2927] px-2 font-semibold text-[#62c8b9] text-[11px]">
+				<span className="inline-flex h-6 items-center gap-1.5 rounded-[5px] bg-fill px-2 font-semibold text-p3-ink text-[11px]">
 					<SpaceIcon className="size-3.5" />
 					{line.space?.name ?? "Inbox"}
 				</span>

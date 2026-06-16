@@ -19,7 +19,7 @@ export function AppSidebar() {
 	return (
 		<aside
 			className={cn(
-				"hidden shrink-0 border-[#292622] border-r bg-[#0b0b0a] text-[#c7bfb4] md:flex md:flex-col",
+				"hidden shrink-0 border-line border-r bg-void text-ink-2 md:flex md:flex-col",
 				"overflow-hidden transition-[width] duration-200",
 				sidebarCollapsed ? "w-0 border-r-0" : "w-[220px]",
 			)}
@@ -37,7 +37,7 @@ export function AppSidebar() {
 				<Button
 					variant="ghost"
 					size="icon-xs"
-					className="text-[#706a62] hover:text-[#c8bfb2]"
+					className="text-ink-faint hover:text-ink-2"
 					onClick={toggleSidebar}
 					title="Toggle sidebar  ["
 				>
@@ -57,18 +57,18 @@ export function AppSidebar() {
 								buttonVariants({ variant: "ghost" }),
 								navItemClass,
 								active
-									? "bg-[#22201f] text-white"
-									: "text-[#b7afa5] hover:bg-[#171614] hover:text-white",
+									? "bg-fill text-white"
+									: "text-ink-3 hover:bg-panel hover:text-white",
 							)}
 						>
-							<Icon className={cn("size-4", active && "text-[#9b88ff]")} />
+							<Icon className={cn("size-4", active && "text-brand-glow")} />
 							{label}
 						</Link>
 					);
 				})}
 			</nav>
 
-			<div className="mt-auto flex items-center justify-between px-5 py-5 text-[#7f776d]">
+			<div className="mt-auto flex items-center justify-between px-5 py-5 text-ink-dim">
 				<Icons.search className="size-4" />
 				<Icons.settings className="size-4" />
 				<Icons.info className="size-4" />

@@ -12,7 +12,7 @@ export function DeleteToast({
   onUndo: () => void;
 }) {
   return (
-    <div className="flex w-[300px] items-center gap-3 rounded-[8px] border border-[#302c27] bg-[#1a1714] px-3.5 py-3 shadow-xl">
+    <div className="flex w-[300px] items-center gap-3 rounded-[8px] border border-line-2 bg-panel px-3.5 py-3 shadow-xl">
       {/* Circular countdown */}
       <svg
         width="22"
@@ -26,7 +26,7 @@ export function DeleteToast({
           cx={11}
           cy={11}
           fill="none"
-          stroke="#302c27"
+          stroke="var(--color-line-2)"
           strokeWidth={2.2}
         />
         <circle
@@ -34,7 +34,7 @@ export function DeleteToast({
           cx={11}
           cy={11}
           fill="none"
-          stroke="#d7b238"
+          stroke="var(--color-amber)"
           strokeWidth={2.2}
           strokeLinecap="round"
           strokeDasharray={CIRCUMFERENCE}
@@ -45,18 +45,18 @@ export function DeleteToast({
         />
       </svg>
 
-      <span className="flex-1 text-[#c8bfb2] text-sm">
-        <span className="text-[#6b6258]">Deleted </span>
+      <span className="flex-1 text-ink-2 text-sm">
+        <span className="text-done">Deleted </span>
         {label}
       </span>
 
       <button
         type="button"
         onClick={onUndo}
-        className="flex shrink-0 items-center gap-1.5 rounded-[5px] px-2.5 py-1 text-[#9b88ff] text-xs transition-colors hover:bg-[#272421]"
+        className="flex shrink-0 items-center gap-1.5 rounded-[5px] px-2.5 py-1 text-brand-glow text-xs transition-colors hover:bg-fill"
       >
         Undo
-        <kbd className="rounded bg-[#2b2722] px-1.5 py-0.5 font-mono text-[10px] text-[#6b6258]">
+        <kbd className="rounded bg-line px-1.5 py-0.5 font-mono text-[10px] text-done">
           ⌘Z
         </kbd>
       </button>

@@ -243,16 +243,16 @@ export function TasksView() {
 	};
 
 	return (
-		<section className="flex h-full bg-[#151310] text-white">
+		<section className="flex h-full bg-base text-white">
 			<div className="min-w-0 flex-1 overflow-y-auto px-5 py-7 lg:px-8">
 				<div className="mx-auto max-w-[1280px]">
 					<div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
 						<div>
 							<h2 className="flex items-center gap-3 font-bold text-3xl">
-								<Icons.square className="size-7 text-[#9b88ff]" />
+								<Icons.square className="size-7 text-brand-glow" />
 								Tasks
 							</h2>
-							<p className="mt-2 max-w-2xl text-[#a99f93] text-sm">
+							<p className="mt-2 max-w-2xl text-ink-muted text-sm">
 								Capture to Backlog, plan into This week, and keep Today small and ordered.
 							</p>
 						</div>
@@ -267,12 +267,12 @@ export function TasksView() {
 								tags={taskTags}
 							/>
 							<Tabs value={ui.layoutMode} onValueChange={(value) => dispatchUi({ type: "layout", layoutMode: value as LayoutMode })}>
-								<TabsList className="rounded-[8px] bg-[#23201d] p-1">
+								<TabsList className="rounded-[8px] bg-fill p-1">
 									{(["columns", "stacked"] as LayoutMode[]).map((mode) => (
 										<TabsTrigger
 											key={mode}
 											value={mode}
-											className="h-8 rounded-[6px] px-3 capitalize text-[#948c82] data-active:bg-[#312d28] data-active:text-white"
+											className="h-8 rounded-[6px] px-3 capitalize text-ink-muted data-active:bg-raise data-active:text-white"
 										>
 											{mode}
 										</TabsTrigger>
@@ -283,7 +283,7 @@ export function TasksView() {
 								type="button"
 								variant="ghost"
 								onClick={() => dispatchUi({ type: "doneOpen", open: !ui.doneOpen })}
-								className="h-9 rounded-[7px] border border-[#2a2621] bg-[#1b1815] px-3 text-[#b7afa5] hover:text-white"
+								className="h-9 rounded-[7px] border border-line bg-surface px-3 text-ink-3 hover:text-white"
 							>
 								<Icons.check className="size-4" />
 								Done
@@ -294,19 +294,19 @@ export function TasksView() {
 
 					{ui.filter.kind !== "all" ? (
 						<div className="mt-5 flex flex-wrap items-center gap-2 text-sm">
-							<span className="text-[#736c63]">Filtered by</span>
+							<span className="text-ink-dim">Filtered by</span>
 							<button
 								type="button"
 								onClick={() => dispatchUi({ type: "filter", filter: { kind: "all", value: "all" } })}
-								className="flex items-center gap-2 rounded-[999px] border border-[#2d2924] bg-[#201d19] px-3 py-1.5 font-semibold text-[#d7cec4] hover:border-[#3a3530]"
+								className="flex items-center gap-2 rounded-[999px] border border-line bg-surface px-3 py-1.5 font-semibold text-ink-2 hover:border-line-strong"
 							>
 								{activeFilterLabel}
-								<Icons.x className="size-3.5 text-[#82786e]" />
+								<Icons.x className="size-3.5 text-ink-dim" />
 							</button>
 						</div>
 					) : null}
 
-					<div className="mt-6 flex gap-2 rounded-[9px] border border-[#2a2621] bg-[#1b1815] p-2">
+					<div className="mt-6 flex gap-2 rounded-[9px] border border-line bg-surface p-2">
 						<Input
 							value={ui.newTask}
 							onChange={(event) => dispatchUi({ type: "newTask", newTask: event.target.value })}
@@ -314,12 +314,12 @@ export function TasksView() {
 								if (event.key === "Enter") addTask();
 							}}
 							placeholder="Add to Backlog..."
-							className="h-10 border-0 bg-transparent text-[#f0ebe3] placeholder:text-[#6b6460] focus-visible:ring-0"
+							className="h-10 border-0 bg-transparent text-ink-bright placeholder:text-ink-faint focus-visible:ring-0"
 						/>
 						<Button
 							type="button"
 							onClick={addTask}
-							className="h-10 rounded-[7px] bg-[#907ce8] px-4 font-bold text-[#17131f] hover:bg-[#a08ef2]"
+							className="h-10 rounded-[7px] bg-brand px-4 font-bold text-brand-ink hover:bg-brand-bright"
 						>
 							<Icons.plus className="size-4" />
 							Add
@@ -327,18 +327,18 @@ export function TasksView() {
 					</div>
 
 					{focusedTask ? (
-						<div className="mt-4 flex items-center gap-3 rounded-[9px] border border-[#4b4168] bg-[#201b2d] px-4 py-3">
-							<Icons.target className="size-5 shrink-0 text-[#c7bcff]" />
+						<div className="mt-4 flex items-center gap-3 rounded-[9px] border border-ink-ghost bg-brand-surface px-4 py-3">
+							<Icons.target className="size-5 shrink-0 text-brand-soft" />
 							<div className="min-w-0 flex-1">
-								<p className="text-[#8f84b8] text-xs font-bold uppercase tracking-[0.14em]">Focused task</p>
-								<p className="truncate font-bold text-[#f0ebe3]">{taskTitle(focusedTask)}</p>
+								<p className="text-ink-3 text-xs font-bold uppercase tracking-[0.14em]">Focused task</p>
+								<p className="truncate font-bold text-ink-bright">{taskTitle(focusedTask)}</p>
 							</div>
 							<Button
 								type="button"
 								variant="ghost"
 								size="sm"
 								onClick={() => dispatchUi({ type: "focusTask", taskId: undefined })}
-								className="h-8 rounded-[6px] px-3 text-[#a69acb] hover:text-white"
+								className="h-8 rounded-[6px] px-3 text-ink-3 hover:text-white"
 							>
 								Clear
 							</Button>
@@ -354,7 +354,7 @@ export function TasksView() {
 									: "grid grid-cols-1",
 							)}
 						>
-							{SECTIONS.map((section) => (
+							{(ui.layoutMode === "stacked" ? SECTIONS.toReversed() : SECTIONS).map((section) => (
 								<TaskSection
 									key={section.id}
 									section={section}
@@ -416,29 +416,29 @@ function TaskFilterMenu({
 					<Button
 						type="button"
 						variant="ghost"
-						className="h-9 rounded-[7px] border border-[#2a2621] bg-[#1b1815] px-3 text-[#d7cec4] hover:text-white"
+						className="h-9 rounded-[7px] border border-line bg-surface px-3 text-ink-2 hover:text-white"
 					/>
 				}
 			>
-				<Icons.search className="size-4 text-[#907ce8]" />
+				<Icons.search className="size-4 text-brand" />
 				<span className="max-w-[160px] truncate">{label}</span>
-				<Icons.chevronRight className="size-4 rotate-90 text-[#736c63]" />
+				<Icons.chevronRight className="size-4 rotate-90 text-ink-dim" />
 			</DropdownMenuTrigger>
 			<DropdownMenuContent
 				align="end"
-				className="w-[280px] border border-[#302c27] bg-[#181613] p-1 text-[#d7cec4]"
+				className="w-[280px] border border-line-2 bg-panel p-1 text-ink-2"
 			>
 				<DropdownMenuItem
 					onClick={() => onFilter({ kind: "all", value: "all" })}
-					className={cn("justify-between", filter.kind === "all" && "bg-[#25211d] text-white")}
+					className={cn("justify-between", filter.kind === "all" && "bg-fill text-white")}
 				>
 					<span className="flex items-center gap-2">
-						<Icons.square className="size-4 text-[#907ce8]" />
+						<Icons.square className="size-4 text-brand" />
 						All tasks
 					</span>
 					<CountBadge count={tasks.length} />
 				</DropdownMenuItem>
-				<DropdownMenuSeparator className="my-1 bg-[#2a2621]" />
+				<DropdownMenuSeparator className="my-1 bg-line" />
 				<DropdownLabel>Groups</DropdownLabel>
 				{spaces.map((space) => (
 					<DropdownMenuItem
@@ -446,17 +446,17 @@ function TaskFilterMenu({
 						onClick={() => onFilter({ kind: "group", value: space.id })}
 						className={cn(
 							"justify-between",
-							filter.kind === "group" && filter.value === space.id && "bg-[#25211d] text-white",
+							filter.kind === "group" && filter.value === space.id && "bg-fill text-white",
 						)}
 					>
 						<span className="truncate">{space.name}</span>
 						<CountBadge count={tasks.filter((task) => task.spaceId === space.id).length} />
 					</DropdownMenuItem>
 				))}
-				<DropdownMenuSeparator className="my-1 bg-[#2a2621]" />
+				<DropdownMenuSeparator className="my-1 bg-line" />
 				<DropdownLabel>Tags</DropdownLabel>
 				{tags.length === 0 ? (
-					<div className="px-2 py-2 text-[#5f574f] text-xs">No task tags yet</div>
+					<div className="px-2 py-2 text-ink-ghost text-xs">No task tags yet</div>
 				) : (
 					tags.map((tag) => (
 						<DropdownMenuItem
@@ -464,7 +464,7 @@ function TaskFilterMenu({
 							onClick={() => onFilter({ kind: "tag", value: tag })}
 							className={cn(
 								"justify-between",
-								filter.kind === "tag" && filter.value === tag && "bg-[#25211d] text-white",
+								filter.kind === "tag" && filter.value === tag && "bg-fill text-white",
 							)}
 						>
 							<span className="truncate">#{tag}</span>
@@ -504,15 +504,15 @@ function TaskSection({
 		<section
 			ref={setNodeRef}
 			className={cn(
-				"flex max-h-[calc(100vh-330px)] min-h-[300px] flex-col overflow-hidden rounded-[9px] border bg-[#151412]",
-				isOver ? "border-[#907ce8] bg-[#191620]" : "border-[#26221e]",
+				"flex max-h-[calc(100vh-330px)] min-h-[300px] flex-col overflow-hidden rounded-[9px] border bg-base",
+				isOver ? "border-brand bg-brand-surface" : "border-fill",
 			)}
 		>
-			<header className="shrink-0 border-[#26221e] border-b px-4 py-3">
+			<header className="shrink-0 border-fill border-b px-4 py-3">
 				<div className="flex items-center justify-between gap-3">
 					<div className="min-w-0">
-						<h3 className="truncate font-bold text-[#efe9df] text-lg">{section.label}</h3>
-						<p className="mt-0.5 truncate text-[#70685f] text-xs">{section.hint}</p>
+						<h3 className="truncate font-bold text-ink text-lg">{section.label}</h3>
+						<p className="mt-0.5 truncate text-ink-faint text-xs">{section.hint}</p>
 					</div>
 					<div className="flex items-center gap-2">
 						{onOpenBlitz ? (
@@ -520,7 +520,7 @@ function TaskSection({
 								type="button"
 								size="sm"
 								onClick={onOpenBlitz}
-								className="h-8 rounded-[7px] bg-[#907ce8] px-3 font-bold text-[#17131f] hover:bg-[#a08ef2]"
+								className="h-8 rounded-[7px] bg-brand px-3 font-bold text-brand-ink hover:bg-brand-bright"
 							>
 								<Icons.target className="size-4" />
 								Blitz
@@ -533,7 +533,7 @@ function TaskSection({
 			<SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
 				<div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
 					{tasks.length === 0 ? (
-						<div className="rounded-[7px] border border-dashed border-[#302c27] px-3 py-8 text-center text-[#5f574f] text-sm">
+						<div className="rounded-[7px] border border-dashed border-line-2 px-3 py-8 text-center text-ink-ghost text-sm">
 							Drop tasks here
 						</div>
 					) : (
@@ -572,16 +572,16 @@ function DoneArchive({
 	onOpenChange: (open: boolean) => void;
 }) {
 	return (
-		<section className="mt-6 rounded-[9px] border border-[#211e1b] bg-[#11100f] opacity-75">
-			<header className="flex items-center justify-between border-[#211e1b] border-b px-4 py-2.5">
+		<section className="mt-6 rounded-[9px] border border-surface bg-void opacity-75">
+			<header className="flex items-center justify-between border-surface border-b px-4 py-2.5">
 				<div>
-					<h3 className="font-bold text-[#8f877d]">Done</h3>
-					<p className="text-[#5f574f] text-xs">Completed tasks stay out of the planning lanes.</p>
+					<h3 className="font-bold text-ink-dim">Done</h3>
+					<p className="text-ink-ghost text-xs">Completed tasks stay out of the planning lanes.</p>
 				</div>
 				<button
 					type="button"
 					onClick={() => onOpenChange(!open)}
-					className="flex items-center gap-2 rounded-[7px] bg-[#201d19] px-2.5 py-1.5 font-semibold text-[#8f877d] text-xs hover:text-[#d7cec4]"
+					className="flex items-center gap-2 rounded-[7px] bg-surface px-2.5 py-1.5 font-semibold text-ink-dim text-xs hover:text-ink-2"
 				>
 					{open ? "Close" : "Open"}
 					<CountBadge count={tasks.length} />
@@ -591,7 +591,7 @@ function DoneArchive({
 				{sortTasks(tasks).map((task) => (
 					<div
 						key={task.id}
-						className="flex items-start gap-2.5 rounded-[7px] border border-[#24211e] bg-[#191714] px-3 py-2"
+						className="flex items-start gap-2.5 rounded-[7px] border border-fill bg-surface px-3 py-2"
 					>
 						<Checkbox
 							checked={task.done}
@@ -602,11 +602,11 @@ function DoneArchive({
 							<button
 								type="button"
 								onClick={() => onOpen(task.id)}
-								className="block max-w-full truncate text-left font-semibold text-[#746d66] text-sm line-through hover:text-[#9f968d]"
+								className="block max-w-full truncate text-left font-semibold text-ink-faint text-sm line-through hover:text-ink-muted"
 							>
 								{taskTitle(task)}
 							</button>
-							<p className="mt-1 truncate text-[#5d554e] text-[10px]">
+							<p className="mt-1 truncate text-ink-ghost text-[10px]">
 								{spaceName(spaces, task.spaceId)}
 							</p>
 						</div>
@@ -619,14 +619,14 @@ function DoneArchive({
 
 function CountBadge({ count }: { count: number }) {
 	return (
-		<span className="rounded-[5px] bg-[#252220] px-1.5 py-0.5 font-mono text-[#82786e] text-[11px]">
+		<span className="rounded-[5px] bg-fill px-1.5 py-0.5 font-mono text-ink-dim text-[11px]">
 			{count}
 		</span>
 	);
 }
 
 function DropdownLabel({ children }: { children: React.ReactNode }) {
-	return <div className="px-2 py-2 text-[#736c63] text-xs">{children}</div>;
+	return <div className="px-2 py-2 text-ink-dim text-xs">{children}</div>;
 }
 
 function BlitzDialog({
@@ -673,15 +673,15 @@ function BlitzDialog({
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent
 				showCloseButton={false}
-				className="inset-0 top-0 left-0 max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 bg-[#07070a] p-0 text-white ring-0 sm:max-w-none"
+				className="inset-0 top-0 left-0 max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 bg-void p-0 text-white ring-0 sm:max-w-none"
 			>
 				<DialogTitle className="sr-only">Blitz focus</DialogTitle>
 				<div className="relative flex min-h-screen flex-col px-7 py-6">
 					<div className="pointer-events-none absolute inset-0 opacity-45 [background:radial-gradient(circle_at_22%_10%,rgba(144,124,232,0.12),transparent_24%),radial-gradient(circle_at_78%_20%,rgba(74,165,200,0.08),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_42%)]" />
 					<header className="relative z-10 flex items-center justify-between">
-						<div className="font-mono text-xs uppercase tracking-[0.28em] text-[#8d7cff]">
+						<div className="font-mono text-xs uppercase tracking-[0.28em] text-brand">
 							Blitz{" "}
-							<span className="ml-2 text-[#6d6878]">
+							<span className="ml-2 text-ink-dim">
 								{Math.min(activeIndex + 1, tasks.length || 1)} of {tasks.length || 1}
 							</span>
 						</div>
@@ -689,30 +689,30 @@ function BlitzDialog({
 							type="button"
 							variant="ghost"
 							onClick={() => onOpenChange(false)}
-							className="h-9 rounded-[8px] border border-white/10 bg-white/[0.03] px-3 text-[#b9b4c6] hover:text-white"
+							className="h-9 rounded-[8px] border border-white/10 bg-white/[0.03] px-3 text-ink-3 hover:text-white"
 						>
 							Exit
-							<span className="rounded-[5px] border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-[#8c8795]">
+							<span className="rounded-[5px] border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-ink-dim">
 								ESC
 							</span>
 						</Button>
 					</header>
 					<main className="relative z-10 mx-auto flex w-full max-w-[760px] flex-1 flex-col items-center justify-center py-10 text-center">
-						<div className="mb-8 rounded-[999px] bg-[#19233a] px-4 py-1.5 font-semibold text-[#6da8ff] text-sm">
-							<span className="mr-2 inline-block size-2 rounded-full bg-[#6da8ff]" />
+						<div className="mb-8 rounded-[999px] bg-brand-surface px-4 py-1.5 font-semibold text-blue text-sm">
+							<span className="mr-2 inline-block size-2 rounded-full bg-blue" />
 							Work
 						</div>
-						<h2 className="max-w-[780px] text-balance font-bold text-4xl text-[#f4f1f7] tracking-normal">
+						<h2 className="max-w-[780px] text-balance font-bold text-4xl text-ink-bright tracking-normal">
 							{activeTask ? taskTitle(activeTask) : "Pick a task for today"}
 						</h2>
-						<div className="mt-12 font-mono text-7xl text-[#f6f3fb] tracking-normal">
+						<div className="mt-12 font-mono text-7xl text-ink-bright tracking-normal">
 							{formatBlitzSeconds(secondsLeft)}
 						</div>
 						<div className="mt-10 w-full max-w-[380px]">
 							<div className="h-1 overflow-hidden rounded-full bg-white/10">
-								<div className="h-full bg-[#8a78f0]" style={{ width: `${progress * 100}%` }} />
+								<div className="h-full bg-brand" style={{ width: `${progress * 100}%` }} />
 							</div>
-							<div className="mt-2 flex justify-between font-mono text-[#6f6a78] text-xs">
+							<div className="mt-2 flex justify-between font-mono text-ink-dim text-xs">
 								<span>{formatBlitzSeconds(elapsed)} elapsed</span>
 								<span>45:00 planned</span>
 							</div>
@@ -724,35 +724,35 @@ function BlitzDialog({
 									setSecondsLeft(45 * 60);
 									setRunning(false);
 								}}
-								className="grid size-12 place-items-center rounded-full border border-white/15 bg-white/[0.04] text-[#a8a1b7]"
+								className="grid size-12 place-items-center rounded-full border border-white/15 bg-white/[0.04] text-ink-3"
 							>
 								<Icons.rotate className="size-5" />
 							</button>
 							<button
 								type="button"
 								onClick={() => setRunning((value) => !value)}
-								className="grid size-[72px] place-items-center rounded-full bg-[#8875ee] text-white shadow-[0_0_32px_rgba(136,117,238,0.45)]"
+								className="grid size-[72px] place-items-center rounded-full bg-brand text-white shadow-[0_0_32px_rgba(136,117,238,0.45)]"
 							>
 								{running ? <PauseGlyph /> : <PlayGlyph />}
 							</button>
 							<button
 								type="button"
 								onClick={complete}
-								className="grid size-12 place-items-center rounded-full border border-[#1e7f65] bg-[#06251f] text-[#45d0a5]"
+								className="grid size-12 place-items-center rounded-full border border-p3 bg-brand-ink text-teal"
 							>
 								<Icons.check className="size-5" />
 							</button>
 						</div>
 						<div className="mt-20 w-full max-w-[700px] text-left">
-							<p className="mb-3 font-bold text-[#777281] text-xs uppercase tracking-[0.14em]">Up next</p>
+							<p className="mb-3 font-bold text-ink-dim text-xs uppercase tracking-[0.14em]">Up next</p>
 							<div className="space-y-2">
 								{tasks.slice(activeIndex + 1, activeIndex + 4).map((task, index) => (
 									<div
 										key={task.id}
-										className="flex items-center gap-3 rounded-[8px] border border-white/10 bg-white/[0.03] px-4 py-3 text-[#aaa4b4]"
+										className="flex items-center gap-3 rounded-[8px] border border-white/10 bg-white/[0.03] px-4 py-3 text-ink-3"
 									>
-										<span className="font-mono text-[#6f6a78] text-xs">{activeIndex + index + 2}</span>
-										<span className="size-2 rounded-full bg-[#6da8ff]" />
+										<span className="font-mono text-ink-dim text-xs">{activeIndex + index + 2}</span>
+										<span className="size-2 rounded-full bg-blue" />
 										<span className="min-w-0 flex-1 truncate text-sm">{taskTitle(task)}</span>
 									</div>
 								))}
@@ -807,9 +807,9 @@ function SortableTaskCard({
 			{...attributes}
 			{...listeners}
 			className={cn(
-				"cursor-grab rounded-[7px] border border-[#2a2621] bg-[#201d19] px-3 py-2.5 text-left shadow-sm",
-				"transition-colors hover:border-[#3a3530] hover:bg-[#25211d] active:cursor-grabbing",
-				focused && "border-[#907ce8] bg-[#241f33]",
+				"cursor-grab rounded-[7px] border border-line bg-surface px-3 py-2.5 text-left shadow-sm",
+				"transition-colors hover:border-line-strong hover:bg-fill active:cursor-grabbing",
+				focused && "border-brand bg-brand-surface",
 				isDragging && "opacity-60",
 				task.done && "cursor-default opacity-70",
 			)}
@@ -831,20 +831,20 @@ function SortableTaskCard({
 							onOpen();
 						}}
 						className={cn(
-							"block max-w-full truncate text-left font-semibold text-[#f0ebe3] text-sm hover:text-white",
-							task.done && "text-[#655e56] line-through",
+							"block max-w-full truncate text-left font-semibold text-ink-bright text-sm hover:text-white",
+							task.done && "text-done line-through",
 						)}
 					>
 						{taskTitle(task)}
 					</button>
 					<div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-						<span className="rounded-[5px] bg-[#2a2621] px-1.5 py-0.5 text-[#82786e] text-[10px]">
+						<span className="rounded-[5px] bg-line px-1.5 py-0.5 text-ink-dim text-[10px]">
 							{groupName}
 						</span>
 						<PriorityChip priority={task.priority} />
 						<DueChip dueAt={task.dueAt} />
 						{task.tags?.slice(0, 2).map((tag) => (
-							<span key={tag} className="rounded-[5px] bg-[#242036] px-1.5 py-0.5 text-[#c7bcff] text-[10px]">
+							<span key={tag} className="rounded-[5px] bg-brand-surface px-1.5 py-0.5 text-brand-soft text-[10px]">
 								#{tag}
 							</span>
 						))}
@@ -865,8 +865,8 @@ function SortableTaskCard({
 							className={cn(
 								"rounded-[5px] px-2 py-0.5 font-semibold text-[10px]",
 								taskQueueOf(task) === queue
-									? "bg-[#907ce8] text-[#17131f]"
-									: "bg-[#2a2621] text-[#82786e] hover:text-[#d8d0c5]",
+									? "bg-brand text-brand-ink"
+									: "bg-line text-ink-dim hover:text-ink-2",
 							)}
 						>
 							{sectionLabel(queue)}
@@ -878,8 +878,8 @@ function SortableTaskCard({
 						className={cn(
 							"ml-auto rounded-[5px] px-2 py-0.5 font-semibold text-[10px]",
 							focused
-								? "bg-[#c7bcff] text-[#17131f]"
-								: "bg-[#2b2540] text-[#c7bcff] hover:text-white",
+								? "bg-brand-soft text-brand-ink"
+								: "bg-brand-surface text-brand-soft hover:text-white",
 						)}
 					>
 						Focus

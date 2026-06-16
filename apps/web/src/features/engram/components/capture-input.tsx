@@ -28,11 +28,11 @@ const SEGMENT_CLASS: Record<Segment["kind"], string> = {
 };
 
 const TYPE_DOT: Record<ItemType, string> = {
-  thought: "bg-[#907ce8]",
-  task: "bg-[#d9a82f]",
-  link: "bg-[#4aa5c8]",
-  image: "bg-[#43b6a6]",
-  file: "bg-[#8d857b]",
+  thought: "bg-brand",
+  task: "bg-honey",
+  link: "bg-blue",
+  image: "bg-teal",
+  file: "bg-ink-muted",
 };
 
 const FIELD_TYPE = "px-1 py-2 text-[15px] leading-6";
@@ -307,15 +307,15 @@ export function CaptureInput({
         placeholder={placeholder}
         className={cn(
           "relative w-full bg-transparent text-transparent caret-white outline-none",
-          "placeholder:text-[#6b6460]",
+          "placeholder:text-ink-faint",
           FIELD_TYPE,
         )}
       />
 
       {/* Popup dropdown */}
       {dropdownOpen && (
-        <div className="absolute bottom-full left-0 z-[200] mb-1.5 w-[clamp(240px,100%,340px)] overflow-hidden rounded-[10px] border border-[#332e28] bg-[#1e1b17] py-1 shadow-xl shadow-black/50">
-          <p className="px-2.5 pt-1 pb-1.5 font-mono text-[10px] uppercase tracking-widest text-[#6b6460]">
+        <div className="absolute bottom-full left-0 z-[200] mb-1.5 w-[clamp(240px,100%,340px)] overflow-hidden rounded-[10px] border border-raise bg-clay py-1 shadow-xl shadow-black/50">
+          <p className="px-2.5 pt-1 pb-1.5 font-mono text-[10px] uppercase tracking-widest text-ink-faint">
             {popupTitle}
           </p>
 
@@ -327,14 +327,14 @@ export function CaptureInput({
               onMouseEnter={() => setActiveIndex(i)}
               className={cn(
                 "flex w-full items-center gap-2.5 px-2.5 py-2 text-left",
-                i === activeIndex ? "bg-[#2a2621]" : "hover:bg-[#252220]",
+                i === activeIndex ? "bg-line" : "hover:bg-fill",
               )}
             >
               <span className={cn("grid size-6 shrink-0 place-items-center rounded-[5px] font-bold text-[11px]", item.bg, item.color)}>
                 {item.label}
               </span>
               <span className={cn("flex-1 text-[13px] font-medium", item.color)}>{item.sublabel}</span>
-              <span className="font-mono text-[10px] text-[#6b6460]">{item.shorthand}</span>
+              <span className="font-mono text-[10px] text-ink-faint">{item.shorthand}</span>
             </button>
           ))}
 
@@ -348,13 +348,13 @@ export function CaptureInput({
                 onMouseEnter={() => setActiveIndex(i)}
                 className={cn(
                   "flex w-full items-center gap-2.5 px-2.5 py-2 text-left",
-                  i === activeIndex ? "bg-[#2a2621] text-[#f0ebe3]" : "text-[#c8bfb2] hover:bg-[#252220]",
+                  i === activeIndex ? "bg-line text-ink" : "text-ink-2 hover:bg-fill",
                 )}
               >
-                <Icon className="size-3.5 shrink-0 text-[#6b6460]" />
+                <Icon className="size-3.5 shrink-0 text-ink-faint" />
                 <span className="flex-1 text-[13px]">{item.label}</span>
-                <span className="text-[11px] text-[#6b6460]">{item.desc}</span>
-                <span className="ml-1 rounded-[4px] bg-[#2a2621] px-1.5 py-0.5 font-mono text-[10px] text-[#8d857b]">{item.hint}</span>
+                <span className="text-[11px] text-ink-faint">{item.desc}</span>
+                <span className="ml-1 rounded-[4px] bg-line px-1.5 py-0.5 font-mono text-[10px] text-ink-muted">{item.hint}</span>
               </button>
             );
           })}
@@ -367,10 +367,10 @@ export function CaptureInput({
               onMouseEnter={() => setActiveIndex(i)}
               className={cn(
                 "flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[13px]",
-                i === activeIndex ? "bg-[#2a2621] text-[#f0ebe3]" : "text-[#c8bfb2] hover:bg-[#252220]",
+                i === activeIndex ? "bg-line text-ink" : "text-ink-2 hover:bg-fill",
               )}
             >
-              <span className="size-1.5 shrink-0 rounded-full bg-[#43b6a6]" />
+              <span className="size-1.5 shrink-0 rounded-full bg-teal" />
               <span className="flex-1 truncate">{item.name}</span>
             </button>
           ))}
@@ -383,12 +383,12 @@ export function CaptureInput({
               onMouseEnter={() => setActiveIndex(i)}
               className={cn(
                 "flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[13px]",
-                i === activeIndex ? "bg-[#2a2621] text-[#f0ebe3]" : "text-[#c8bfb2] hover:bg-[#252220]",
+                i === activeIndex ? "bg-line text-ink" : "text-ink-2 hover:bg-fill",
               )}
             >
               <span className={cn("size-2 shrink-0 rounded-[2px]", TYPE_DOT[item.type])} />
               <span className="min-w-0 flex-1 truncate">{item.label}</span>
-              <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-[#6b6460]">{item.type}</span>
+              <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-ink-faint">{item.type}</span>
             </button>
           ))}
         </div>

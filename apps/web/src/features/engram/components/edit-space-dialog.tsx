@@ -31,11 +31,11 @@ const ACCENT_OPTIONS: {
 	text: string;
 	dot: string;
 }[] = [
-	{ value: "violet", label: "Violet", bg: "bg-[#251f38]", ring: "ring-[#907ce8]/50", text: "text-[#c4b5fd]", dot: "bg-[#907ce8]" },
-	{ value: "gold", label: "Gold", bg: "bg-[#2a2317]", ring: "ring-[#d9a82f]/50", text: "text-[#e5b83d]", dot: "bg-[#d9a82f]" },
-	{ value: "teal", label: "Teal", bg: "bg-[#162624]", ring: "ring-[#43b6a6]/50", text: "text-[#7dd4c6]", dot: "bg-[#43b6a6]" },
-	{ value: "red", label: "Red", bg: "bg-[#2a1a17]", ring: "ring-[#e46f50]/50", text: "text-[#f07d5e]", dot: "bg-[#e46f50]" },
-	{ value: "blue", label: "Blue", bg: "bg-[#162230]", ring: "ring-[#4aa5c8]/50", text: "text-[#58b8d8]", dot: "bg-[#4aa5c8]" },
+	{ value: "violet", label: "Violet", bg: "bg-brand-surface", ring: "ring-brand/50", text: "text-brand-soft", dot: "bg-brand" },
+	{ value: "gold", label: "Gold", bg: "bg-fill", ring: "ring-honey/50", text: "text-p2-ink", dot: "bg-honey" },
+	{ value: "teal", label: "Teal", bg: "bg-fill", ring: "ring-teal/50", text: "text-p3-ink", dot: "bg-teal" },
+	{ value: "red", label: "Red", bg: "bg-surface", ring: "ring-coral/50", text: "text-p1-ink", dot: "bg-coral" },
+	{ value: "blue", label: "Blue", bg: "bg-brand-surface", ring: "ring-blue/50", text: "text-p3-ink", dot: "bg-blue" },
 ];
 
 type Section = "name" | "icon" | "color";
@@ -190,13 +190,13 @@ function EditSpaceDialogContent({
 		<Dialog open={isOpen} onOpenChange={handleOpenChange}>
 			<DialogContent
 				showCloseButton={false}
-				className="rounded-[12px] border-[#2e2b26] bg-[#1a1714] sm:max-w-[420px] p-0 gap-0 overflow-hidden"
+				className="rounded-[12px] border-line-soft bg-panel sm:max-w-[420px] p-0 gap-0 overflow-hidden"
 			>
-				<DialogHeader className="border-[#2e2b26] border-b px-5 py-4">
+				<DialogHeader className="border-line-soft border-b px-5 py-4">
 					<DialogTitle className="font-bold text-white text-base">
 						Edit space
 					</DialogTitle>
-					<DialogDescription className="text-[#8d857b] text-sm">
+					<DialogDescription className="text-ink-muted text-sm">
 						Update the name, icon, and color of this space.
 					</DialogDescription>
 				</DialogHeader>
@@ -204,7 +204,7 @@ function EditSpaceDialogContent({
 				<div className="space-y-5 px-5 py-5">
 					{/* ── Name ── */}
 					<div className="space-y-2">
-						<label className="font-bold text-[#b0a99f] text-[11px] uppercase tracking-widest">
+						<label className="font-bold text-ink-3 text-[11px] uppercase tracking-widest">
 							Name
 						</label>
 						<Input
@@ -213,13 +213,13 @@ function EditSpaceDialogContent({
 							onChange={(e) => setName(e.target.value)}
 							onKeyDown={handleNameKeyDown}
 							placeholder="e.g. Side project, Health, Travel…"
-							className="h-10 rounded-[8px] border-[#342f2a] bg-[#211f1c] px-3 text-[15px] text-[#efe9df] placeholder:text-[#5a5450] focus:border-[#4c463e] focus-visible:ring-0"
+							className="h-10 rounded-[8px] border-raise bg-surface px-3 text-[15px] text-ink placeholder:text-ink-ghost focus:border-line-max focus-visible:ring-0"
 						/>
 					</div>
 
 					{/* ── Icon ── */}
 					<div className="space-y-2">
-						<label className="font-bold text-[#b0a99f] text-[11px] uppercase tracking-widest">
+						<label className="font-bold text-ink-3 text-[11px] uppercase tracking-widest">
 							Icon
 						</label>
 						<div className="grid grid-cols-6 gap-1.5" role="listbox" aria-label="Space icon">
@@ -239,10 +239,10 @@ function EditSpaceDialogContent({
 											"grid size-9 place-items-center rounded-[7px] border",
 											"transition-[background-color,border-color,box-shadow,transform,color] duration-150",
 											"active:scale-[0.93] motion-reduce:active:scale-100",
-											"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#907ce8]/60 focus-visible:ring-offset-1 focus-visible:ring-offset-[#1a1714]",
+											"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-1 focus-visible:ring-offset-panel",
 											isSelected
 												? `${selectedAccent.bg} ${selectedAccent.ring} ring-1 ${selectedAccent.text} border-transparent`
-												: "border-[#2e2b26] text-[#6b6560] hover:border-[#3a3530] hover:text-[#c8bfb2]",
+												: "border-line-soft text-ink-faint hover:border-line-strong hover:text-ink-2",
 										)}
 									>
 										<Icon className="size-4" />
@@ -254,7 +254,7 @@ function EditSpaceDialogContent({
 
 					{/* ── Color ── */}
 					<div className="space-y-2">
-						<label className="font-bold text-[#b0a99f] text-[11px] uppercase tracking-widest">
+						<label className="font-bold text-ink-3 text-[11px] uppercase tracking-widest">
 							Color
 						</label>
 						<div className="flex gap-2" role="radiogroup" aria-label="Space color">
@@ -272,10 +272,10 @@ function EditSpaceDialogContent({
 										"font-semibold text-xs",
 										"transition-[background-color,border-color,box-shadow,transform,color] duration-150",
 										"active:scale-[0.95] motion-reduce:active:scale-100",
-										"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#907ce8]/60 focus-visible:ring-offset-1 focus-visible:ring-offset-[#1a1714]",
+										"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-1 focus-visible:ring-offset-panel",
 										color === opt.value
 											? `${opt.bg} ${opt.ring} ring-1 ${opt.text} border-transparent`
-											: "border-[#2e2b26] text-[#6b6560] hover:border-[#3a3530] hover:text-[#9a9088]",
+											: "border-line-soft text-ink-faint hover:border-line-strong hover:text-ink-muted",
 									)}
 								>
 									<span className={cn("size-2 rounded-full", opt.dot)} />
@@ -287,7 +287,7 @@ function EditSpaceDialogContent({
 
 					{/* ── Preview ── */}
 					<div className="space-y-2">
-						<label className="font-bold text-[#b0a99f] text-[11px] uppercase tracking-widest">
+						<label className="font-bold text-ink-3 text-[11px] uppercase tracking-widest">
 							Preview
 						</label>
 						<div
@@ -308,12 +308,12 @@ function EditSpaceDialogContent({
 					</div>
 				</div>
 
-				<DialogFooter className="border-[#2e2b26] border-t px-5 py-3">
+				<DialogFooter className="border-line-soft border-t px-5 py-3">
 					<Button
 						variant="ghost"
 						onClick={closeEditSpaceDialog}
 						className={cn(
-							"rounded-[8px] text-[#8d857b] hover:text-white",
+							"rounded-[8px] text-ink-muted hover:text-white",
 							"transition-[color,background-color,transform] duration-150",
 							"active:scale-[0.97] motion-reduce:active:scale-100",
 						)}
@@ -324,7 +324,7 @@ function EditSpaceDialogContent({
 						onClick={handleSave}
 						disabled={!canSave}
 						className={cn(
-							"rounded-[8px] bg-[#907ce8] font-semibold text-[#17131f] hover:bg-[#a08ef2] disabled:opacity-30",
+							"rounded-[8px] bg-brand font-semibold text-brand-ink hover:bg-brand-bright disabled:opacity-30",
 							"transition-[background-color,opacity,transform] duration-150",
 							"active:scale-[0.97] motion-reduce:active:scale-100",
 						)}

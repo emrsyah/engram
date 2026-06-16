@@ -120,7 +120,7 @@ export function SaveStateIndicator({ state }: { state: SaveState }) {
       variant="secondary"
       className={cn(
         "h-4 gap-1 rounded-[4px] px-1.5 font-mono text-[9px] transition-opacity duration-200",
-        state === "saving" ? "bg-[#3a3327] text-[#d6a93a]" : "bg-[#1a2e2a] text-[#43b6a6]",
+        state === "saving" ? "bg-line-strong text-honey" : "bg-fill text-teal",
       )}
     >
       <Save className="size-2" />
