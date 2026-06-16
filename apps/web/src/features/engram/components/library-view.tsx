@@ -9,7 +9,6 @@ import {
 	DropdownMenuTrigger,
 } from "@alphonse/ui/components/dropdown-menu";
 import { Input } from "@alphonse/ui/components/input";
-import { Tabs, TabsList, TabsTrigger } from "@alphonse/ui/components/tabs";
 import { cn } from "@alphonse/ui/lib/utils";
 import { useState } from "react";
 
@@ -216,23 +215,7 @@ export function LibraryView() {
 								onOrderField={setOrderField}
 								onToggleDir={toggleOrderDir}
 							/>
-							<Tabs value={prefs.viewMode} onValueChange={(value) => setViewMode(value as LibraryViewMode)}>
-								<TabsList className="h-9 gap-1 rounded-[8px] border border-line-2 bg-sunken p-1">
-									{VIEW_MODES.map((mode) => {
-										const Icon = Icons[mode.icon];
-										return (
-											<TabsTrigger
-												key={mode.id}
-												value={mode.id}
-												className="h-7 gap-1.5 rounded-[6px] px-2.5 font-medium text-ink-muted data-active:bg-brand-surface data-active:text-brand-soft"
-											>
-												<Icon className="size-3.5" />
-												<span className="hidden sm:inline">{mode.label}</span>
-											</TabsTrigger>
-										);
-									})}
-								</TabsList>
-							</Tabs>
+							<LibraryViewMenu viewMode={prefs.viewMode} onViewMode={setViewMode} />
 						</div>
 					</div>
 
@@ -321,8 +304,11 @@ function LibraryFilterMenu({
 					/>
 				}
 			>
-				<Icons.search className="size-4 text-brand" />
-				<span className="max-w-[160px] truncate">{label}</span>
+				<Icons.list className="size-4 text-brand" />
+				<span className="text-ink-dim">Filter</span>
+				{filter.kind !== "all" ? (
+					<span className="max-w-[140px] truncate font-semibold text-ink">{label}</span>
+				) : null}
 				<Icons.chevronRight className="size-4 rotate-90 text-ink-faint" />
 			</DropdownMenuTrigger>
 			<DropdownMenuContent
@@ -431,6 +417,53 @@ function GroupByMenu({
 						{groupBy === option.id ? <Icons.check className="size-4 text-brand" /> : null}
 					</DropdownMenuItem>
 				))}
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+function LibraryViewMenu({
+	viewMode,
+	onViewMode,
+}: {
+	viewMode: LibraryViewMode;
+	onViewMode: (mode: LibraryViewMode) => void;
+}) {
+	const active = VIEW_MODES.find((mode) => mode.id === viewMode) ?? VIEW_MODES[0];
+	const ActiveIcon = Icons[active.icon];
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={
+					<Button
+						type="button"
+						variant="ghost"
+						className="h-9 gap-2 rounded-[8px] border border-line-2 bg-sunken px-3 text-ink-2 hover:text-white"
+					/>
+				}
+			>
+				<ActiveIcon className="size-4 text-brand" />
+				<span className="text-ink-dim">View</span>
+				<span className="font-semibold">{active.label}</span>
+				<Icons.chevronRight className="size-4 rotate-90 text-ink-faint" />
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="end" className="w-[200px] border border-line-2 bg-panel p-1 text-ink-2">
+				{VIEW_MODES.map((mode) => {
+					const Icon = Icons[mode.icon];
+					return (
+						<DropdownMenuItem
+							key={mode.id}
+							onClick={() => onViewMode(mode.id)}
+							className={cn("justify-between", viewMode === mode.id && "bg-fill text-white")}
+						>
+							<span className="flex items-center gap-2">
+								<Icon className="size-4" />
+								{mode.label}
+							</span>
+							{viewMode === mode.id ? <Icons.check className="size-4 text-brand" /> : null}
+						</DropdownMenuItem>
+					);
+				})}
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);
