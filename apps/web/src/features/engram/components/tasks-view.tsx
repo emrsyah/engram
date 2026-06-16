@@ -11,6 +11,7 @@ import {
 	DropdownMenuTrigger,
 } from "@alphonse/ui/components/dropdown-menu";
 import { Input } from "@alphonse/ui/components/input";
+import { PopoverContent, PopoverRoot, PopoverTrigger } from "@alphonse/ui/components/popover";
 import { Tabs, TabsList, TabsTrigger } from "@alphonse/ui/components/tabs";
 import { cn } from "@alphonse/ui/lib/utils";
 import {
@@ -34,7 +35,7 @@ import { useEffect, useReducer, useState } from "react";
 
 import { useEngramStore } from "../store";
 import type { Item, Space, TaskQueue } from "../types";
-import { useUIStore } from "../ui-store";
+import { type BlitzPhase, type BlitzPrefs, useUIStore } from "../ui-store";
 import { usePersistentState } from "../use-persistent-state";
 import { DueChip, PriorityChip } from "./chips";
 import { Icons } from "./icons";
@@ -676,6 +677,9 @@ function DropdownLabel({ children }: { children: React.ReactNode }) {
 	return <div className="px-2 py-2 text-ink-dim text-xs">{children}</div>;
 }
 
+const WORK_PRESETS = [15, 25, 45, 60, 90];
+const BREAK_PRESETS = [5, 10, 15, 20];
+
 export function BlitzDialog({
 	open,
 	onClose,
@@ -683,10 +687,16 @@ export function BlitzDialog({
 	secondsLeft,
 	running,
 	activeIndex,
-	duration,
+	phase,
+	phaseDuration,
+	prefs,
 	onToggleRun,
 	onReset,
 	onComplete,
+	onSkipPhase,
+	onSetWorkMinutes,
+	onSetBreakMinutes,
+	onSetPrefs,
 }: {
 	open: boolean;
 	onClose: () => void;
@@ -694,15 +704,25 @@ export function BlitzDialog({
 	secondsLeft: number;
 	running: boolean;
 	activeIndex: number;
-	duration: number;
+	phase: BlitzPhase;
+	phaseDuration: number;
+	prefs: BlitzPrefs;
 	onToggleRun: () => void;
 	onReset: () => void;
 	onComplete: (id: string) => void;
+	onSkipPhase: () => void;
+	onSetWorkMinutes: (minutes: number) => void;
+	onSetBreakMinutes: (minutes: number) => void;
+	onSetPrefs: (patch: Partial<BlitzPrefs>) => void;
 }) {
+	const isBreak = phase === "break";
 	const safeIndex = Math.min(activeIndex, Math.max(tasks.length - 1, 0));
 	const activeTask = tasks[safeIndex];
-	const elapsed = duration - secondsLeft;
-	const progress = elapsed / duration;
+	const elapsed = Math.max(phaseDuration - secondsLeft, 0);
+	const progress = phaseDuration > 0 ? elapsed / phaseDuration : 0;
+	const accent = isBreak ? "text-teal" : "text-blue";
+	const accentBar = isBreak ? "bg-teal" : "bg-brand";
+	const accentDot = isBreak ? "bg-teal" : "bg-blue";
 
 	const complete = () => {
 		if (!activeTask) return;
@@ -725,80 +745,252 @@ export function BlitzDialog({
 								{Math.min(safeIndex + 1, tasks.length || 1)} of {tasks.length || 1}
 							</span>
 						</div>
-						<Button
-							type="button"
-							variant="ghost"
-							onClick={onClose}
-							className="h-9 rounded-[8px] border border-white/10 bg-white/[0.03] px-3 text-ink-3 hover:text-white"
-						>
-							Exit
-							<span className="rounded-[5px] border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-ink-dim">
-								ESC
-							</span>
-						</Button>
+						<div className="flex items-center gap-2">
+							<BlitzSettings
+								prefs={prefs}
+								onSetWorkMinutes={onSetWorkMinutes}
+								onSetBreakMinutes={onSetBreakMinutes}
+								onSetPrefs={onSetPrefs}
+							/>
+							<Button
+								type="button"
+								variant="ghost"
+								onClick={onClose}
+								className="h-9 rounded-[8px] border border-white/10 bg-white/[0.03] px-3 text-ink-3 hover:text-white"
+							>
+								Exit
+								<span className="rounded-[5px] border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-ink-dim">
+									ESC
+								</span>
+							</Button>
+						</div>
 					</header>
 					<main className="relative z-10 mx-auto flex w-full max-w-[760px] flex-1 flex-col items-center justify-center py-10 text-center">
-						<div className="mb-8 rounded-[999px] bg-brand-surface px-4 py-1.5 font-semibold text-blue text-sm">
-							<span className="mr-2 inline-block size-2 rounded-full bg-blue" />
-							Work
-						</div>
+						<button
+							type="button"
+							onClick={onSkipPhase}
+							title={isBreak ? "Switch to focus" : "Switch to break"}
+							className={cn(
+								"mb-8 flex items-center gap-2 rounded-[999px] px-4 py-1.5 font-semibold text-sm transition-colors",
+								isBreak ? "bg-teal/15 text-teal hover:bg-teal/25" : "bg-brand-surface text-blue hover:bg-brand-surface/70",
+							)}
+						>
+							<span className={cn("inline-block size-2 rounded-full", accentDot)} />
+							{isBreak ? "Break" : "Focus"}
+						</button>
 						<h2 className="max-w-[780px] text-balance font-bold text-4xl text-ink-bright tracking-normal">
-							{activeTask ? taskTitle(activeTask) : "Pick a task for today"}
+							{isBreak
+								? "Breathe — back in a moment"
+								: activeTask
+									? taskTitle(activeTask)
+									: "Pick a task for today"}
 						</h2>
 						<div className="mt-12 font-mono text-7xl text-ink-bright tracking-normal">
 							{formatBlitzSeconds(secondsLeft)}
 						</div>
 						<div className="mt-10 w-full max-w-[380px]">
 							<div className="h-1 overflow-hidden rounded-full bg-white/10">
-								<div className="h-full bg-brand" style={{ width: `${progress * 100}%` }} />
+								<div className={cn("h-full", accentBar)} style={{ width: `${progress * 100}%` }} />
 							</div>
 							<div className="mt-2 flex justify-between font-mono text-ink-dim text-xs">
 								<span>{formatBlitzSeconds(elapsed)} elapsed</span>
-								<span>45:00 planned</span>
+								<span>{formatBlitzSeconds(phaseDuration)} planned</span>
 							</div>
 						</div>
 						<div className="mt-9 flex items-center gap-3">
 							<button
 								type="button"
 								onClick={onReset}
-								className="grid size-12 place-items-center rounded-full border border-white/15 bg-white/[0.04] text-ink-3"
+								title="Reset timer"
+								className="grid size-12 place-items-center rounded-full border border-white/15 bg-white/[0.04] text-ink-3 transition-colors hover:text-white"
 							>
 								<Icons.rotate className="size-5" />
 							</button>
 							<button
 								type="button"
 								onClick={onToggleRun}
-								className="grid size-[72px] place-items-center rounded-full bg-brand text-white shadow-[0_0_32px_rgba(136,117,238,0.45)]"
+								className={cn(
+									"grid size-[72px] place-items-center rounded-full text-white shadow-[0_0_32px_rgba(136,117,238,0.45)] transition-transform active:scale-[0.96]",
+									isBreak ? "bg-teal" : "bg-brand",
+								)}
 							>
 								{running ? <PauseGlyph /> : <PlayGlyph />}
 							</button>
 							<button
 								type="button"
 								onClick={complete}
-								className="grid size-12 place-items-center rounded-full border border-p3 bg-brand-ink text-teal"
+								disabled={isBreak || !activeTask}
+								title="Complete task"
+								className="grid size-12 place-items-center rounded-full border border-p3 bg-brand-ink text-teal transition-opacity disabled:opacity-30"
 							>
 								<Icons.check className="size-5" />
 							</button>
 						</div>
-						<div className="mt-20 w-full max-w-[700px] text-left">
-							<p className="mb-3 font-bold text-ink-dim text-xs uppercase tracking-[0.14em]">Up next</p>
-							<div className="space-y-2">
-								{tasks.slice(safeIndex + 1, safeIndex + 4).map((task, index) => (
-									<div
-										key={task.id}
-										className="flex items-center gap-3 rounded-[8px] border border-white/10 bg-white/[0.03] px-4 py-3 text-ink-3"
-									>
-										<span className="font-mono text-ink-dim text-xs">{safeIndex + index + 2}</span>
-										<span className="size-2 rounded-full bg-blue" />
-										<span className="min-w-0 flex-1 truncate text-sm">{taskTitle(task)}</span>
-									</div>
-								))}
+						{!isBreak ? (
+							<div className="mt-20 w-full max-w-[700px] text-left">
+								<p className="mb-3 font-bold text-ink-dim text-xs uppercase tracking-[0.14em]">Up next</p>
+								<div className="space-y-2">
+									{tasks.slice(safeIndex + 1, safeIndex + 4).map((task, index) => (
+										<div
+											key={task.id}
+											className="flex items-center gap-3 rounded-[8px] border border-white/10 bg-white/[0.03] px-4 py-3 text-ink-3"
+										>
+											<span className="font-mono text-ink-dim text-xs">{safeIndex + index + 2}</span>
+											<span className={cn("size-2 rounded-full", accentDot)} />
+											<span className="min-w-0 flex-1 truncate text-sm">{taskTitle(task)}</span>
+										</div>
+									))}
+								</div>
 							</div>
-						</div>
+						) : null}
 					</main>
 				</div>
 			</DialogContent>
 		</Dialog>
+	);
+}
+
+function BlitzChip({
+	label,
+	active,
+	onClick,
+}: {
+	label: string;
+	active: boolean;
+	onClick: () => void;
+}) {
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			className={cn(
+				"h-8 min-w-9 rounded-[7px] px-2.5 font-mono text-xs transition-colors",
+				active
+					? "bg-brand text-white"
+					: "border border-white/10 bg-white/[0.03] text-ink-3 hover:bg-white/[0.07] hover:text-white",
+			)}
+		>
+			{label}
+		</button>
+	);
+}
+
+function BlitzSwitch({
+	label,
+	checked,
+	onChange,
+}: {
+	label: string;
+	checked: boolean;
+	onChange: (value: boolean) => void;
+}) {
+	return (
+		<button
+			type="button"
+			role="switch"
+			aria-checked={checked}
+			onClick={() => onChange(!checked)}
+			className="flex w-full items-center justify-between py-1 text-left"
+		>
+			<span className="text-ink-2 text-sm">{label}</span>
+			<span
+				className={cn(
+					"relative h-5 w-9 rounded-full transition-colors",
+					checked ? "bg-brand" : "bg-white/10",
+				)}
+			>
+				<span
+					className={cn(
+						"absolute top-0.5 size-4 rounded-full bg-white transition-transform",
+						checked ? "translate-x-[18px]" : "translate-x-0.5",
+					)}
+				/>
+			</span>
+		</button>
+	);
+}
+
+function BlitzSettings({
+	prefs,
+	onSetWorkMinutes,
+	onSetBreakMinutes,
+	onSetPrefs,
+}: {
+	prefs: BlitzPrefs;
+	onSetWorkMinutes: (minutes: number) => void;
+	onSetBreakMinutes: (minutes: number) => void;
+	onSetPrefs: (patch: Partial<BlitzPrefs>) => void;
+}) {
+	return (
+		<PopoverRoot>
+			<PopoverTrigger
+				render={
+					<Button
+						type="button"
+						variant="ghost"
+						className="size-9 rounded-[8px] border border-white/10 bg-white/[0.03] p-0 text-ink-3 hover:text-white"
+					/>
+				}
+			>
+				<Icons.settings className="size-4" />
+				<span className="sr-only">Customize Blitz</span>
+			</PopoverTrigger>
+			<PopoverContent
+				side="bottom"
+				className="w-72 rounded-[12px] border-line-2 bg-panel p-4 text-white shadow-[0_8px_24px_-6px_rgba(0,0,0,0.5)]"
+			>
+				<div className="space-y-4">
+					<div>
+						<p className="mb-2 font-semibold text-ink-dim text-[11px] uppercase tracking-[0.08em]">
+							Focus length
+						</p>
+						<div className="flex flex-wrap gap-1.5">
+							{WORK_PRESETS.map((minutes) => (
+								<BlitzChip
+									key={minutes}
+									label={`${minutes}m`}
+									active={prefs.workMinutes === minutes}
+									onClick={() => onSetWorkMinutes(minutes)}
+								/>
+							))}
+						</div>
+					</div>
+
+					<div className="h-px bg-line" />
+
+					<BlitzSwitch
+						label="Breaks between sessions"
+						checked={prefs.breakEnabled}
+						onChange={(value) => onSetPrefs({ breakEnabled: value })}
+					/>
+					{prefs.breakEnabled ? (
+						<div className="flex flex-wrap gap-1.5">
+							{BREAK_PRESETS.map((minutes) => (
+								<BlitzChip
+									key={minutes}
+									label={`${minutes}m`}
+									active={prefs.breakMinutes === minutes}
+									onClick={() => onSetBreakMinutes(minutes)}
+								/>
+							))}
+						</div>
+					) : null}
+
+					<div className="h-px bg-line" />
+
+					<BlitzSwitch
+						label="Auto-start next task"
+						checked={prefs.autoStartNext}
+						onChange={(value) => onSetPrefs({ autoStartNext: value })}
+					/>
+					<BlitzSwitch
+						label="Chime when timer ends"
+						checked={prefs.chime}
+						onChange={(value) => onSetPrefs({ chime: value })}
+					/>
+				</div>
+			</PopoverContent>
+		</PopoverRoot>
 	);
 }
 

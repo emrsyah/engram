@@ -15,11 +15,17 @@ export function BlitzContainer() {
 		blitzRunning,
 		blitzSecondsLeft,
 		blitzActiveIndex,
-		blitzDuration,
+		blitzPhase,
+		blitzPhaseDuration,
+		blitzPrefs,
 		closeBlitz,
 		toggleBlitzRunning,
 		resetBlitz,
 		advanceBlitz,
+		skipBlitzPhase,
+		setBlitzWorkMinutes,
+		setBlitzBreakMinutes,
+		setBlitzPrefs,
 	} = useUIStore();
 	const { allTaskItems, toggleDone } = useEngramStore();
 
@@ -37,13 +43,19 @@ export function BlitzContainer() {
 			secondsLeft={blitzSecondsLeft}
 			running={blitzRunning}
 			activeIndex={blitzActiveIndex}
-			duration={blitzDuration}
+			phase={blitzPhase}
+			phaseDuration={blitzPhaseDuration}
+			prefs={blitzPrefs}
 			onToggleRun={toggleBlitzRunning}
 			onReset={resetBlitz}
 			onComplete={(id) => {
 				toggleDone(id);
 				advanceBlitz();
 			}}
+			onSkipPhase={skipBlitzPhase}
+			onSetWorkMinutes={setBlitzWorkMinutes}
+			onSetBreakMinutes={setBlitzBreakMinutes}
+			onSetPrefs={setBlitzPrefs}
 		/>
 	);
 }
