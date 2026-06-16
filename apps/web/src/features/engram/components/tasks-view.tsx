@@ -260,7 +260,7 @@ export function TasksView() {
 				<div className="mx-auto max-w-[1280px]">
 					<div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
 						<div>
-							<h2 className="flex items-center gap-3 font-bold text-3xl">
+							<h2 className="flex items-center gap-3 font-serif font-medium text-3xl tracking-tight">
 								<Icons.square className="size-7 text-brand-glow" />
 								Tasks
 							</h2>
@@ -318,7 +318,7 @@ export function TasksView() {
 						</div>
 					) : null}
 
-					<div className="mt-6 flex gap-2 rounded-[9px] border border-line bg-surface p-2">
+					<div className="mt-6 flex gap-2 rounded-[12px] border border-line bg-surface p-2">
 						<Input
 							value={ui.newTask}
 							onChange={(event) => dispatchUi({ type: "newTask", newTask: event.target.value })}
@@ -339,7 +339,7 @@ export function TasksView() {
 					</div>
 
 					{focusedTask ? (
-						<div className="mt-4 flex items-center gap-3 rounded-[9px] border border-ink-ghost bg-brand-surface px-4 py-3">
+						<div className="mt-4 flex items-center gap-3 rounded-[12px] border border-ink-ghost bg-brand-surface px-4 py-3">
 							<Icons.target className="size-5 shrink-0 text-brand-soft" />
 							<div className="min-w-0 flex-1">
 								<p className="text-ink-3 text-xs font-bold uppercase tracking-[0.14em]">Focused task</p>
@@ -525,7 +525,7 @@ function TaskSection({
 		<section
 			ref={setNodeRef}
 			className={cn(
-				"flex flex-col overflow-hidden rounded-[9px] border bg-base",
+				"flex flex-col overflow-hidden rounded-[12px] border bg-base",
 				collapsed ? "max-h-none" : "max-h-[calc(100vh-330px)] min-h-[300px]",
 				isOver ? "border-brand bg-brand-surface" : "border-fill",
 			)}
@@ -616,7 +616,7 @@ function DoneArchive({
 	onOpenChange: (open: boolean) => void;
 }) {
 	return (
-		<section className="mt-6 rounded-[9px] border border-surface bg-void opacity-75">
+		<section className="mt-6 rounded-[12px] border border-surface bg-void opacity-75">
 			<header className="flex items-center justify-between border-surface border-b px-4 py-2.5">
 				<div>
 					<h3 className="font-bold text-ink-dim">Done</h3>

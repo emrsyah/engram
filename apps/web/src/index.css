@@ -7,57 +7,60 @@
    Values mirror docs/DESIGN.md; near-duplicate shades are collapsed.
    ─────────────────────────────────────────────────────────────────────── */
 @theme {
-  /* Surfaces — darkest → lightest. Deeper + better separated for cleaner contrast. */
-  --color-void: #0a0908;     /* shell / outermost frame */
-  --color-base: #131110;     /* main content background */
-  --color-panel: #181513;    /* panels, popovers, dropdowns */
-  --color-clay: #1b1714;     /* capture bar, elevated surfaces */
-  --color-sunken: #0d0b0a;   /* nested / input-focus surfaces */
-  --color-surface: #1f1b17;  /* card & row backgrounds */
-  --color-fill: #272320;     /* subtle fills: tracks, badges, hovers */
-  --color-raise: #332e28;    /* card hover, drag-over target */
+  /* Surfaces — cool near-black, darkest → lightest. (v2 "Cool Tool") */
+  --color-void: #0a0a0b;     /* shell / outermost frame, top bar */
+  --color-base: #0e0e10;     /* main content background — the floor */
+  --color-panel: #161618;    /* panels, popovers, dropdowns */
+  --color-clay: #1a1a1d;     /* capture bar, elevated surfaces */
+  --color-sunken: #0c0c0e;   /* nested wells, input rest background */
+  --color-surface: #17181a;  /* card & row backgrounds */
+  --color-fill: #1f2023;     /* subtle fills: tracks, badges, hovers */
+  --color-raise: #26272b;    /* card/row hover, drag-over target */
 
-  /* Lines / borders — soft → strong. A touch lighter so dividers read as intentional. */
-  --color-line: #2c2823;
-  --color-line-soft: #322d27;
-  --color-line-2: #38332c;
-  --color-line-strong: #443e36;
-  --color-line-max: #564e44;
+  /* Lines / borders — hairline → strong (cool gray). */
+  --color-line: #202125;
+  --color-line-soft: #26272c;
+  --color-line-2: #2d2e33;
+  --color-line-strong: #3a3b41;
+  --color-line-max: #4a4b52;
 
-  /* Ink / text — bright → dim. Higher contrast at the top, cleaner mid-greys. */
-  --color-ink: #f3eee5;
-  --color-ink-bright: #f8f4ed;
-  --color-ink-2: #ddd4ca;
-  --color-ink-3: #b8afa3;
-  --color-ink-muted: #9a9085;
-  --color-ink-dim: #877c70;
-  --color-ink-faint: #6f685e;
-  --color-ink-ghost: #5e564c;
-  --color-done: #6a635a;
+  /* Ink / text — cool off-white → gray. */
+  --color-ink: #e6e7e9;
+  --color-ink-bright: #f4f5f6;
+  --color-ink-2: #c2c4c8;
+  --color-ink-3: #a4a6ab;
+  --color-ink-muted: #8a8c90;
+  --color-ink-dim: #6f7176;
+  --color-ink-faint: #595b60;
+  --color-ink-ghost: #45474c;
+  --color-done: #5a5c61;
 
-  /* Primary brand accent (amethyst) + states. Slightly more vivid + modern.
+  /* Primary brand accent (Attio blue) + states.
      Named `brand` (not `accent`) to avoid colliding with shadcn's --color-accent. */
-  --color-brand: #9784f2;
-  --color-brand-bright: #ab9af8;
-  --color-brand-glow: #a48fff;
-  --color-brand-soft: #ccc1ff;
-  --color-brand-ink: #15111d;        /* text on brand */
-  --color-brand-surface: #27203a;    /* violet-tinted surface */
+  --color-brand: #3b6ef5;
+  --color-brand-bright: #5b86ff;
+  --color-brand-glow: #6f95ff;
+  --color-brand-soft: #aac1ff;
+  --color-brand-ink: #ffffff;        /* text on brand */
+  --color-brand-surface: #15203a;    /* blue-tinted active surface */
 
-  /* Semantic accents — a hair cleaner/brighter. */
-  --color-amber: #dcb63f;
-  --color-honey: #dbae42;
-  --color-teal: #47beac;
-  --color-coral: #e9785a;
-  --color-blue: #50aed1;
+  /* Semantic accents — rationed, fixed meaning. */
+  --color-success: #4ec77f;
+  --color-amber: #e0a23a;
+  --color-honey: #dca63f;
+  --color-info: #5b9bd8;
+  --color-blue: #5b9bd8;
+  --color-coral: #e5675c;
+  --color-purple: #a884f0;
+  --color-teal: #46bdac;
 
-  /* Priority chips */
-  --color-p1: #5a2a20;
-  --color-p1-ink: #f07d5e;
-  --color-p2: #514017;
-  --color-p2-ink: #e5b83d;
-  --color-p3: #183d4b;
-  --color-p3-ink: #58b8d8;
+  /* Priority chips (cool re-tint) */
+  --color-p1: #3a1f1c;
+  --color-p1-ink: #f0857a;
+  --color-p2: #332a14;
+  --color-p2-ink: #e0b24a;
+  --color-p3: #15293a;
+  --color-p3-ink: #62b0e0;
 }
 
 /* ── Custom easing curves ──────────────────────────────────────────── */
@@ -94,8 +97,8 @@ body {
 }
 
 .engram-card {
-  border: 1px solid var(--color-line-strong);
-  border-radius: 8px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
   background: var(--color-surface);
   box-shadow: 0 16px 40px rgb(0 0 0 / 24%);
   color: var(--color-ink);
@@ -113,10 +116,10 @@ body {
 }
 
 .engram-card[data-selected="true"] {
-  border-color: var(--color-amber);
+  border-color: var(--color-brand);
   box-shadow:
-    0 0 0 1px var(--color-amber),
-    0 0 24px -4px rgba(215, 178, 56, 0.3),
+    0 0 0 1px var(--color-brand),
+    0 0 24px -4px rgba(59, 110, 245, 0.3),
     0 12px 32px rgb(0 0 0 / 28%);
   transform: translateY(-1px);
 }

@@ -297,7 +297,7 @@ export function BoardView() {
         <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
             <h2
-              className="stagger-item flex items-center gap-3 font-bold text-3xl"
+              className="stagger-item flex items-center gap-3 font-serif font-medium text-3xl tracking-tight"
               style={{ animationDelay: "0ms" }}
             >
               <Icons.layout className="size-7 text-brand-glow" />

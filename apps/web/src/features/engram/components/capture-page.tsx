@@ -153,7 +153,7 @@ export function CapturePage() {
 				<div className="min-w-0">
 					<div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
 						<div>
-							<h2 className="flex items-center gap-3 font-bold text-3xl">
+							<h2 className="flex items-center gap-3 font-serif font-medium text-3xl tracking-tight">
 								<Icons.sparkles className="size-7 text-brand-glow" />
 								Capture
 							</h2>

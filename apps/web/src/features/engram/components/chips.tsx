@@ -71,7 +71,7 @@ export function DueChip({ dueAt }: { dueAt?: string }) {
   return (
     <Badge
       variant="secondary"
-      className="h-6 rounded-[5px] bg-line-strong px-2 font-mono font-bold text-honey"
+      className="h-6 rounded-[5px] bg-amber/12 px-2 font-mono font-bold text-honey"
     >
       {label}
     </Badge>

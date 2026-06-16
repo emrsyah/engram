@@ -200,7 +200,7 @@ export function InboxView() {
         <div className="flex items-end justify-between gap-5">
           <div>
             <h2
-              className="stagger-item flex items-center gap-3 font-bold text-3xl"
+              className="stagger-item flex items-center gap-3 font-serif font-medium text-3xl tracking-tight"
               style={{ animationDelay: "0ms" }}
             >
               <Icons.inbox className="size-7 text-brand-glow" />

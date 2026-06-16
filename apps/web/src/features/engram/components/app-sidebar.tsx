@@ -57,11 +57,11 @@ export function AppSidebar() {
 								buttonVariants({ variant: "ghost" }),
 								navItemClass,
 								active
-									? "bg-fill text-white"
-									: "text-ink-3 hover:bg-panel hover:text-white",
+									? "bg-brand-surface text-white"
+									: "text-ink-muted hover:bg-fill hover:text-ink-2",
 							)}
 						>
-							<Icon className={cn("size-4", active && "text-brand-glow")} />
+							<Icon className={cn("size-4", active && "text-brand-soft")} />
 							{label}
 						</Link>
 					);

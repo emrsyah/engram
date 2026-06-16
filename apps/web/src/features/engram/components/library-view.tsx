@@ -118,7 +118,7 @@ export function LibraryView() {
 				<div className="mx-auto max-w-[920px]">
 					<div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
 						<div>
-							<h2 className="flex items-center gap-3 font-bold text-3xl">
+							<h2 className="flex items-center gap-3 font-serif font-medium text-3xl tracking-tight">
 								<Icons.book className="size-7 text-brand-glow" />
 								Library
 							</h2>
@@ -166,7 +166,7 @@ export function LibraryView() {
 						</div>
 					) : null}
 
-					<div className="mt-7 flex gap-2 rounded-[9px] border border-line bg-panel p-2">
+					<div className="mt-7 flex gap-2 rounded-[12px] border border-line bg-panel p-2">
 						<Input
 							value={text}
 							onChange={(event) => setText(event.target.value)}
@@ -188,7 +188,7 @@ export function LibraryView() {
 
 					<div className="mt-7 space-y-4">
 						{visibleItems.length === 0 ? (
-							<div className="rounded-[9px] border border-dashed border-raise px-6 py-14 text-center">
+							<div className="rounded-[12px] border border-dashed border-raise px-6 py-14 text-center">
 								<Icons.book className="mx-auto size-8 text-line-max" />
 								<p className="mt-3 font-semibold text-ink-2">Nothing saved here yet</p>
 							</div>
@@ -373,7 +373,7 @@ function LibraryGroup({
 	onOpen: (id: string) => void;
 }) {
 	return (
-		<div className="overflow-hidden rounded-[9px] border border-fill bg-panel">
+		<div className="overflow-hidden rounded-[12px] border border-fill bg-panel">
 			<div className="flex items-center justify-between border-fill border-b px-4 py-3">
 				<h3 className="font-bold text-ink">{title}</h3>
 				<span className="rounded-[5px] bg-fill px-1.5 py-0.5 font-mono text-ink-dim text-[11px]">

@@ -152,7 +152,7 @@ export function FocusView() {
 					<div className="mb-4 flex flex-wrap items-end justify-between gap-5">
 						<div>
 							<h2
-								className="stagger-item flex items-center gap-3 font-bold text-3xl"
+								className="stagger-item flex items-center gap-3 font-serif font-medium text-3xl tracking-tight"
 								style={{ animationDelay: "0ms" }}
 							>
 								<Icons.target className="size-7 text-brand" />
@@ -415,7 +415,7 @@ function DailyBriefingCard({
 
 function BriefingSource({ label, value }: { label: string; value: string }) {
 	return (
-		<div className="rounded-[9px] border border-raise bg-base px-3 py-2.5">
+		<div className="rounded-[12px] border border-raise bg-base px-3 py-2.5">
 			<p className="font-mono text-ink-ghost text-[10px] uppercase tracking-[0.14em]">{label}</p>
 			<p className="mt-1 font-semibold text-ink-3 text-sm">{value}</p>
 		</div>
