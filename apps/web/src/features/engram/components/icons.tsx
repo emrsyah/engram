@@ -126,6 +126,7 @@ export const TimerIcon = hi(Timer01Icon);
 
 export const Icons = {
   archive: ArchiveIcon,
+  arrowUpRight: ArrowUpRightIcon,
   book: BookOpenIcon,
   briefcase: BriefcaseIcon,
   calendar: CalendarIcon,
@@ -137,6 +138,7 @@ export const Icons = {
   cornerDownRight: CornerDownRight,
   file: FileIcon,
   flag: FlagIcon,
+  hash: Hash,
   image: ImageIcon,
   inbox: InboxIcon2,
   info: InfoIcon,
@@ -160,6 +162,7 @@ export const Icons = {
   sparkles: Sparkles,
   square: SquareIcon,
   target: Target,
+  timer: TimerIcon,
   trash: DeleteIcon,
   x: CancelIcon,
 };

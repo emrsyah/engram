@@ -1,16 +1,22 @@
 "use client";
 
 import { Button } from "@alphonse/ui/components/button";
+import { Calendar } from "@alphonse/ui/components/calendar";
 import { Checkbox } from "@alphonse/ui/components/checkbox";
 import { Dialog, DialogContent, DialogTitle } from "@alphonse/ui/components/dialog";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
+	DropdownMenuCheckboxItem,
 	DropdownMenuItem,
 	DropdownMenuSeparator,
+	DropdownMenuSub,
+	DropdownMenuSubContent,
+	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
 } from "@alphonse/ui/components/dropdown-menu";
 import { Input } from "@alphonse/ui/components/input";
+import { PopoverContent, PopoverRoot, PopoverTrigger } from "@alphonse/ui/components/popover";
 import { cn } from "@alphonse/ui/lib/utils";
 import {
 	closestCenter,
@@ -29,13 +35,13 @@ import {
 	verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 
+import { SPACE_ICONS, type SpaceIconKey } from "../nav";
 import { useEngramStore } from "../store";
-import type { Item, Space, TaskQueue } from "../types";
+import type { Accent, Item, Priority, Space, TaskQueue } from "../types";
 import { type BlitzPhase, type BlitzPrefs, useUIStore } from "../ui-store";
 import { usePersistentState } from "../use-persistent-state";
-import { DueChip, PriorityChip } from "./chips";
 import { Icons } from "./icons";
 
 type TaskFilter =
@@ -80,6 +86,20 @@ const SECTIONS: { id: SectionId; label: string; hint: string }[] = [
 ];
 
 const ACTIVE_SECTIONS: PlanningSectionId[] = ["later", "next", "now"];
+
+const SPACE_ACCENT_CLASSES: Record<Accent, string> = {
+	violet: "bg-brand text-ink-bright",
+	gold: "bg-amber text-base",
+	teal: "bg-teal text-brand-ink",
+	red: "bg-coral text-base",
+	blue: "bg-blue text-brand-ink",
+};
+
+const PRIORITY_META_CLASSES: Record<Priority, string> = {
+	1: "border-p1/40 bg-p1 text-p1-ink",
+	2: "border-p2/40 bg-p2 text-p2-ink",
+	3: "border-p3/40 bg-p3 text-p3-ink",
+};
 
 const TASKS_PREFS_KEY = "engram.tasks.prefs.v1";
 const DEFAULT_TASKS_PREFS: TasksPrefs = {
@@ -176,6 +196,12 @@ function spaceName(spaces: Space[], id: string) {
 	return spaces.find((space) => space.id === id)?.name ?? "Ungrouped";
 }
 
+function SpaceIcon({ icon, className }: { icon: string; className?: string }) {
+	const iconKey = (icon in SPACE_ICONS ? icon : "sparkles") as SpaceIconKey;
+	const Icon = Icons[SPACE_ICONS[iconKey]];
+	return <Icon className={className} />;
+}
+
 function columnId(section: SectionId) {
 	return `section-${section}`;
 }
@@ -190,8 +216,46 @@ export function formatBlitzSeconds(seconds: number) {
 	return `${mins}:${secs}`;
 }
 
+function hasDueTime(dueAt?: string) {
+	return !!dueAt && dueAt.includes("T");
+}
+
+function parseTaskDueDate(dueAt: string) {
+	if (hasDueTime(dueAt)) return new Date(dueAt);
+	const [year, month, day] = dueAt.split("-").map(Number);
+	return new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
+}
+
+function toDateInputValue(date: Date) {
+	const year = date.getFullYear();
+	const month = String(date.getMonth() + 1).padStart(2, "0");
+	const day = String(date.getDate()).padStart(2, "0");
+	return `${year}-${month}-${day}`;
+}
+
+function toTimeInputValue(date: Date) {
+	return new Intl.DateTimeFormat("en-GB", {
+		hour: "2-digit",
+		minute: "2-digit",
+		hour12: false,
+		timeZone: "Asia/Jakarta",
+	}).format(date);
+}
+
+function quickDate(offsetDays: number) {
+	const date = new Date();
+	date.setDate(date.getDate() + offsetDays);
+	return toDateInputValue(date);
+}
+
+function nextWeekDate() {
+	const date = new Date();
+	date.setDate(date.getDate() + 7);
+	return toDateInputValue(date);
+}
+
 export function TasksView() {
-	const { allTaskItems, allTags, createItem, spaces, setTaskQueue, toggleDone, updateItem } =
+	const { allTaskItems, allTags, createItem, moveItemToSpace, removeItem, spaces, setTaskQueue, toggleDone, updateItem } =
 		useEngramStore();
 	const { openDetail, openBlitz } = useUIStore();
 	const [ui, dispatchUi] = useReducer(tasksUiReducer, INITIAL_TASKS_UI);
@@ -262,6 +326,16 @@ export function TasksView() {
 		}
 		setTaskQueue(task.id, "now", 0);
 		dispatchUi({ type: "focusTask", taskId: task.id });
+	};
+
+	const renameTask = (id: string, title: string) => {
+		const nextTitle = title.trim();
+		if (!nextTitle) return;
+		updateItem(id, { title: nextTitle });
+	};
+
+	const patchTask = (id: string, patch: Partial<Item>) => {
+		updateItem(id, patch);
 	};
 
 	const handleDragEnd = ({ active, over }: DragEndEvent) => {
@@ -397,13 +471,19 @@ export function TasksView() {
 									section={section}
 									tasks={tasksBySection.get(section.id) ?? []}
 									spaces={spaces}
+									tags={allTags}
 									layoutMode={prefs.layoutMode}
 									collapsed={prefs.collapsed[section.id as PlanningSectionId] ?? false}
 									onToggleCollapse={() => toggleSection(section.id as PlanningSectionId)}
 									onToggleDone={toggleDone}
 									onQueue={setTaskQueue}
+									onEdit={renameTask}
+									onPatch={patchTask}
+									onMoveToSpace={moveItemToSpace}
+									onDelete={removeItem}
 									onOpen={openDetail}
 									onFocus={focusTask}
+									onStartBlitz={openBlitz}
 									focusedTaskId={ui.focusedTaskId}
 									onOpenBlitz={section.id === "now" ? openBlitz : undefined}
 								/>
@@ -622,26 +702,38 @@ function TaskSection({
 	section,
 	tasks,
 	spaces,
+	tags,
 	layoutMode,
 	collapsed,
 	onToggleCollapse,
 	onToggleDone,
 	onQueue,
+	onEdit,
+	onPatch,
+	onMoveToSpace,
+	onDelete,
 	onOpen,
 	onFocus,
+	onStartBlitz,
 	focusedTaskId,
 	onOpenBlitz,
 }: {
 	section: { id: SectionId; label: string; hint: string };
 	tasks: Item[];
 	spaces: Space[];
+	tags: string[];
 	layoutMode: LayoutMode;
 	collapsed: boolean;
 	onToggleCollapse: () => void;
 	onToggleDone: (id: string) => void;
 	onQueue: (id: string, queue: TaskQueue) => void;
+	onEdit: (id: string, title: string) => void;
+	onPatch: (id: string, patch: Partial<Item>) => void;
+	onMoveToSpace: (id: string, spaceId: string) => void;
+	onDelete: (id: string) => void;
 	onOpen: (id: string) => void;
 	onFocus: (task: Item) => void;
+	onStartBlitz: () => void;
 	focusedTaskId?: string;
 	onOpenBlitz?: () => void;
 }) {
@@ -710,11 +802,20 @@ function TaskSection({
 								<SortableTaskCard
 									key={task.id}
 									task={task}
-									groupName={spaceName(spaces, task.spaceId)}
+									spaces={spaces}
+									tags={tags}
 									onToggleDone={onToggleDone}
 									onQueue={onQueue}
+									onEdit={onEdit}
+									onPatch={onPatch}
+									onMoveToSpace={onMoveToSpace}
+									onDelete={onDelete}
 									onOpen={() => onOpen(task.id)}
 									onFocus={() => onFocus(task)}
+									onStartBlitz={() => {
+										onFocus(task);
+										onStartBlitz();
+									}}
 									focused={focusedTaskId === task.id}
 								/>
 							))
@@ -797,6 +898,439 @@ function CountBadge({ count }: { count: number }) {
 
 function DropdownLabel({ children }: { children: React.ReactNode }) {
 	return <div className="px-2 py-2 text-ink-dim text-xs">{children}</div>;
+}
+
+function InlineSpacePill({
+	spaces,
+	spaceId,
+	onChange,
+}: {
+	spaces: Space[];
+	spaceId: string;
+	onChange: (spaceId: string) => void;
+}) {
+	const active = spaces.find((space) => space.id === spaceId);
+	const activeAccent = active ? SPACE_ACCENT_CLASSES[active.color] : "bg-line text-ink-dim";
+
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={
+					<button
+						type="button"
+						className="flex h-6 max-w-[170px] items-center gap-1.5 rounded-[5px] border border-line-soft bg-base px-2 font-bold text-[10px] text-ink-muted transition-colors hover:border-line-strong hover:text-ink-2"
+					/>
+				}
+			>
+				<span className={cn("grid size-3.5 place-items-center rounded-[3px] text-[9px] leading-none", activeAccent)}>
+					<SpaceIcon icon={active?.icon ?? "sparkles"} className="size-2.5" />
+				</span>
+				<span className="truncate">{active?.name ?? "Group"}</span>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent
+				align="start"
+				className="w-56 border border-line-2 bg-panel p-1 text-ink-2"
+			>
+				{spaces.map((space) => (
+					<DropdownMenuItem
+						key={space.id}
+						onClick={() => onChange(space.id)}
+						className="justify-between"
+					>
+						<span className="flex min-w-0 items-center gap-2">
+							<span className={cn("grid size-4 place-items-center rounded-[4px] text-[10px] leading-none", SPACE_ACCENT_CLASSES[space.color])}>
+								<SpaceIcon icon={space.icon} className="size-3" />
+							</span>
+							<span className="truncate">{space.name}</span>
+						</span>
+						{space.id === spaceId ? <Icons.check className="size-3.5 text-brand" /> : null}
+					</DropdownMenuItem>
+				))}
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+function InlinePriorityPill({
+	priority,
+	onChange,
+	onClear,
+}: {
+	priority?: Priority;
+	onChange: (priority: Priority) => void;
+	onClear: () => void;
+}) {
+	const label = priority ? `P${priority}` : "Priority";
+
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={
+					<button
+						type="button"
+						className={cn(
+							"flex h-6 items-center gap-1.5 rounded-[5px] border px-2 font-bold text-[10px] transition-colors",
+							priority
+								? PRIORITY_META_CLASSES[priority]
+								: "border-line-soft bg-base text-done hover:border-line-strong hover:text-ink-2",
+						)}
+					/>
+				}
+			>
+				<Icons.flag className="size-3" />
+				{label}
+			</DropdownMenuTrigger>
+			<DropdownMenuContent
+				align="start"
+				className="w-40 border border-line-2 bg-panel p-1 text-ink-2"
+			>
+				{([1, 2, 3] as Priority[]).map((p) => (
+					<DropdownMenuItem
+						key={p}
+						onClick={() => onChange(p)}
+						className="justify-between"
+					>
+						<span className={cn("rounded-[4px] px-1.5 py-0.5 font-bold text-[10px]", PRIORITY_META_CLASSES[p])}>
+							P{p}
+						</span>
+						{priority === p ? <Icons.check className="size-3.5 text-brand" /> : null}
+					</DropdownMenuItem>
+				))}
+				<DropdownMenuSeparator className="my-1 bg-line" />
+				<DropdownMenuItem onClick={onClear}>Clear priority</DropdownMenuItem>
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+function InlineDuePill({
+	dueAt,
+	onChange,
+}: {
+	dueAt?: string;
+	onChange: (dueAt?: string) => void;
+}) {
+	const dueDate = dueAt ? parseTaskDueDate(dueAt) : undefined;
+	const dueHasTime = hasDueTime(dueAt);
+	const dueLabel = dueAt && dueDate ? formatDueShort(dueDate, dueHasTime) : "Schedule";
+
+	return (
+		<PopoverRoot>
+			<PopoverTrigger
+				render={
+					<button
+						type="button"
+						className={cn(
+							"flex h-6 items-center gap-1.5 rounded-[5px] border px-2 font-mono font-bold text-[10px] transition-colors",
+							dueAt
+								? "border-honey/30 bg-amber/12 text-honey hover:border-honey/50"
+								: "border-line-soft bg-base text-done hover:border-line-strong hover:text-ink-2",
+						)}
+					/>
+				}
+			>
+				{dueHasTime ? <Icons.clock className="size-3" /> : <Icons.calendar className="size-3" />}
+				{dueLabel}
+			</PopoverTrigger>
+			<PopoverContent className="w-auto p-0">
+				<Calendar
+					mode="single"
+					selected={dueDate}
+					onSelect={(date) => {
+						if (!date) {
+							onChange(undefined);
+							return;
+						}
+						const next = new Date(date);
+						if (dueHasTime && dueDate) {
+							next.setHours(dueDate.getHours(), dueDate.getMinutes(), 0, 0);
+							onChange(next.toISOString());
+							return;
+						}
+						onChange(toDateInputValue(next));
+					}}
+				/>
+				<div className="border-surface border-t px-3 py-2">
+					<div className="mb-2 flex gap-1.5">
+						<button
+							type="button"
+							onClick={() => onChange(quickDate(0))}
+							className="h-7 rounded-[5px] border border-line-2 px-2 text-ink-muted text-xs hover:text-ink-2"
+						>
+							Today
+						</button>
+						<button
+							type="button"
+							onClick={() => onChange(quickDate(1))}
+							className="h-7 rounded-[5px] border border-line-2 px-2 text-ink-muted text-xs hover:text-ink-2"
+						>
+							Tomorrow
+						</button>
+					</div>
+					<label className="flex items-center justify-between gap-3 text-ink-muted text-xs">
+						<span>Time</span>
+						<input
+							type="time"
+							value={dueDate && dueHasTime ? toTimeInputValue(dueDate) : ""}
+							onChange={(event) => {
+								if (!event.target.value) {
+									if (dueDate) onChange(toDateInputValue(dueDate));
+									return;
+								}
+								const [hours, minutes] = event.target.value.split(":").map(Number);
+								const next = dueDate ? new Date(dueDate) : new Date();
+								next.setHours(hours ?? 0, minutes ?? 0, 0, 0);
+								onChange(next.toISOString());
+							}}
+							className="h-7 rounded-[5px] border border-line-2 bg-base px-2 font-mono text-ink text-xs outline-none focus:border-line-max"
+						/>
+					</label>
+					<p className="mt-1.5 text-ink-ghost text-[10px]">Indonesia time (WIB)</p>
+					<div className="mt-2 flex gap-2">
+						<button
+							type="button"
+							disabled={!dueDate || !dueHasTime}
+							onClick={() => dueDate && onChange(toDateInputValue(dueDate))}
+							className="text-ink-muted text-xs hover:text-ink-2 disabled:text-line-strong"
+						>
+							Clear time
+						</button>
+						<button
+							type="button"
+							disabled={!dueAt}
+							onClick={() => onChange(undefined)}
+							className="text-ink-muted text-xs hover:text-ink-2 disabled:text-line-strong"
+						>
+							Clear due
+						</button>
+					</div>
+				</div>
+			</PopoverContent>
+		</PopoverRoot>
+	);
+}
+
+function formatDueShort(date: Date, hasTime: boolean) {
+	const today = new Date();
+	const tomorrow = new Date();
+	tomorrow.setDate(today.getDate() + 1);
+	const time = hasTime ? formatIndonesiaTime(date) : "";
+
+	if (date.toDateString() === today.toDateString()) return hasTime ? `Today ${time}` : "Today";
+	if (date.toDateString() === tomorrow.toDateString()) return hasTime ? `Tmrw ${time}` : "Tmrw";
+	const day = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+	return hasTime ? `${day} ${time}` : day;
+}
+
+function formatIndonesiaTime(date: Date) {
+	return date.toLocaleTimeString("en-US", {
+		hour: "numeric",
+		minute: "2-digit",
+		timeZone: "Asia/Jakarta",
+	});
+}
+
+function TaskMoreMenu({
+	task,
+	spaces,
+	tags,
+	onPatch,
+	onMoveToSpace,
+	onQueue,
+	onOpen,
+	onFocus,
+	onStartBlitz,
+	onDelete,
+}: {
+	task: Item;
+	spaces: Space[];
+	tags: string[];
+	onPatch: (patch: Partial<Item>) => void;
+	onMoveToSpace: (spaceId: string) => void;
+	onQueue: (queue: TaskQueue) => void;
+	onOpen: () => void;
+	onFocus: () => void;
+	onStartBlitz: () => void;
+	onDelete: () => void;
+}) {
+	const dueDate = task.dueAt ? parseTaskDueDate(task.dueAt) : undefined;
+	const dueHasTime = hasDueTime(task.dueAt);
+
+	const setDueTime = (value: string) => {
+		if (!value) {
+			if (dueDate) onPatch({ dueAt: toDateInputValue(dueDate) });
+			return;
+		}
+		const [hours, minutes] = value.split(":").map(Number);
+		const next = dueDate ? new Date(dueDate) : new Date();
+		next.setHours(hours ?? 0, minutes ?? 0, 0, 0);
+		onPatch({ dueAt: next.toISOString() });
+	};
+
+	const toggleTag = (tag: string, checked: boolean) => {
+		const current = task.tags ?? [];
+		onPatch({ tags: checked ? [...new Set([...current, tag])] : current.filter((item) => item !== tag) });
+	};
+
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={
+					<button
+						type="button"
+						title="Task actions"
+						className="grid size-7 place-items-center rounded-[6px] text-ink-muted hover:bg-fill hover:text-ink"
+					/>
+				}
+			>
+				<Icons.moreHorizontal className="size-4" />
+				<span className="sr-only">Task actions</span>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent
+				align="end"
+				className="w-64 border border-line-2 bg-panel p-1 text-ink-2"
+			>
+				<DropdownMenuItem onClick={onOpen} className="justify-between">
+					<span className="flex items-center gap-2">
+						<Icons.arrowUpRight className="size-4 text-ink-dim" />
+						Open details
+					</span>
+				</DropdownMenuItem>
+				<DropdownMenuItem onClick={onFocus}>
+					<Icons.target className="size-4 text-brand" />
+					Focus today
+				</DropdownMenuItem>
+				<DropdownMenuItem onClick={onStartBlitz}>
+					<Icons.timer className="size-4 text-brand" />
+					Start Blitz
+				</DropdownMenuItem>
+
+				<DropdownMenuSeparator className="my-1 bg-line" />
+
+				<DropdownMenuSub>
+					<DropdownMenuSubTrigger>
+						<Icons.flag className="size-4 text-ink-dim" />
+						Priority
+					</DropdownMenuSubTrigger>
+					<DropdownMenuSubContent className="w-36 border border-line-2 bg-panel p-1 text-ink-2">
+						{([1, 2, 3] as Priority[]).map((priority) => (
+							<DropdownMenuItem
+								key={priority}
+								onClick={() => onPatch({ priority })}
+								className="justify-between"
+							>
+								P{priority}
+								{task.priority === priority ? <Icons.check className="size-3.5 text-brand" /> : null}
+							</DropdownMenuItem>
+						))}
+						<DropdownMenuSeparator className="my-1 bg-line" />
+						<DropdownMenuItem onClick={() => onPatch({ priority: undefined })}>
+							Clear priority
+						</DropdownMenuItem>
+					</DropdownMenuSubContent>
+				</DropdownMenuSub>
+
+				<DropdownMenuSub>
+					<DropdownMenuSubTrigger>
+						<Icons.calendar className="size-4 text-ink-dim" />
+						Due date
+					</DropdownMenuSubTrigger>
+					<DropdownMenuSubContent className="w-48 border border-line-2 bg-panel p-1 text-ink-2">
+						<DropdownMenuItem onClick={() => onPatch({ dueAt: quickDate(0) })}>
+							Today
+						</DropdownMenuItem>
+						<DropdownMenuItem onClick={() => onPatch({ dueAt: quickDate(1) })}>
+							Tomorrow
+						</DropdownMenuItem>
+						<DropdownMenuItem onClick={() => onPatch({ dueAt: nextWeekDate() })}>
+							Next week
+						</DropdownMenuItem>
+						<div className="px-2 py-2">
+							<label className="flex items-center justify-between gap-3 text-ink-muted text-xs">
+								<span>Time</span>
+								<input
+									type="time"
+									value={dueDate && dueHasTime ? toTimeInputValue(dueDate) : ""}
+									onClick={(event) => event.stopPropagation()}
+									onKeyDown={(event) => event.stopPropagation()}
+									onChange={(event) => setDueTime(event.target.value)}
+									className="h-7 rounded-[5px] border border-line-2 bg-base px-2 font-mono text-ink text-xs outline-none focus:border-line-max"
+								/>
+							</label>
+						</div>
+						<DropdownMenuSeparator className="my-1 bg-line" />
+						<DropdownMenuItem onClick={() => onPatch({ dueAt: undefined })}>
+							Clear due
+						</DropdownMenuItem>
+					</DropdownMenuSubContent>
+				</DropdownMenuSub>
+
+				<DropdownMenuSub>
+					<DropdownMenuSubTrigger>
+						<Icons.briefcase className="size-4 text-ink-dim" />
+						Move
+					</DropdownMenuSubTrigger>
+					<DropdownMenuSubContent className="w-52 border border-line-2 bg-panel p-1 text-ink-2">
+						<DropdownLabel>Group</DropdownLabel>
+						{spaces.map((space) => (
+							<DropdownMenuItem
+								key={space.id}
+								onClick={() => onMoveToSpace(space.id)}
+								className="justify-between"
+							>
+								<span className="truncate">{space.name}</span>
+								{task.spaceId === space.id ? <Icons.check className="size-3.5 text-brand" /> : null}
+							</DropdownMenuItem>
+						))}
+						<DropdownMenuSeparator className="my-1 bg-line" />
+						<DropdownLabel>Lane</DropdownLabel>
+						{ACTIVE_SECTIONS.map((queue) => (
+							<DropdownMenuItem
+								key={queue}
+								onClick={() => onQueue(queue)}
+								className="justify-between"
+							>
+								{sectionLabel(queue)}
+								{sectionOf(task) === queue ? <Icons.check className="size-3.5 text-brand" /> : null}
+							</DropdownMenuItem>
+						))}
+					</DropdownMenuSubContent>
+				</DropdownMenuSub>
+
+				<DropdownMenuSub>
+					<DropdownMenuSubTrigger>
+						<Icons.hash className="size-4 text-ink-dim" />
+						Tags
+					</DropdownMenuSubTrigger>
+					<DropdownMenuSubContent className="w-48 border border-line-2 bg-panel p-1 text-ink-2">
+						{tags.length === 0 ? (
+							<div className="px-2 py-2 text-ink-ghost text-xs">No tags yet</div>
+						) : (
+							tags.map((tag) => (
+								<DropdownMenuCheckboxItem
+									key={tag}
+									checked={task.tags?.includes(tag) ?? false}
+									onCheckedChange={(checked) => toggleTag(tag, checked)}
+								>
+									#{tag}
+								</DropdownMenuCheckboxItem>
+							))
+						)}
+					</DropdownMenuSubContent>
+				</DropdownMenuSub>
+
+				<DropdownMenuSeparator className="my-1 bg-line" />
+				<DropdownMenuItem
+					variant="destructive"
+					onClick={onDelete}
+					className="text-coral focus:bg-coral/10 focus:text-coral"
+				>
+					<Icons.trash className="size-4" />
+					Delete
+				</DropdownMenuItem>
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
 }
 
 const WORK_PRESETS = [15, 25, 45, 60, 90];
@@ -1214,26 +1748,73 @@ function PlayGlyph() {
 
 function SortableTaskCard({
 	task,
-	groupName,
+	spaces,
+	tags,
 	onToggleDone,
 	onQueue,
+	onEdit,
+	onPatch,
+	onMoveToSpace,
+	onDelete,
 	onOpen,
 	onFocus,
+	onStartBlitz,
 	focused,
 }: {
 	task: Item;
-	groupName: string;
+	spaces: Space[];
+	tags: string[];
 	onToggleDone: (id: string) => void;
 	onQueue: (id: string, queue: TaskQueue) => void;
+	onEdit: (id: string, title: string) => void;
+	onPatch: (id: string, patch: Partial<Item>) => void;
+	onMoveToSpace: (id: string, spaceId: string) => void;
+	onDelete: (id: string) => void;
 	onOpen: () => void;
 	onFocus: () => void;
+	onStartBlitz: () => void;
 	focused: boolean;
 }) {
+	const [editing, setEditing] = useState(false);
+	const [draftTitle, setDraftTitle] = useState(taskTitle(task));
+	const inputRef = useRef<HTMLInputElement>(null);
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
 		id: task.id,
-		disabled: task.done,
+		disabled: task.done || editing,
 	});
-	const section = sectionOf(task);
+	const currentTitle = taskTitle(task);
+
+	useEffect(() => {
+		if (!editing) setDraftTitle(currentTitle);
+	}, [currentTitle, editing]);
+
+	useEffect(() => {
+		if (editing) inputRef.current?.select();
+	}, [editing]);
+
+	const startEdit = () => {
+		setDraftTitle(currentTitle);
+		setEditing(true);
+	};
+
+	const cancelEdit = () => {
+		setDraftTitle(currentTitle);
+		setEditing(false);
+	};
+
+	const saveEdit = () => {
+		const nextTitle = draftTitle.trim();
+		if (nextTitle && nextTitle !== currentTitle) onEdit(task.id, nextTitle);
+		setEditing(false);
+	};
+
+	useEffect(() => {
+		if (!editing) return;
+		const nextTitle = draftTitle.trim();
+		if (!nextTitle || nextTitle === currentTitle) return;
+		const timeout = window.setTimeout(() => onEdit(task.id, nextTitle), 650);
+		return () => window.clearTimeout(timeout);
+	}, [currentTitle, draftTitle, editing, onEdit, task.id]);
 
 	return (
 		<article
@@ -1242,9 +1823,9 @@ function SortableTaskCard({
 			{...attributes}
 			{...listeners}
 			className={cn(
-				"cursor-grab rounded-[7px] border border-line bg-surface px-3 py-2.5 text-left shadow-sm",
+				"cursor-grab rounded-[8px] border border-line bg-surface px-3.5 py-3 text-left shadow-sm",
 				"transition-colors hover:border-line-strong hover:bg-fill active:cursor-grabbing",
-				focused && "border-brand bg-brand-surface",
+				focused && "border-brand bg-brand-surface shadow-[0_0_0_1px_rgba(144,124,232,0.22)]",
 				isDragging && "opacity-60",
 				task.done && "cursor-default opacity-70",
 			)}
@@ -1258,26 +1839,100 @@ function SortableTaskCard({
 					/>
 				</span>
 				<div className="min-w-0 flex-1">
-					<button
-						type="button"
-						onPointerDown={(event) => event.stopPropagation()}
-						onClick={(event) => {
-							event.stopPropagation();
-							onOpen();
-						}}
-						className={cn(
-							"block max-w-full truncate text-left font-semibold text-ink-bright text-sm hover:text-white",
-							task.done && "text-done line-through",
+					<div className="flex min-w-0 items-start gap-1.5">
+						{editing ? (
+							<Input
+								ref={inputRef}
+								value={draftTitle}
+								onPointerDown={(event) => event.stopPropagation()}
+								onClick={(event) => event.stopPropagation()}
+								onChange={(event) => setDraftTitle(event.target.value)}
+								onBlur={saveEdit}
+								onKeyDown={(event) => {
+									if (event.key === "Enter") {
+										event.preventDefault();
+										saveEdit();
+									}
+									if (event.key === "Escape") {
+										event.preventDefault();
+										cancelEdit();
+									}
+								}}
+								aria-label="Task title"
+								className="h-7 min-w-0 flex-1 rounded-[6px] border-line-strong bg-sunken px-2 py-1 font-semibold text-ink-bright text-sm focus-visible:ring-1 focus-visible:ring-brand"
+							/>
+						) : (
+							<button
+								type="button"
+								onPointerDown={(event) => event.stopPropagation()}
+								onClick={(event) => {
+									event.stopPropagation();
+									startEdit();
+								}}
+								className={cn(
+									"block min-w-0 flex-1 truncate text-left font-semibold text-ink-bright text-sm hover:text-white",
+									task.done && "text-done line-through",
+								)}
+							>
+								{currentTitle}
+							</button>
 						)}
+						<div
+							onPointerDown={(event) => event.stopPropagation()}
+							onClick={(event) => event.stopPropagation()}
+							className="flex shrink-0 items-center gap-0.5"
+						>
+							{editing ? (
+								<button
+									type="button"
+									onPointerDown={(event) => {
+										event.preventDefault();
+										event.stopPropagation();
+									}}
+									onClick={cancelEdit}
+									title="Cancel edit"
+									className="grid size-7 place-items-center rounded-[6px] text-ink-muted hover:bg-fill hover:text-ink"
+								>
+									<Icons.x className="size-3.5" />
+								</button>
+							) : (
+								<TaskMoreMenu
+									task={task}
+									spaces={spaces}
+									tags={tags}
+									onPatch={(patch) => onPatch(task.id, patch)}
+									onMoveToSpace={(spaceId) => onMoveToSpace(task.id, spaceId)}
+									onQueue={(queue) => onQueue(task.id, queue)}
+									onOpen={onOpen}
+									onFocus={onFocus}
+									onStartBlitz={onStartBlitz}
+									onDelete={() => onDelete(task.id)}
+								/>
+							)}
+						</div>
+					</div>
+					<div
+						onPointerDown={(event) => event.stopPropagation()}
+						onClick={(event) => event.stopPropagation()}
+						className="mt-2 flex flex-wrap items-center gap-1.5"
 					>
-						{taskTitle(task)}
-					</button>
-					<div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-						<span className="rounded-[5px] bg-line px-1.5 py-0.5 text-ink-dim text-[10px]">
-							{groupName}
-						</span>
-						<PriorityChip priority={task.priority} />
-						<DueChip dueAt={task.dueAt} />
+						{focused ? (
+							<span className="flex h-6 items-center gap-1 rounded-[5px] border border-brand/35 bg-brand-surface px-2 font-bold text-[10px] text-brand-soft">
+								<Icons.target className="size-3" />
+								Focused
+							</span>
+						) : null}
+						<InlineSpacePill
+							spaces={spaces}
+							spaceId={task.spaceId}
+							onChange={(spaceId) => onMoveToSpace(task.id, spaceId)}
+						/>
+						<InlineDuePill dueAt={task.dueAt} onChange={(dueAt) => onPatch(task.id, { dueAt })} />
+						<InlinePriorityPill
+							priority={task.priority}
+							onChange={(priority) => onPatch(task.id, { priority })}
+							onClear={() => onPatch(task.id, { priority: undefined })}
+						/>
 						{task.tags?.slice(0, 2).map((tag) => (
 							<span key={tag} className="rounded-[5px] bg-brand-surface px-1.5 py-0.5 text-brand-soft text-[10px]">
 								#{tag}
@@ -1286,44 +1941,6 @@ function SortableTaskCard({
 					</div>
 				</div>
 			</div>
-			{!task.done ? (
-				<div
-					onPointerDown={(event) => event.stopPropagation()}
-					onClick={(event) => event.stopPropagation()}
-					className="mt-2.5 flex items-center gap-2"
-				>
-					<div className="inline-flex items-center gap-0.5 rounded-[8px] border border-line-2 bg-sunken p-0.5">
-						{ACTIVE_SECTIONS.map((queue) => (
-							<button
-								key={queue}
-								type="button"
-								onClick={() => onQueue(task.id, queue)}
-								className={cn(
-									"rounded-[6px] px-2.5 py-1 font-medium text-[11px] transition-colors",
-									section === queue
-										? "bg-brand text-brand-ink"
-										: "text-ink-muted hover:bg-fill hover:text-ink-2",
-								)}
-							>
-								{sectionLabel(queue)}
-							</button>
-						))}
-					</div>
-					<button
-						type="button"
-						onClick={onFocus}
-						className={cn(
-							"ml-auto inline-flex items-center gap-1.5 rounded-[8px] border px-2.5 py-1 font-medium text-[11px] transition-colors",
-							focused
-								? "border-brand bg-brand text-brand-ink"
-								: "border-line-2 text-brand-soft hover:bg-fill",
-						)}
-					>
-						<Icons.target className="size-3" />
-						Focus
-					</button>
-				</div>
-			) : null}
 		</article>
 	);
 }
