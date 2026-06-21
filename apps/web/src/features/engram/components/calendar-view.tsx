@@ -21,7 +21,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@alphonse/ui/components/dropdown-menu";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
@@ -94,6 +94,32 @@ function startOfDay(date: Date) {
 	copy.setHours(0, 0, 0, 0);
 	return copy;
 }
+
+function addDays(date: Date, days: number) {
+	return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+}
+
+/** A `YYYY-MM-DD` string as a local midnight Date. */
+function parseYMD(value: string) {
+	const [year, month, day] = value.slice(0, 10).split("-").map(Number);
+	return new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
+}
+
+/** Inclusive [start, end] day range a Google event covers (all-day end is exclusive). */
+function eventSpan(event: GoogleEvent): { start: Date; end: Date } {
+	if (event.allDay) {
+		const start = parseYMD(event.start ?? "");
+		const endExclusive = event.end ? parseYMD(event.end) : addDays(start, 1);
+		const end = addDays(endExclusive, -1);
+		return { start, end: end < start ? start : end };
+	}
+	const start = startOfDay(new Date(event.start ?? ""));
+	// Subtract 1ms so an event ending exactly at midnight doesn't bleed into the next day.
+	const end = event.end ? startOfDay(new Date(new Date(event.end).getTime() - 1)) : start;
+	return { start, end: end < start ? start : end };
+}
+
+type GoogleEventSpan = { event: GoogleEvent; isStart: boolean; isEnd: boolean };
 
 function isSameDay(a: Date, b: Date) {
 	return (
@@ -178,10 +204,31 @@ export function CalendarView() {
 		null,
 	);
 
-	const statusQuery = useQuery(trpc.calendar.status.queryOptions());
-	const connected = statusQuery.data?.connected ?? false;
+	// Local opt-out. Google is our only auth provider, so we can't server-side
+	// revoke just the calendar scope without breaking sign-in — "Disconnect"
+	// hides the integration here; a full revoke is done via Google's settings.
+	const [googleHidden, setGoogleHidden] = usePersistentState<boolean>(
+		"engram.calendar.google.hidden",
+		false,
+	);
+
+	// Cache tuning so navigating away and back doesn't blank/reload the calendar:
+	// the shared queryClient keeps these cached, staleTime suppresses redundant
+	// refetches, and gcTime retains data while the page is unmounted.
+	const statusQuery = useQuery(
+		trpc.calendar.status.queryOptions(undefined, {
+			staleTime: 5 * 60_000,
+			gcTime: 30 * 60_000,
+		}),
+	);
+	const grantedOnGoogle = statusQuery.data?.connected ?? false;
+	const connected = grantedOnGoogle && !googleHidden;
 	const calendarsQuery = useQuery(
-		trpc.calendar.calendars.queryOptions(undefined, { enabled: connected }),
+		trpc.calendar.calendars.queryOptions(undefined, {
+			enabled: connected,
+			staleTime: 10 * 60_000,
+			gcTime: 30 * 60_000,
+		}),
 	);
 	const googleCalendars = calendarsQuery.data ?? [];
 
@@ -203,7 +250,14 @@ export function CalendarView() {
 	const eventsQuery = useQuery(
 		trpc.calendar.events.queryOptions(
 			{ timeMin: range.timeMin, timeMax: range.timeMax, calendarIds: selectedGoogleIds },
-			{ enabled: connected && selectedGoogleIds.length > 0 },
+			{
+				enabled: connected && selectedGoogleIds.length > 0,
+				staleTime: 5 * 60_000,
+				gcTime: 30 * 60_000,
+				// Keep showing the previous month's/visit's events while the next
+				// fetch resolves, so switching months or revisiting never flashes empty.
+				placeholderData: keepPreviousData,
+			},
 		),
 	);
 
@@ -213,24 +267,53 @@ export function CalendarView() {
 		return map;
 	}, [googleCalendars]);
 
+	// Spread each event across every day it covers (clamped to the visible grid)
+	// so multi-day events read as a continuous run, with start/middle/end styling.
 	const googleByDay = useMemo(() => {
-		const map = new Map<string, GoogleEvent[]>();
+		const map = new Map<string, GoogleEventSpan[]>();
+		const gridStart = startOfDay(weeks[0][0]);
+		const gridEnd = startOfDay(weeks[5][6]);
 		for (const event of (eventsQuery.data as GoogleEvent[] | undefined) ?? []) {
 			if (!event.start) continue;
-			const key = event.allDay ? event.start.slice(0, 10) : dateKey(new Date(event.start));
-			const list = map.get(key);
-			if (list) list.push(event);
-			else map.set(key, [event]);
+			const span = eventSpan(event);
+			const firstDay = span.start < gridStart ? gridStart : span.start;
+			const lastDay = span.end > gridEnd ? gridEnd : span.end;
+			for (let day = firstDay; day <= lastDay; day = addDays(day, 1)) {
+				const isStart = isSameDay(day, span.start);
+				const isEnd = isSameDay(day, span.end);
+				const key = dateKey(day);
+				const list = map.get(key);
+				const entry = { event, isStart, isEnd };
+				if (list) list.push(entry);
+				else map.set(key, [entry]);
+			}
+		}
+		// Stable global ordering (earliest start, then id) so a multi-day run keeps
+		// the same lane across every cell it touches — making the bar look connected.
+		for (const [, list] of map) {
+			list.sort((a, b) => {
+				const startCmp = (a.event.start ?? "").localeCompare(b.event.start ?? "");
+				return startCmp !== 0 ? startCmp : a.event.id.localeCompare(b.event.id);
+			});
 		}
 		return map;
-	}, [eventsQuery.data]);
+	}, [eventsQuery.data, weeks]);
 
-	const connectGoogle = () =>
+	const connectGoogle = () => {
+		setGoogleHidden(false);
+		// Already granted on Google's side (just hidden locally) → no need to re-consent.
+		if (grantedOnGoogle) return;
 		authClient.linkSocial({
 			provider: "google",
 			scopes: [GOOGLE_CALENDAR_SCOPE],
 			callbackURL: "/calendar",
 		});
+	};
+
+	const disconnectGoogle = () => {
+		setGoogleHidden(true);
+		setGoogleCalendarIds([]);
+	};
 
 	const toggleCalendar = (id: string, checked: boolean) =>
 		setGoogleCalendarIds((current) => {
@@ -282,8 +365,8 @@ export function CalendarView() {
 
 	return (
 		<section className="flex h-full flex-col bg-base text-white">
-			<div className="min-w-0 flex-1 overflow-y-auto px-5 py-7 lg:px-8">
-				<div className="mx-auto flex h-full max-w-[1280px] flex-col">
+			<div className="min-w-0 flex-1 overflow-y-auto px-5 pt-7 pb-28 lg:px-8">
+				<div className="mx-auto flex max-w-[1280px] flex-col">
 					<div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
 						<div>
 							<h2 className="flex items-center gap-3 font-serif font-medium text-3xl tracking-tight">
@@ -318,8 +401,10 @@ export function CalendarView() {
 								<GoogleCalendarMenu
 									calendars={googleCalendars}
 									selectedIds={selectedGoogleIds}
+									syncing={calendarsQuery.isFetching || eventsQuery.isFetching}
 									onToggle={toggleCalendar}
 									onReconnect={connectGoogle}
+									onDisconnect={disconnectGoogle}
 								/>
 							) : (
 								<button
@@ -374,8 +459,8 @@ export function CalendarView() {
 						onDragEnd={handleDragEnd}
 						onDragCancel={() => setActiveId(null)}
 					>
-						<div className="mt-4 flex min-h-[560px] flex-1 flex-col overflow-hidden rounded-[12px] border border-line">
-							<div className="grid grid-cols-7 border-line border-b bg-surface">
+						<div className="mt-4 flex flex-col overflow-hidden rounded-[12px] border border-line">
+							<div className="sticky top-0 z-10 grid grid-cols-7 border-line border-b bg-surface">
 								{WEEKDAYS.map((weekday) => (
 									<div
 										key={weekday}
@@ -385,7 +470,7 @@ export function CalendarView() {
 									</div>
 								))}
 							</div>
-							<div className="grid flex-1 grid-cols-7 grid-rows-6">
+							<div className="grid grid-cols-7 [grid-auto-rows:minmax(116px,auto)]">
 								{weeks.flat().map((day) => (
 									<DayCell
 										key={dateKey(day)}
@@ -425,7 +510,7 @@ function DayCell({
 	inMonth: boolean;
 	isToday: boolean;
 	events: Item[];
-	googleEvents: GoogleEvent[];
+	googleEvents: GoogleEventSpan[];
 	calendarColor: Map<string, string>;
 	onAdd: () => void;
 	onOpenEvent: (id: string) => void;
@@ -436,7 +521,7 @@ function DayCell({
 		<div
 			ref={setNodeRef}
 			className={cn(
-				"group/cell relative flex min-h-[112px] flex-col gap-1 border-line border-r border-b p-1.5 [&:nth-child(7n)]:border-r-0",
+				"group/cell relative flex flex-col gap-1 border-line border-r border-b p-1.5 [&:nth-child(7n)]:border-r-0",
 				inMonth ? "bg-base" : "bg-sunken",
 				isOver && "bg-brand-surface",
 			)}
@@ -459,16 +544,19 @@ function DayCell({
 					<Icons.plus className="size-3.5" />
 				</button>
 			</div>
-			<div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-				{events.map((event) => (
-					<EventChip key={event.id} event={event} onOpen={() => onOpenEvent(event.id)} />
-				))}
-				{googleEvents.map((event) => (
+			{/* Multi-day Google events first, consistently ordered, so runs line up across cells. */}
+			<div className="flex flex-col gap-1">
+				{googleEvents.map(({ event, isStart, isEnd }) => (
 					<GoogleEventChip
 						key={event.id}
 						event={event}
 						color={calendarColor.get(event.calendarId) ?? null}
+						isStart={isStart}
+						isEnd={isEnd}
 					/>
+				))}
+				{events.map((event) => (
+					<EventChip key={event.id} event={event} onOpen={() => onOpenEvent(event.id)} />
 				))}
 			</div>
 		</div>
@@ -476,9 +564,20 @@ function DayCell({
 }
 
 /** Read-only event sourced from Google Calendar — opens the event in Google on click. */
-function GoogleEventChip({ event, color }: { event: GoogleEvent; color: string | null }) {
-	const timed = !event.allDay && event.start ? formatTime(new Date(event.start)) : null;
+function GoogleEventChip({
+	event,
+	color,
+	isStart,
+	isEnd,
+}: {
+	event: GoogleEvent;
+	color: string | null;
+	isStart: boolean;
+	isEnd: boolean;
+}) {
+	const timed = isStart && !event.allDay && event.start ? formatTime(new Date(event.start)) : null;
 	const accent = color ?? "var(--color-line-strong)";
+	const continues = !isStart || !isEnd;
 
 	return (
 		<a
@@ -486,10 +585,25 @@ function GoogleEventChip({ event, color }: { event: GoogleEvent; color: string |
 			target="_blank"
 			rel="noreferrer"
 			title={event.title}
-			style={{ borderLeftColor: accent, background: `color-mix(in srgb, ${accent} 12%, transparent)` }}
-			className="flex w-full items-center gap-1 truncate rounded-[5px] border border-line border-l-2 px-1.5 py-0.5 text-left text-[11px] text-ink-2 hover:text-white"
+			style={{
+				// Left accent + left rounding only where the run begins; right rounding only where it ends.
+				borderLeftColor: isStart ? accent : "transparent",
+				background: `color-mix(in srgb, ${accent} 12%, transparent)`,
+				borderTopLeftRadius: isStart ? 5 : 0,
+				borderBottomLeftRadius: isStart ? 5 : 0,
+				borderTopRightRadius: isEnd ? 5 : 0,
+				borderBottomRightRadius: isEnd ? 5 : 0,
+			}}
+			className={cn(
+				"flex w-full items-center gap-1 truncate border border-line border-l-2 px-1.5 py-0.5 text-left text-[11px] text-ink-2 hover:text-white",
+				continues && "border-dashed",
+			)}
 		>
-			<span className="size-1.5 shrink-0 rounded-full" style={{ background: accent }} />
+			{isStart ? (
+				<span className="size-1.5 shrink-0 rounded-full" style={{ background: accent }} />
+			) : (
+				<Icons.chevronRight className="size-3 shrink-0 opacity-40" />
+			)}
 			{timed ? <span className="shrink-0 font-mono tabular-nums opacity-80">{timed}</span> : null}
 			<span className="min-w-0 flex-1 truncate">{event.title}</span>
 		</a>
@@ -499,22 +613,30 @@ function GoogleEventChip({ event, color }: { event: GoogleEvent; color: string |
 function GoogleCalendarMenu({
 	calendars,
 	selectedIds,
+	syncing,
 	onToggle,
 	onReconnect,
+	onDisconnect,
 }: {
 	calendars: { id: string; summary: string; primary: boolean; color: string | null }[];
 	selectedIds: string[];
+	syncing: boolean;
 	onToggle: (id: string, checked: boolean) => void;
 	onReconnect: () => void;
+	onDisconnect: () => void;
 }) {
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger className="flex h-9 items-center gap-2 rounded-[8px] border border-brand/40 bg-brand-surface px-3 text-brand-soft text-sm hover:text-white">
 				<Icons.calendar className="size-4" />
 				Google
-				<span className="rounded-[5px] bg-fill px-1.5 py-0.5 font-mono text-[10px] text-ink-muted">
-					{selectedIds.length}
-				</span>
+				{syncing ? (
+					<Icons.rotate className="size-3.5 animate-spin text-ink-muted" />
+				) : (
+					<span className="rounded-[5px] bg-fill px-1.5 py-0.5 font-mono text-[10px] text-ink-muted">
+						{selectedIds.length}
+					</span>
+				)}
 				<Icons.chevronRight className="size-4 rotate-90 opacity-60" />
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end" className="w-[260px] border border-line-2 bg-panel p-1 text-ink-2">
@@ -544,6 +666,19 @@ function GoogleCalendarMenu({
 					<Icons.rotate className="size-4" />
 					Reconnect / fix permissions
 				</DropdownMenuItem>
+				<DropdownMenuItem onClick={onDisconnect} className="text-ink-dim">
+					<Icons.x className="size-4" />
+					Disconnect calendar
+				</DropdownMenuItem>
+				<a
+					href="https://myaccount.google.com/connections"
+					target="_blank"
+					rel="noreferrer"
+					className="flex items-center gap-2 rounded-[6px] px-2 py-1.5 text-ink-faint text-xs hover:bg-fill hover:text-ink-2"
+				>
+					<Icons.arrowUpRight className="size-3.5" />
+					Revoke access in Google
+				</a>
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);
