@@ -4,7 +4,7 @@ import { cn } from "@alphonse/ui/lib/utils";
 import { CalendarIcon, FlagIcon, Hash as HashIcon, LayoutDashboard as LayoutDashboardIcon } from "./icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { type CaptureToken, highlightSegments, type Segment } from "../capture-grammar";
+import { type CaptureToken, escapeBefore, highlightSegments, type Segment } from "../capture-grammar";
 import type { ItemType } from "../types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -263,6 +263,36 @@ export function CaptureInput({
     }
   }
 
+  // Inline "cancel syntax": Backspace at a token's right edge (or Delete at its
+  // left edge) escapes that token — the word stays as plain text, the highlight
+  // and parsing drop away — instead of deleting a character. Press again to
+  // delete normally.
+  function tryInlineCancel(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Backspace" && e.key !== "Delete") return false;
+    const el = ref.current;
+    const caret = el?.selectionStart ?? null;
+    if (el === null || caret === null || el.selectionStart !== el.selectionEnd) return false;
+
+    let pos = 0;
+    for (const seg of segments) {
+      const segStart = pos;
+      const segEnd = pos + seg.text.length;
+      const cancellable = seg.kind === "priority" || seg.kind === "tag" || seg.kind === "date";
+      const atRightEdge = e.key === "Backspace" && segEnd === caret;
+      const atLeftEdge = e.key === "Delete" && segStart === caret;
+      if (cancellable && (atRightEdge || atLeftEdge)) {
+        onValueChange(escapeBefore(value, segStart));
+        // The marker is inserted before the token, so a Backspace caret shifts by one.
+        const nextCaret = e.key === "Backspace" ? caret + 1 : caret;
+        setPopup(null);
+        requestAnimationFrame(() => { el.focus(); el.setSelectionRange(nextCaret, nextCaret); });
+        return true;
+      }
+      pos = segEnd;
+    }
+    return false;
+  }
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (dropdownOpen) {
       if (e.key === "ArrowDown") { e.preventDefault(); setActiveIndex((i) => (i + 1) % popupItems.length); return; }
@@ -276,6 +306,7 @@ export function CaptureInput({
       // let other keys fall through to mutate text; popup recomputes on keyup
       return;
     }
+    if (tryInlineCancel(e)) { e.preventDefault(); return; }
     onCommitKeyDown?.(e);
   }
 

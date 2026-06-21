@@ -19,14 +19,24 @@ import { startOfDay } from "date-fns";
 
 import type { Priority } from "./types";
 
+// ── Escape marker ─────────────────────────────────────────────────────────
+// A zero-width word-joiner (U+2060) inserted immediately before a token to
+// "cancel" it: the word stays as literal text but is no longer parsed or
+// highlighted. Every token pattern below either breaks naturally on the marker
+// (priority, which requires `^|\s` before `!`) or carries a `(?<!⁠)`
+// lookbehind so an escaped occurrence is skipped. parseCapture strips the
+// marker from the title before the item is created.
+export const ESCAPE = "⁠";
+
 // ── Token patterns ──────────────────────────────────────────────────────────
 
 // Priority: `!1`, `!p2`, ` !p3`. Capture group 1 is the digit (used by parse;
-// ignored by highlight). The same span matches for both paths.
+// ignored by highlight). The same span matches for both paths. The `^|\s`
+// requirement means an ESCAPE before `!` already prevents a match.
 const PRIORITY_RE = /(?:^|\s)!(?:p)?([123])\b/i;
 
 // Tags: `#focus`, `#side-project`. Capture group 1 is the tag name.
-const TAG_RE = /#(\w[\w-]*)/g;
+const TAG_RE = /(?<!⁠)#(\w[\w-]*)/g;
 
 // Mentions. The two paths intentionally differ:
 //   • PARSE strips completed mentions (`@foo`, `@foo-bar`) from the title.
@@ -40,18 +50,18 @@ const MENTION_HIGHLIGHT_RE = /@\w*/g;
 const SPACE_TRIGGER_RE = /~\S*/g;
 
 // "Someday"/"later" defers with no due date and wins over date parsing.
-const SOMEDAY_RE = /\b(?:someday|later)\b/i;
+const SOMEDAY_RE = /(?<!⁠)\b(?:someday|later)\b/i;
 
 // Relative day phrases, in priority order, with their day offset from `base`.
 const DUE_PHRASES: { regex: RegExp; offsetDays: number; label: string }[] = [
-  { regex: /\btonight\b/i, offsetDays: 0, label: "Tonight" },
-  { regex: /\btoday\b/i, offsetDays: 0, label: "Today" },
-  { regex: /\btomorrow\b/i, offsetDays: 1, label: "Tomorrow" },
-  { regex: /\bnext week\b/i, offsetDays: 7, label: "Next week" },
+  { regex: /(?<!⁠)\btonight\b/i, offsetDays: 0, label: "Tonight" },
+  { regex: /(?<!⁠)\btoday\b/i, offsetDays: 0, label: "Today" },
+  { regex: /(?<!⁠)\btomorrow\b/i, offsetDays: 1, label: "Tomorrow" },
+  { regex: /(?<!⁠)\bnext week\b/i, offsetDays: 7, label: "Next week" },
 ];
 
 // Clock time near a day phrase, or standalone. Parse allows `at3pm` (\s*).
-const DUE_TIME_RE = /\b(?:at\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i;
+const DUE_TIME_RE = /(?<!⁠)\b(?:at\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i;
 const DUE_TIME_AFTER_RE = /^\s*(?:at\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i;
 const DUE_TIME_BEFORE_RE = /\b(?:at\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*$/i;
 
@@ -63,8 +73,8 @@ const DUE_TIME_BEFORE_RE = /\b(?:at\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*$/i;
 // RECONCILE #3 (someday colour): highlight lumps someday/later into the green
 //   "date" colour, while parse treats them as a distinct "someday" token.
 //   Preserved via HIGHLIGHT_DATE_WORD_RE below.
-const HIGHLIGHT_DATE_WORD_RE = /\b(?:tonight|today|tomorrow|next week|someday|later)\b/gi;
-const HIGHLIGHT_TIME_RE = /\b(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/gi;
+const HIGHLIGHT_DATE_WORD_RE = /(?<!⁠)\b(?:tonight|today|tomorrow|next week|someday|later)\b/gi;
+const HIGHLIGHT_TIME_RE = /(?<!⁠)\b(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/gi;
 
 // ── parseCapture: raw string → Item payload ─────────────────────────────────
 
@@ -114,7 +124,8 @@ export function parseCapture(value: string, base = new Date()): ParsedCapture {
   }
 
   return {
-    cleanText: cleanText.replace(/\s{2,}/g, " ").trim(),
+    // Drop any escape markers so cancelled words read as plain text in the title.
+    cleanText: cleanText.replaceAll(ESCAPE, "").replace(/\s{2,}/g, " ").trim(),
     priority,
     dueDate: parsedDue?.date,
     dueHasTime: parsedDue?.hasTime,
@@ -122,6 +133,54 @@ export function parseCapture(value: string, base = new Date()): ParsedCapture {
     tags,
     tokens,
   };
+}
+
+/**
+ * "Cancel" a parsed token: insert an ESCAPE marker before its occurrence in
+ * `value` so the word stays as literal text but is no longer parsed/highlighted.
+ * Returns the new string (marker is zero-width, so the visible text is unchanged).
+ */
+export function cancelToken(value: string, token: ParsedCapture["tokens"][number]): string {
+  if (token.kind === "priority") {
+    const m = value.match(PRIORITY_RE);
+    if (!m || m.index === undefined) return value;
+    // Skip the leading whitespace so the marker lands right before `!`.
+    const lead = m[0].length - m[0].replace(/^\s+/, "").length;
+    return insertEscape(value, [m.index + lead]);
+  }
+  if (token.kind === "someday") {
+    const m = value.match(SOMEDAY_RE);
+    return m?.index === undefined ? value : insertEscape(value, [m.index]);
+  }
+  if (token.kind === "tag") {
+    // token.label is like "#focus" — escape that exact, not-yet-escaped tag.
+    const escaped = token.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`(?<!${ESCAPE})${escaped}\\b`);
+    const m = value.match(re);
+    return m?.index === undefined ? value : insertEscape(value, [m.index]);
+  }
+  // date — escape every day-phrase and standalone time so "tomorrow 3pm" fully cancels.
+  const indices: number[] = [];
+  for (const phrase of DUE_PHRASES) {
+    const m = value.match(phrase.regex);
+    if (m?.index !== undefined) indices.push(m.index);
+  }
+  const time = value.match(DUE_TIME_RE);
+  if (time?.index !== undefined) indices.push(time.index);
+  return indices.length ? insertEscape(value, indices) : value;
+}
+
+/** Insert a single ESCAPE marker before `index`, cancelling the token that starts there. */
+export function escapeBefore(value: string, index: number): string {
+  return insertEscape(value, [index]);
+}
+
+/** Insert the ESCAPE marker at each index, right-to-left so earlier offsets stay valid. */
+function insertEscape(value: string, indices: number[]): string {
+  const sorted = [...new Set(indices)].sort((a, b) => b - a);
+  let out = value;
+  for (const index of sorted) out = out.slice(0, index) + ESCAPE + out.slice(index);
+  return out;
 }
 
 function parseDuePhrase(value: string, base: Date) {
