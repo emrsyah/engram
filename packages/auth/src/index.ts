@@ -32,6 +32,12 @@ export function createAuth() {
       google: {
         clientId: env.GOOGLE_CLIENT_ID,
         clientSecret: env.GOOGLE_CLIENT_SECRET,
+        // Offline access so Google issues a refresh token — required to keep
+        // calling the Calendar API after the short-lived access token expires.
+        // The read-only calendar scope is requested incrementally (via
+        // authClient.linkSocial) only when the user connects their calendar,
+        // so normal sign-in still asks for just profile + email.
+        accessType: "offline",
       },
     },
     // Encrypt stored OAuth access/refresh tokens at rest (AES-256-GCM).

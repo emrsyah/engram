@@ -13,7 +13,19 @@ import {
 	type DragEndEvent,
 	type DragStartEvent,
 } from "@dnd-kit/core";
-import { useMemo, useState } from "react";
+import {
+	DropdownMenu,
+	DropdownMenuCheckboxItem,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@alphonse/ui/components/dropdown-menu";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+
+import { authClient } from "@/lib/auth-client";
+import { trpc } from "@/utils/trpc";
 
 import { useEngramStore } from "../store";
 import type { Item, Priority, Space } from "../types";
@@ -21,6 +33,20 @@ import { useUIStore } from "../ui-store";
 import { usePersistentState } from "../use-persistent-state";
 import { Icons } from "./icons";
 import { taskTitle } from "./tasks-view";
+
+// Read-only calendar access, requested incrementally when the user connects.
+// Kept in sync with GOOGLE_CALENDAR_SCOPE in packages/api/src/routers/calendar.ts.
+const GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
+
+type GoogleEvent = {
+	id: string;
+	calendarId: string;
+	title: string;
+	start: string | null;
+	end: string | null;
+	allDay: boolean;
+	htmlLink: string | null;
+};
 
 type CalendarPrefs = {
 	spaceId: string | "all";
@@ -144,6 +170,74 @@ export function CalendarView() {
 		return map;
 	}, [allTaskItems, prefs.showDone, prefs.spaceId]);
 
+	// ── Google Calendar ──────────────────────────────────────────────────────
+	// null = never chosen yet (so we can default to Google's own visibility once
+	// the list loads); [] = explicitly showing none.
+	const [googleCalendarIds, setGoogleCalendarIds] = usePersistentState<string[] | null>(
+		"engram.calendar.google.v1",
+		null,
+	);
+
+	const statusQuery = useQuery(trpc.calendar.status.queryOptions());
+	const connected = statusQuery.data?.connected ?? false;
+	const calendarsQuery = useQuery(
+		trpc.calendar.calendars.queryOptions(undefined, { enabled: connected }),
+	);
+	const googleCalendars = calendarsQuery.data ?? [];
+
+	useEffect(() => {
+		if (googleCalendarIds === null && googleCalendars.length > 0) {
+			setGoogleCalendarIds(googleCalendars.filter((c) => c.selectedByDefault).map((c) => c.id));
+		}
+	}, [googleCalendars, googleCalendarIds, setGoogleCalendarIds]);
+
+	const selectedGoogleIds = googleCalendarIds ?? [];
+
+	const range = useMemo(() => {
+		const first = weeks[0][0];
+		const last = weeks[5][6];
+		const end = new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1);
+		return { timeMin: first.toISOString(), timeMax: end.toISOString() };
+	}, [weeks]);
+
+	const eventsQuery = useQuery(
+		trpc.calendar.events.queryOptions(
+			{ timeMin: range.timeMin, timeMax: range.timeMax, calendarIds: selectedGoogleIds },
+			{ enabled: connected && selectedGoogleIds.length > 0 },
+		),
+	);
+
+	const calendarColor = useMemo(() => {
+		const map = new Map<string, string>();
+		for (const calendar of googleCalendars) if (calendar.color) map.set(calendar.id, calendar.color);
+		return map;
+	}, [googleCalendars]);
+
+	const googleByDay = useMemo(() => {
+		const map = new Map<string, GoogleEvent[]>();
+		for (const event of (eventsQuery.data as GoogleEvent[] | undefined) ?? []) {
+			if (!event.start) continue;
+			const key = event.allDay ? event.start.slice(0, 10) : dateKey(new Date(event.start));
+			const list = map.get(key);
+			if (list) list.push(event);
+			else map.set(key, [event]);
+		}
+		return map;
+	}, [eventsQuery.data]);
+
+	const connectGoogle = () =>
+		authClient.linkSocial({
+			provider: "google",
+			scopes: [GOOGLE_CALENDAR_SCOPE],
+			callbackURL: "/calendar",
+		});
+
+	const toggleCalendar = (id: string, checked: boolean) =>
+		setGoogleCalendarIds((current) => {
+			const base = current ?? [];
+			return checked ? [...new Set([...base, id])] : base.filter((value) => value !== id);
+		});
+
 	const goToday = () => setCursor({ year: today.getFullYear(), month: today.getMonth() });
 	const step = (delta: number) =>
 		setCursor((current) => {
@@ -220,6 +314,24 @@ export function CalendarView() {
 								<Icons.check className="size-4" />
 								Show done
 							</button>
+							{connected ? (
+								<GoogleCalendarMenu
+									calendars={googleCalendars}
+									selectedIds={selectedGoogleIds}
+									onToggle={toggleCalendar}
+									onReconnect={connectGoogle}
+								/>
+							) : (
+								<button
+									type="button"
+									onClick={connectGoogle}
+									disabled={statusQuery.isLoading}
+									className="flex h-9 items-center gap-2 rounded-[8px] border border-line-2 bg-sunken px-3 text-ink-2 text-sm hover:text-white disabled:opacity-50"
+								>
+									<Icons.calendar className="size-4 text-brand" />
+									Connect Google
+								</button>
+							)}
 						</div>
 					</div>
 
@@ -281,6 +393,8 @@ export function CalendarView() {
 										inMonth={day.getMonth() === cursor.month}
 										isToday={isSameDay(day, today)}
 										events={eventsByDay.get(dateKey(day)) ?? []}
+										googleEvents={googleByDay.get(dateKey(day)) ?? []}
+										calendarColor={calendarColor}
 										onAdd={() => addEventOn(day)}
 										onOpenEvent={openDetail}
 									/>
@@ -302,6 +416,8 @@ function DayCell({
 	inMonth,
 	isToday,
 	events,
+	googleEvents,
+	calendarColor,
 	onAdd,
 	onOpenEvent,
 }: {
@@ -309,6 +425,8 @@ function DayCell({
 	inMonth: boolean;
 	isToday: boolean;
 	events: Item[];
+	googleEvents: GoogleEvent[];
+	calendarColor: Map<string, string>;
 	onAdd: () => void;
 	onOpenEvent: (id: string) => void;
 }) {
@@ -345,8 +463,89 @@ function DayCell({
 				{events.map((event) => (
 					<EventChip key={event.id} event={event} onOpen={() => onOpenEvent(event.id)} />
 				))}
+				{googleEvents.map((event) => (
+					<GoogleEventChip
+						key={event.id}
+						event={event}
+						color={calendarColor.get(event.calendarId) ?? null}
+					/>
+				))}
 			</div>
 		</div>
+	);
+}
+
+/** Read-only event sourced from Google Calendar — opens the event in Google on click. */
+function GoogleEventChip({ event, color }: { event: GoogleEvent; color: string | null }) {
+	const timed = !event.allDay && event.start ? formatTime(new Date(event.start)) : null;
+	const accent = color ?? "var(--color-line-strong)";
+
+	return (
+		<a
+			href={event.htmlLink ?? undefined}
+			target="_blank"
+			rel="noreferrer"
+			title={event.title}
+			style={{ borderLeftColor: accent, background: `color-mix(in srgb, ${accent} 12%, transparent)` }}
+			className="flex w-full items-center gap-1 truncate rounded-[5px] border border-line border-l-2 px-1.5 py-0.5 text-left text-[11px] text-ink-2 hover:text-white"
+		>
+			<span className="size-1.5 shrink-0 rounded-full" style={{ background: accent }} />
+			{timed ? <span className="shrink-0 font-mono tabular-nums opacity-80">{timed}</span> : null}
+			<span className="min-w-0 flex-1 truncate">{event.title}</span>
+		</a>
+	);
+}
+
+function GoogleCalendarMenu({
+	calendars,
+	selectedIds,
+	onToggle,
+	onReconnect,
+}: {
+	calendars: { id: string; summary: string; primary: boolean; color: string | null }[];
+	selectedIds: string[];
+	onToggle: (id: string, checked: boolean) => void;
+	onReconnect: () => void;
+}) {
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger className="flex h-9 items-center gap-2 rounded-[8px] border border-brand/40 bg-brand-surface px-3 text-brand-soft text-sm hover:text-white">
+				<Icons.calendar className="size-4" />
+				Google
+				<span className="rounded-[5px] bg-fill px-1.5 py-0.5 font-mono text-[10px] text-ink-muted">
+					{selectedIds.length}
+				</span>
+				<Icons.chevronRight className="size-4 rotate-90 opacity-60" />
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="end" className="w-[260px] border border-line-2 bg-panel p-1 text-ink-2">
+				<div className="px-2 py-2 text-ink-dim text-xs">Calendars to show</div>
+				{calendars.length === 0 ? (
+					<div className="px-2 py-3 text-ink-ghost text-xs">No calendars found</div>
+				) : (
+					calendars.map((calendar) => (
+						<DropdownMenuCheckboxItem
+							key={calendar.id}
+							checked={selectedIds.includes(calendar.id)}
+							onCheckedChange={(checked) => onToggle(calendar.id, checked === true)}
+							onSelect={(event) => event.preventDefault()}
+						>
+							<span className="flex min-w-0 items-center gap-2">
+								<span
+									className="size-2.5 shrink-0 rounded-full"
+									style={{ background: calendar.color ?? "var(--color-line-strong)" }}
+								/>
+								<span className="truncate">{calendar.summary}</span>
+							</span>
+						</DropdownMenuCheckboxItem>
+					))
+				)}
+				<DropdownMenuSeparator className="my-1 bg-line" />
+				<DropdownMenuItem onClick={onReconnect} className="text-ink-dim">
+					<Icons.rotate className="size-4" />
+					Reconnect / fix permissions
+				</DropdownMenuItem>
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }
 
