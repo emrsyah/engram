@@ -1,0 +1,32 @@
+# Phase 0 spike — throwaway. Postgres (logical replication) + ElectricSQL proxy.
+# Isolated from the real Supabase DB on purpose. Tear down with `docker compose down -v`.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: engram_spike
+    # wal_level=logical is the one hard Postgres requirement for Electric.
+    command: ["postgres", "-c", "wal_level=logical"]
+    ports:
+      - "54321:5432" # host:container — high port to avoid clashing with any local pg
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d engram_spike"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  electric:
+    image: electricsql/electric:latest
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/engram_spike?sslmode=disable
+      # Spike only: disable auth/secret so we can curl the shape API directly.
+      ELECTRIC_INSECURE: "true"
+    ports:
+      - "3010:3000" # Electric HTTP shape API → http://localhost:3010/v1/shape
+    depends_on:
+      postgres:
+        condition: service_healthy

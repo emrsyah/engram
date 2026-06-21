@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Engram sync spike — Electric → PGlite (IndexedDB)</title>
+  <style>
+    body { font: 14px/1.5 ui-monospace, monospace; max-width: 760px; margin: 40px auto; padding: 0 16px; background:#111; color:#eee; }
+    h1 { font-size: 18px; } code { color:#7dd3fc; }
+    .row { padding: 8px 10px; border:1px solid #333; border-radius:8px; margin:6px 0; background:#1a1a1a; }
+    .meta { color:#888; font-size:12px; }
+    #log { white-space: pre-wrap; color:#9ca3af; border-top:1px solid #333; margin-top:20px; padding-top:12px; }
+    .ok { color:#4ade80; } .err { color:#f87171; }
+  </style>
+</head>
+<body>
+  <h1>Engram sync spike</h1>
+  <p class="meta">
+    Reads sync from Electric (<code>:3010</code>) into local PGlite at
+    <code>idb://engram-spike</code>, filtered to <code>user_id='u1'</code>.
+    Reload → loads from IndexedDB. Insert in Postgres → appears live.
+  </p>
+  <div id="items">loading…</div>
+  <div id="log"></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

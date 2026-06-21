@@ -113,6 +113,8 @@ type CaptureInputProps = {
   autoFocus?: boolean;
   inputRef?: React.RefObject<HTMLInputElement | null>;
   className?: string;
+  /** Where the trigger popup opens. Defaults to "top" (for bottom-anchored bars). */
+  popupPlacement?: "top" | "bottom";
 };
 
 export function CaptureInput({
@@ -129,6 +131,7 @@ export function CaptureInput({
   autoFocus,
   inputRef,
   className,
+  popupPlacement = "top",
 }: CaptureInputProps) {
   const internalRef = useRef<HTMLInputElement>(null);
   const ref = inputRef ?? internalRef;
@@ -201,10 +204,17 @@ export function CaptureInput({
     if (popup.kind === "priority") {
       const opt = PRIORITY_OPTIONS.find((p) => p.id === id);
       if (!opt) return;
-      const next = splice(value, popup.triggerAt, popup.caretAt, opt.shorthand);
+      // Priority is exclusive: drop the in-progress trigger AND any priority already
+      // in the line, then append the chosen one — never accumulate `!p1 !p2`.
+      const withoutTrigger = value.slice(0, popup.triggerAt) + value.slice(popup.caretAt);
+      const stripped = withoutTrigger
+        .replace(/(?:^|\s)!(?:p)?[123]\b/gi, " ")
+        .replace(/\s{2,}/g, " ")
+        .trimEnd();
+      const next = stripped.length ? `${stripped} ${opt.shorthand}` : opt.shorthand;
       onValueChange(next);
       setPopup(null);
-      const pos = popup.triggerAt + opt.shorthand.length;
+      const pos = next.length;
       requestAnimationFrame(() => { ref.current?.focus(); ref.current?.setSelectionRange(pos, pos); });
       return;
     }
@@ -314,7 +324,12 @@ export function CaptureInput({
 
       {/* Popup dropdown */}
       {dropdownOpen && (
-        <div className="absolute bottom-full left-0 z-[200] mb-1.5 w-[clamp(240px,100%,340px)] overflow-hidden rounded-[10px] border border-raise bg-clay py-1 shadow-xl shadow-black/50">
+        <div
+          className={cn(
+            "absolute left-0 z-[200] w-[clamp(240px,100%,340px)] overflow-hidden rounded-[10px] border border-raise bg-clay py-1 shadow-xl shadow-black/50",
+            popupPlacement === "bottom" ? "top-full mt-1.5" : "bottom-full mb-1.5",
+          )}
+        >
           <p className="px-2.5 pt-1 pb-1.5 font-mono text-[10px] uppercase tracking-widest text-ink-faint">
             {popupTitle}
           </p>

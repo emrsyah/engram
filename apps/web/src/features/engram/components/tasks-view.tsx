@@ -37,11 +37,14 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useReducer, useRef, useState } from "react";
 
+import { parseCapture } from "../capture-grammar";
+import { haptic } from "../haptics";
 import { SPACE_ICONS, type SpaceIconKey } from "../nav";
 import { useEngramStore } from "../store";
 import type { Accent, Item, Priority, Space, TaskQueue } from "../types";
 import { type BlitzPhase, type BlitzPrefs, useUIStore } from "../ui-store";
 import { usePersistentState } from "../use-persistent-state";
+import { CaptureInput, type MentionItem } from "./capture-input";
 import { Icons } from "./icons";
 
 type TaskFilter =
@@ -53,6 +56,17 @@ type LayoutMode = "columns" | "stacked";
 type SortMode = "manual" | "due" | "priority" | "recent";
 type PlanningSectionId = "later" | "next" | "now";
 type SectionId = PlanningSectionId | "done";
+
+/** Payload emitted by the capture bar once a line has been parsed. */
+type CaptureSubmit = {
+	title: string;
+	priority?: Priority;
+	dueAt?: string;
+	someday?: boolean;
+	tags?: string[];
+	spaceId: string;
+	connections: MentionItem[];
+};
 
 /** Durable view preferences — persisted across navigation and reload. */
 type TasksPrefs = {
@@ -167,6 +181,14 @@ function startOfDay(date: Date) {
 	return copy;
 }
 
+/** True when a task's due date is on a past calendar day (compared at start-of-day). */
+function isOverdue(dueAt?: string) {
+	if (!dueAt) return false;
+	const due = startOfDay(parseTaskDueDate(dueAt)).getTime();
+	const today = startOfDay(new Date()).getTime();
+	return due < today;
+}
+
 /** Where a task's due date places it: today/overdue → Today, any later date → This week. */
 function dateBucket(dueAt?: string): PlanningSectionId | undefined {
 	if (!dueAt) return undefined;
@@ -177,14 +199,18 @@ function dateBucket(dueAt?: string): PlanningSectionId | undefined {
 
 /**
  * Section resolution, in precedence order:
- *  1. An explicit "now"/"next" queue (set by drag or the lane buttons) wins.
- *  2. Otherwise the due date decides (today → Today, later → This week).
- *  3. Dateless tasks fall to Backlog.
+ *  1. An explicit queue (set by drag or the lane buttons) always wins — including
+ *     "later". This keeps the board the user chose stable: a task dragged to Backlog
+ *     stays there, and adding a due date never silently relocates a placed task.
+ *  2. For an unplaced task (no explicit queue), the due date decides
+ *     (today/overdue → Today, later → This week).
+ *  3. Otherwise it falls to Backlog.
  */
 export function sectionOf(task: Item): SectionId {
 	if (task.done) return "done";
 	if (task.taskQueue === "now") return "now";
 	if (task.taskQueue === "next") return "next";
+	if (task.taskQueue === "later") return "later";
 	return dateBucket(task.dueAt) ?? "later";
 }
 
@@ -255,7 +281,7 @@ function nextWeekDate() {
 }
 
 export function TasksView() {
-	const { allTaskItems, allTags, createItem, moveItemToSpace, removeItem, spaces, setTaskQueue, toggleDone, updateItem } =
+	const { allTaskItems, allTags, connectItems, createItem, moveItemToSpace, removeItem, spaces, setTaskQueue, toggleDone, updateItem } =
 		useEngramStore();
 	const { openDetail, openBlitz } = useUIStore();
 	const [ui, dispatchUi] = useReducer(tasksUiReducer, INITIAL_TASKS_UI);
@@ -293,17 +319,24 @@ export function TasksView() {
 	}
 	for (const [key, tasks] of tasksBySection) tasksBySection.set(key, sortTasksBy(tasks, prefs.sort));
 
-	const addTask = () => {
-		const title = ui.newTask.trim();
-		if (!title || !defaultSpaceId) return;
-		createItem({
+	const captureMentionItems: MentionItem[] = allTaskItems
+		.filter((task) => !task.done)
+		.map((task) => ({ id: task.id, label: taskTitle(task), type: task.type }));
+
+	const createTaskFromCapture = (payload: CaptureSubmit) => {
+		haptic("success");
+		const item = createItem({
 			type: "task",
-			title,
+			title: payload.title,
+			priority: payload.priority,
+			dueAt: payload.dueAt,
+			someday: !payload.dueAt && payload.someday ? true : undefined,
+			tags: payload.tags && payload.tags.length > 0 ? payload.tags : undefined,
 			taskQueue: "later",
-			spaceId: defaultSpaceId,
+			spaceId: payload.spaceId,
 			stayOnCurrentView: true,
 		});
-		dispatchUi({ type: "newTask", newTask: "" });
+		for (const conn of payload.connections) connectItems(item.id, conn.id);
 	};
 
 	const focusedTask = ui.focusedTaskId
@@ -417,25 +450,12 @@ export function TasksView() {
 						</div>
 					) : null}
 
-					<div className="mt-6 flex gap-2 rounded-[12px] border border-line-2 bg-sunken p-2 focus-within:border-line-strong">
-						<Input
-							value={ui.newTask}
-							onChange={(event) => dispatchUi({ type: "newTask", newTask: event.target.value })}
-							onKeyDown={(event) => {
-								if (event.key === "Enter") addTask();
-							}}
-							placeholder="Add to Backlog..."
-							className="h-10 border-0 bg-transparent text-ink-bright placeholder:text-ink-dim focus-visible:ring-0"
-						/>
-						<Button
-							type="button"
-							onClick={addTask}
-							className="h-10 gap-2 rounded-[8px] bg-brand px-4 font-semibold text-brand-ink hover:bg-brand-bright"
-						>
-							<Icons.plus className="size-4" />
-							Add
-						</Button>
-					</div>
+					<TaskCaptureBar
+						spaces={spaces}
+						mentionItems={captureMentionItems}
+						defaultSpaceId={defaultSpaceId}
+						onCreate={createTaskFromCapture}
+					/>
 
 					{focusedTask ? (
 						<div className="mt-4 flex items-center gap-3 rounded-[12px] border border-ink-ghost bg-brand-surface px-4 py-3">
@@ -502,6 +522,166 @@ export function TasksView() {
 				</div>
 			</div>
 		</section>
+	);
+}
+
+/**
+ * The "Add to Backlog" bar, upgraded with the shared capture grammar:
+ * `!p1` priority, `#tag`, natural-language dates (today/tomorrow/3pm…), `~space`
+ * to file it, `/` for the command palette, and `@` to link to another task.
+ */
+function TaskCaptureBar({
+	spaces,
+	mentionItems,
+	defaultSpaceId,
+	onCreate,
+}: {
+	spaces: Space[];
+	mentionItems: MentionItem[];
+	defaultSpaceId?: string;
+	onCreate: (payload: CaptureSubmit) => void;
+}) {
+	const inputRef = useRef<HTMLInputElement>(null);
+	const [text, setText] = useState("");
+	const [captureTarget, setCaptureTarget] = useState<string | undefined>(defaultSpaceId);
+	const [connections, setConnections] = useState<MentionItem[]>([]);
+	// A date chosen via the picker / `/date` command overrides any date parsed from text.
+	const [manualDue, setManualDue] = useState<string | undefined>(undefined);
+	const [dueOpen, setDueOpen] = useState(false);
+
+	const targetSpaceId = captureTarget ?? defaultSpaceId;
+	const parsed = parseCapture(text);
+	const parsedDue = parsed.dueDate
+		? parsed.dueHasTime
+			? parsed.dueDate.toISOString()
+			: toDateInputValue(parsed.dueDate)
+		: undefined;
+	const effectiveDueAt = manualDue ?? parsedDue;
+	// Title is the text with all syntax tokens stripped — a line that is *only*
+	// metadata (e.g. "tomorrow !p1") has no title and can't be committed.
+	const title = parsed.cleanText;
+	const canCommit = title.length > 0 && !!targetSpaceId;
+
+	const availableMentions = mentionItems.filter(
+		(item) => !connections.some((conn) => conn.id === item.id),
+	);
+
+	const reset = () => {
+		setText("");
+		setConnections([]);
+		setManualDue(undefined);
+		requestAnimationFrame(() => inputRef.current?.focus());
+	};
+
+	const submit = () => {
+		if (!canCommit || !targetSpaceId) return;
+		onCreate({
+			title,
+			priority: parsed.priority,
+			dueAt: effectiveDueAt,
+			someday: parsed.someday,
+			tags: parsed.tags,
+			spaceId: targetSpaceId,
+			connections,
+		});
+		reset();
+	};
+
+	return (
+		<div className="mt-6 rounded-[12px] border border-line-2 bg-sunken p-2 focus-within:border-line-strong">
+			<div className="flex items-center gap-2">
+				<Icons.plus className="ml-1 size-4 shrink-0 text-brand-glow" />
+				<CaptureInput
+					inputRef={inputRef}
+					value={text}
+					onValueChange={setText}
+					highlight={["priority", "tag", "date", "mention"]}
+					popupPlacement="bottom"
+					mentionItems={availableMentions}
+					onSelectMention={(item) =>
+						setConnections((current) =>
+							current.some((conn) => conn.id === item.id) ? current : [...current, item],
+						)
+					}
+					spaces={spaces.map((space) => ({ id: space.id, name: space.name }))}
+					onSelectSpace={(id) => setCaptureTarget(id)}
+					onOpenDatePicker={() => setDueOpen(true)}
+					onCommitKeyDown={(event) => {
+						if (event.key === "Enter") {
+							event.preventDefault();
+							submit();
+						}
+					}}
+					placeholder="Add to Backlog…  !p1 · #tag · tomorrow 3pm · ~space · @link"
+				/>
+				<Button
+					type="button"
+					onClick={submit}
+					disabled={!canCommit}
+					className="h-10 gap-2 rounded-[8px] bg-brand px-4 font-semibold text-brand-ink hover:bg-brand-bright disabled:opacity-40"
+				>
+					<Icons.plus className="size-4" />
+					Add
+				</Button>
+			</div>
+
+			{parsed.tokens.length > 0 || connections.length > 0 || effectiveDueAt ? (
+				<div className="mt-2 flex flex-wrap items-center gap-1.5 pl-7">
+					{parsed.tokens.map((token) => (
+						<span
+							key={`${token.kind}-${token.label}`}
+							className={cn(
+								"rounded-[5px] border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider",
+								token.kind === "priority"
+									? "border-amber/30 bg-amber/12 text-honey"
+									: token.kind === "tag"
+										? "border-p3 bg-brand-surface text-blue"
+										: token.kind === "someday"
+											? "border-brand/30 bg-brand-surface text-brand-soft"
+											: "border-line-strong bg-fill text-ink-2",
+							)}
+						>
+							{token.label}
+						</span>
+					))}
+					{connections.map((conn) => (
+						<span
+							key={conn.id}
+							className="flex items-center gap-1 rounded-[5px] border border-line-max bg-brand-surface py-0.5 pr-1 pl-2 text-[11px] text-brand-soft"
+						>
+							<Icons.link className="size-2.5 shrink-0 text-brand-glow" />
+							<span className="max-w-[160px] truncate">{conn.label}</span>
+							<button
+								type="button"
+								onClick={() =>
+									setConnections((current) => current.filter((item) => item.id !== conn.id))
+								}
+								aria-label={`Remove link to ${conn.label}`}
+								className="ml-0.5 grid size-4 place-items-center rounded-[3px] text-brand hover:bg-p3 hover:text-white"
+							>
+								<Icons.x className="size-2.5" />
+							</button>
+						</span>
+					))}
+				</div>
+			) : null}
+
+			<div className="mt-2 flex flex-wrap items-center gap-1.5 pl-7">
+				{targetSpaceId ? (
+					<InlineSpacePill
+						spaces={spaces}
+						spaceId={targetSpaceId}
+						onChange={(spaceId) => setCaptureTarget(spaceId)}
+					/>
+				) : null}
+				<InlineDuePill
+					dueAt={effectiveDueAt}
+					open={dueOpen}
+					onOpenChange={setDueOpen}
+					onChange={(dueAt) => setManualDue(dueAt ?? undefined)}
+				/>
+			</div>
+		</div>
 	);
 }
 
@@ -1005,26 +1185,35 @@ function InlinePriorityPill({
 
 function InlineDuePill({
 	dueAt,
+	overdue = false,
 	onChange,
+	open,
+	onOpenChange,
 }: {
 	dueAt?: string;
+	overdue?: boolean;
 	onChange: (dueAt?: string) => void;
+	open?: boolean;
+	onOpenChange?: (open: boolean) => void;
 }) {
 	const dueDate = dueAt ? parseTaskDueDate(dueAt) : undefined;
 	const dueHasTime = hasDueTime(dueAt);
 	const dueLabel = dueAt && dueDate ? formatDueShort(dueDate, dueHasTime) : "Schedule";
 
 	return (
-		<PopoverRoot>
+		<PopoverRoot open={open} onOpenChange={onOpenChange}>
 			<PopoverTrigger
 				render={
 					<button
 						type="button"
+						title={overdue ? "Overdue" : undefined}
 						className={cn(
 							"flex h-6 items-center gap-1.5 rounded-[5px] border px-2 font-mono font-bold text-[10px] transition-colors",
-							dueAt
-								? "border-honey/30 bg-amber/12 text-honey hover:border-honey/50"
-								: "border-line-soft bg-base text-done hover:border-line-strong hover:text-ink-2",
+							overdue
+								? "border-coral/40 bg-coral/12 text-coral hover:border-coral/60"
+								: dueAt
+									? "border-honey/30 bg-amber/12 text-honey hover:border-honey/50"
+									: "border-line-soft bg-base text-done hover:border-line-strong hover:text-ink-2",
 						)}
 					/>
 				}
@@ -1746,6 +1935,16 @@ function PlayGlyph() {
 	return <span className="ml-1 h-0 w-0 border-y-[11px] border-y-transparent border-l-[16px] border-l-current" />;
 }
 
+function DragGripGlyph() {
+	return (
+		<span className="grid grid-cols-2 gap-[2px]" aria-hidden>
+			{Array.from({ length: 6 }).map((_, index) => (
+				<span key={index} className="size-[2.5px] rounded-full bg-current" />
+			))}
+		</span>
+	);
+}
+
 function SortableTaskCard({
 	task,
 	spaces,
@@ -1783,6 +1982,7 @@ function SortableTaskCard({
 		disabled: task.done || editing,
 	});
 	const currentTitle = taskTitle(task);
+	const overdue = !task.done && isOverdue(task.dueAt);
 
 	useEffect(() => {
 		if (!editing) setDraftTitle(currentTitle);
@@ -1820,17 +2020,28 @@ function SortableTaskCard({
 		<article
 			ref={setNodeRef}
 			style={{ transform: CSS.Transform.toString(transform), transition }}
-			{...attributes}
-			{...listeners}
 			className={cn(
-				"cursor-grab rounded-[8px] border border-line bg-surface px-3.5 py-3 text-left shadow-sm",
-				"transition-colors hover:border-line-strong hover:bg-fill active:cursor-grabbing",
+				"group/task rounded-[8px] border border-line bg-surface px-3.5 py-3 text-left shadow-sm",
+				"transition-colors hover:border-line-strong hover:bg-fill",
+				overdue && "border-l-[3px] border-l-coral",
 				focused && "border-brand bg-brand-surface shadow-[0_0_0_1px_rgba(144,124,232,0.22)]",
 				isDragging && "opacity-60",
-				task.done && "cursor-default opacity-70",
+				task.done && "opacity-70",
 			)}
 		>
-			<div className="flex items-start gap-2.5">
+			<div className="flex items-start gap-2">
+				{!task.done ? (
+					<button
+						type="button"
+						{...attributes}
+						{...listeners}
+						title="Drag to reorder or move"
+						aria-label="Drag to reorder or move"
+						className="mt-0.5 grid size-6 shrink-0 cursor-grab touch-none place-items-center rounded-[5px] text-ink-faint opacity-0 transition-opacity hover:bg-fill hover:text-ink-muted focus-visible:opacity-100 active:cursor-grabbing group-hover/task:opacity-100"
+					>
+						<DragGripGlyph />
+					</button>
+				) : null}
 				<span onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
 					<Checkbox
 						checked={task.done}
@@ -1927,7 +2138,11 @@ function SortableTaskCard({
 							spaceId={task.spaceId}
 							onChange={(spaceId) => onMoveToSpace(task.id, spaceId)}
 						/>
-						<InlineDuePill dueAt={task.dueAt} onChange={(dueAt) => onPatch(task.id, { dueAt })} />
+						<InlineDuePill
+							dueAt={task.dueAt}
+							overdue={overdue}
+							onChange={(dueAt) => onPatch(task.id, { dueAt })}
+						/>
 						<InlinePriorityPill
 							priority={task.priority}
 							onChange={(priority) => onPatch(task.id, { priority })}
