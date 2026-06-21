@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@alphonse/ui/components/button";
+import { Checkbox } from "@alphonse/ui/components/checkbox";
 import { cn } from "@alphonse/ui/lib/utils";
 import {
 	DndContext,
@@ -155,7 +156,7 @@ function monthMatrix(year: number, month: number): Date[][] {
 }
 
 export function CalendarView() {
-	const { allTaskItems, spaces, updateItem, createItem } = useEngramStore();
+	const { allTaskItems, spaces, updateItem, createItem, toggleDone } = useEngramStore();
 	const { openDetail } = useUIStore();
 	const [prefs, setPrefs] = usePersistentState<CalendarPrefs>(
 		CALENDAR_PREFS_KEY,
@@ -166,6 +167,8 @@ export function CalendarView() {
 	const [cursor, setCursor] = useState(() => ({ year: today.getFullYear(), month: today.getMonth() }));
 	const [activeId, setActiveId] = useState<string | null>(null);
 	const activeEvent = activeId ? allTaskItems.find((task) => task.id === activeId) : undefined;
+	// Mobile: the day whose agenda is shown below the compact grid.
+	const [selectedKey, setSelectedKey] = useState(() => dateKey(today));
 
 	const sensors = useSensors(
 		useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -321,12 +324,24 @@ export function CalendarView() {
 			return checked ? [...new Set([...base, id])] : base.filter((value) => value !== id);
 		});
 
-	const goToday = () => setCursor({ year: today.getFullYear(), month: today.getMonth() });
+	const goToday = () => {
+		setCursor({ year: today.getFullYear(), month: today.getMonth() });
+		setSelectedKey(dateKey(today));
+	};
 	const step = (delta: number) =>
 		setCursor((current) => {
 			const next = new Date(current.year, current.month + delta, 1);
+			setSelectedKey(dateKey(next));
 			return { year: next.getFullYear(), month: next.getMonth() };
 		});
+
+	// Mobile: tap a day → show its agenda; follow spillover days into their month.
+	const selectDay = (day: Date) => {
+		setSelectedKey(dateKey(day));
+		if (day.getMonth() !== cursor.month) setCursor({ year: day.getFullYear(), month: day.getMonth() });
+	};
+
+	const selectedDay = parseYMD(selectedKey);
 
 	const addEventOn = (day: Date) => {
 		const space = prefs.spaceId !== "all" ? prefs.spaceId : spaces[0]?.id;
@@ -369,12 +384,13 @@ export function CalendarView() {
 				<div className="mx-auto flex max-w-[1280px] flex-col">
 					<div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
 						<div>
-							<h2 className="flex items-center gap-3 font-serif font-medium text-3xl tracking-tight">
-								<Icons.calendar className="size-7 text-brand-glow" />
+							<h2 className="flex items-center gap-3 font-serif font-medium text-2xl tracking-tight sm:text-3xl">
+								<Icons.calendar className="size-6 text-brand-glow sm:size-7" />
 								Calendar
 							</h2>
 							<p className="mt-2 max-w-2xl text-ink-muted text-sm">
-								Your scheduled tasks. Click a day to add one, or drag an event to reschedule it.
+								Your scheduled tasks. <span className="hidden sm:inline">Click a day to add one, or drag an event to reschedule it.</span>
+								<span className="sm:hidden">Tap a day to see and add events.</span>
 							</p>
 						</div>
 
@@ -453,43 +469,88 @@ export function CalendarView() {
 						</div>
 					</div>
 
-					<DndContext
-						sensors={sensors}
-						onDragStart={handleDragStart}
-						onDragEnd={handleDragEnd}
-						onDragCancel={() => setActiveId(null)}
-					>
-						<div className="mt-4 flex flex-col overflow-hidden rounded-[12px] border border-line">
-							<div className="sticky top-0 z-10 grid grid-cols-7 border-line border-b bg-surface">
+					{/* Desktop: full month grid with drag-to-reschedule. */}
+					<div className="hidden md:block">
+						<DndContext
+							sensors={sensors}
+							onDragStart={handleDragStart}
+							onDragEnd={handleDragEnd}
+							onDragCancel={() => setActiveId(null)}
+						>
+							<div className="mt-4 flex flex-col overflow-hidden rounded-[12px] border border-line">
+								<div className="sticky top-0 z-10 grid grid-cols-7 border-line border-b bg-surface">
+									{WEEKDAYS.map((weekday) => (
+										<div
+											key={weekday}
+											className="px-3 py-2.5 font-medium text-ink-muted text-xs"
+										>
+											{weekday}
+										</div>
+									))}
+								</div>
+								<div className="grid grid-cols-7 [grid-auto-rows:minmax(116px,auto)]">
+									{weeks.flat().map((day) => (
+										<DayCell
+											key={dateKey(day)}
+											day={day}
+											inMonth={day.getMonth() === cursor.month}
+											isToday={isSameDay(day, today)}
+											events={eventsByDay.get(dateKey(day)) ?? []}
+											googleEvents={googleByDay.get(dateKey(day)) ?? []}
+											calendarColor={calendarColor}
+											onAdd={() => addEventOn(day)}
+											onOpenEvent={openDetail}
+										/>
+									))}
+								</div>
+							</div>
+							<DragOverlay dropAnimation={null}>
+								{activeEvent ? <EventChip event={activeEvent} overlay /> : null}
+							</DragOverlay>
+						</DndContext>
+					</div>
+
+					{/* Mobile: compact tappable grid + selected-day agenda. */}
+					<div className="md:hidden">
+						<div className="mt-4 overflow-hidden rounded-[12px] border border-line">
+							<div className="grid grid-cols-7 border-line border-b bg-surface">
 								{WEEKDAYS.map((weekday) => (
-									<div
-										key={weekday}
-										className="px-3 py-2.5 font-medium text-ink-muted text-xs"
-									>
-										{weekday}
+									<div key={weekday} className="py-2 text-center font-medium text-ink-muted text-[11px]">
+										{weekday.slice(0, 1)}
 									</div>
 								))}
 							</div>
-							<div className="grid grid-cols-7 [grid-auto-rows:minmax(116px,auto)]">
-								{weeks.flat().map((day) => (
-									<DayCell
-										key={dateKey(day)}
-										day={day}
-										inMonth={day.getMonth() === cursor.month}
-										isToday={isSameDay(day, today)}
-										events={eventsByDay.get(dateKey(day)) ?? []}
-										googleEvents={googleByDay.get(dateKey(day)) ?? []}
-										calendarColor={calendarColor}
-										onAdd={() => addEventOn(day)}
-										onOpenEvent={openDetail}
-									/>
-								))}
+							<div className="grid grid-cols-7">
+								{weeks.flat().map((day) => {
+									const key = dateKey(day);
+									return (
+										<MiniDay
+											key={key}
+											day={day}
+											inMonth={day.getMonth() === cursor.month}
+											isToday={isSameDay(day, today)}
+											isSelected={key === selectedKey}
+											tasks={eventsByDay.get(key) ?? []}
+											googleSpans={googleByDay.get(key) ?? []}
+											calendarColor={calendarColor}
+											onSelect={() => selectDay(day)}
+										/>
+									);
+								})}
 							</div>
 						</div>
-						<DragOverlay dropAnimation={null}>
-							{activeEvent ? <EventChip event={activeEvent} overlay /> : null}
-						</DragOverlay>
-					</DndContext>
+
+						<MobileAgenda
+							day={selectedDay}
+							isToday={isSameDay(selectedDay, today)}
+							tasks={eventsByDay.get(selectedKey) ?? []}
+							googleSpans={googleByDay.get(selectedKey) ?? []}
+							calendarColor={calendarColor}
+							onAdd={() => addEventOn(selectedDay)}
+							onOpenTask={openDetail}
+							onToggleDone={toggleDone}
+						/>
+					</div>
 				</div>
 			</div>
 		</section>
@@ -716,6 +777,193 @@ function EventChip({
 			{timed ? <span className="shrink-0 tabular-nums opacity-80">{timed}</span> : null}
 			<span className="min-w-0 flex-1 truncate font-sans">{taskTitle(event)}</span>
 		</button>
+	);
+}
+
+/** Dot color for a task in the compact mobile grid. */
+function taskDotColor(task: Item) {
+	if (task.done) return "var(--color-done)";
+	if (task.priority === 1) return "var(--color-coral)";
+	if (task.priority === 2) return "var(--color-amber)";
+	if (task.priority === 3) return "var(--color-blue)";
+	return "var(--color-ink-muted)";
+}
+
+/** Compact, tappable day cell for the mobile month grid (number + event dots). */
+function MiniDay({
+	day,
+	inMonth,
+	isToday,
+	isSelected,
+	tasks,
+	googleSpans,
+	calendarColor,
+	onSelect,
+}: {
+	day: Date;
+	inMonth: boolean;
+	isToday: boolean;
+	isSelected: boolean;
+	tasks: Item[];
+	googleSpans: GoogleEventSpan[];
+	calendarColor: Map<string, string>;
+	onSelect: () => void;
+}) {
+	const dots = [
+		...tasks.map((task) => taskDotColor(task)),
+		...googleSpans.map(({ event }) => calendarColor.get(event.calendarId) ?? "var(--color-line-strong)"),
+	];
+	const shown = dots.slice(0, 4);
+	const extra = dots.length - shown.length;
+
+	return (
+		<button
+			type="button"
+			onClick={onSelect}
+			className={cn(
+				"flex min-h-[54px] flex-col items-center gap-1 border-line border-r border-b py-1.5 active:bg-fill [&:nth-child(7n)]:border-r-0",
+				isSelected && "bg-brand-surface",
+			)}
+		>
+			<span
+				className={cn(
+					"grid size-7 place-items-center rounded-full text-[13px]",
+					isToday
+						? "bg-brand font-semibold text-brand-ink"
+						: isSelected
+							? "font-semibold text-white"
+							: inMonth
+								? "text-ink-2"
+								: "text-ink-ghost",
+				)}
+			>
+				{day.getDate()}
+			</span>
+			<span className="flex h-1.5 items-center gap-0.5">
+				{shown.map((color, index) => (
+					<span key={index} className="size-1.5 rounded-full" style={{ background: color }} />
+				))}
+				{extra > 0 ? <span className="ml-0.5 text-[8px] text-ink-faint leading-none">+</span> : null}
+			</span>
+		</button>
+	);
+}
+
+function MobileAgenda({
+	day,
+	isToday,
+	tasks,
+	googleSpans,
+	calendarColor,
+	onAdd,
+	onOpenTask,
+	onToggleDone,
+}: {
+	day: Date;
+	isToday: boolean;
+	tasks: Item[];
+	googleSpans: GoogleEventSpan[];
+	calendarColor: Map<string, string>;
+	onAdd: () => void;
+	onOpenTask: (id: string) => void;
+	onToggleDone: (id: string) => void;
+}) {
+	const heading = isToday
+		? "Today"
+		: day.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+	const empty = tasks.length === 0 && googleSpans.length === 0;
+
+	return (
+		<div className="mt-5">
+			<div className="flex items-center justify-between">
+				<h4 className="font-semibold text-ink-bright">{heading}</h4>
+				<Button
+					type="button"
+					size="sm"
+					onClick={onAdd}
+					className="h-9 gap-1.5 rounded-[8px] bg-brand px-3 font-semibold text-brand-ink hover:bg-brand-bright"
+				>
+					<Icons.plus className="size-4" />
+					Add
+				</Button>
+			</div>
+			<div className="mt-3 space-y-2">
+				{googleSpans.map(({ event }) => (
+					<a
+						key={event.id}
+						href={event.htmlLink ?? undefined}
+						target="_blank"
+						rel="noreferrer"
+						className="flex items-center gap-2.5 rounded-[8px] border border-line bg-surface px-3 py-2.5"
+					>
+						<span
+							className="size-2.5 shrink-0 rounded-full"
+							style={{ background: calendarColor.get(event.calendarId) ?? "var(--color-line-strong)" }}
+						/>
+						{!event.allDay && event.start ? (
+							<span className="shrink-0 font-mono text-ink-muted text-[11px] tabular-nums">
+								{formatTime(new Date(event.start))}
+							</span>
+						) : null}
+						<span className="min-w-0 flex-1 truncate text-ink-2 text-sm">{event.title}</span>
+						<Icons.arrowUpRight className="size-3.5 shrink-0 text-ink-faint" />
+					</a>
+				))}
+				{tasks.map((task) => (
+					<MobileTaskRow
+						key={task.id}
+						task={task}
+						onOpen={() => onOpenTask(task.id)}
+						onToggleDone={() => onToggleDone(task.id)}
+					/>
+				))}
+				{empty ? (
+					<div className="rounded-[8px] border border-line border-dashed px-3 py-8 text-center text-ink-ghost text-sm">
+						Nothing scheduled. Tap Add to create a task.
+					</div>
+				) : null}
+			</div>
+		</div>
+	);
+}
+
+function MobileTaskRow({
+	task,
+	onOpen,
+	onToggleDone,
+}: {
+	task: Item;
+	onOpen: () => void;
+	onToggleDone: () => void;
+}) {
+	const timed = hasTime(task.dueAt) ? formatTime(parseDue(task.dueAt!)) : null;
+
+	return (
+		<div className="flex items-center gap-3 rounded-[8px] border border-line bg-surface px-3 py-2.5">
+			<span onClick={(event) => event.stopPropagation()}>
+				<Checkbox checked={task.done} onCheckedChange={onToggleDone} className="rounded-full" />
+			</span>
+			<button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
+				<span
+					className={cn(
+						"block truncate font-medium text-ink-bright text-sm",
+						task.done && "text-done line-through",
+					)}
+				>
+					{taskTitle(task)}
+				</span>
+				{timed || task.priority ? (
+					<span className="mt-0.5 flex items-center gap-2">
+						{timed ? <span className="font-mono text-ink-muted text-[11px]">{timed}</span> : null}
+						{task.priority ? (
+							<span className={cn("rounded-[4px] border px-1.5 font-bold text-[10px]", EVENT_CLASSES[task.priority])}>
+								P{task.priority}
+							</span>
+						) : null}
+					</span>
+				) : null}
+			</button>
+		</div>
 	);
 }
 
