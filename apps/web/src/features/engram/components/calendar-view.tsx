@@ -23,7 +23,7 @@ import {
 	DropdownMenuTrigger,
 } from "@alphonse/ui/components/dropdown-menu";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/utils/trpc";
@@ -49,13 +49,34 @@ type GoogleEvent = {
 	htmlLink: string | null;
 };
 
+type CalendarViewMode = "month" | "week" | "day" | "custom";
+
 type CalendarPrefs = {
 	spaceId: string | "all";
 	showDone: boolean;
+	view: CalendarViewMode;
+	customDays: number;
 };
 
-const CALENDAR_PREFS_KEY = "engram.calendar.prefs.v1";
-const DEFAULT_CALENDAR_PREFS: CalendarPrefs = { spaceId: "all", showDone: false };
+// v2 adds `view` + `customDays`; bumped so older stored prefs don't yield an
+// undefined view (usePersistentState replaces wholesale, it doesn't merge).
+const CALENDAR_PREFS_KEY = "engram.calendar.prefs.v2";
+const DEFAULT_CALENDAR_PREFS: CalendarPrefs = {
+	spaceId: "all",
+	showDone: false,
+	view: "month",
+	customDays: 3,
+};
+
+const VIEW_OPTIONS: { value: CalendarViewMode; label: string }[] = [
+	{ value: "month", label: "Month" },
+	{ value: "week", label: "Week" },
+	{ value: "day", label: "Day" },
+	{ value: "custom", label: "Custom" },
+];
+
+const HOUR_HEIGHT = 48;
+const CUSTOM_DAY_CHOICES = [2, 3, 4, 5];
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MONTHS = [
@@ -155,6 +176,34 @@ function monthMatrix(year: number, month: number): Date[][] {
 	return weeks;
 }
 
+/** Monday-started week containing `date`. */
+function weekDays(date: Date): Date[] {
+	const lead = (date.getDay() + 6) % 7;
+	const start = addDays(startOfDay(date), -lead);
+	return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+}
+
+/** The visible days for a time-grid view (week / day / custom). */
+function timeGridDays(anchor: Date, view: CalendarViewMode, customDays: number): Date[] {
+	if (view === "week") return weekDays(anchor);
+	if (view === "day") return [startOfDay(anchor)];
+	return Array.from({ length: customDays }, (_, i) => addDays(startOfDay(anchor), i));
+}
+
+/** Minutes since local midnight for a timed event/task start. */
+function minutesOfDay(date: Date) {
+	return date.getHours() * 60 + date.getMinutes();
+}
+
+/** Compact local-time label from a minute-of-day (matches grid positioning, which is local). */
+function formatMin(minutes: number) {
+	const hour = Math.floor(minutes / 60);
+	const minute = minutes % 60;
+	const ampm = hour < 12 ? "am" : "pm";
+	const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+	return minute === 0 ? `${hour12}${ampm}` : `${hour12}:${pad2(minute)}${ampm}`;
+}
+
 export function CalendarView() {
 	const { allTaskItems, spaces, updateItem, createItem, toggleDone } = useEngramStore();
 	const { openDetail } = useUIStore();
@@ -165,6 +214,17 @@ export function CalendarView() {
 
 	const today = startOfDay(new Date());
 	const [cursor, setCursor] = useState(() => ({ year: today.getFullYear(), month: today.getMonth() }));
+	// Anchor day for the time-grid views (week / day / custom).
+	const [anchor, setAnchor] = useState(() => startOfDay(new Date()));
+	const view = prefs.view;
+	const isTimeGrid = view !== "month";
+	// Live "now" for the current-time line, refreshed each minute.
+	const [now, setNow] = useState(() => new Date());
+	useEffect(() => {
+		if (!isTimeGrid) return;
+		const id = setInterval(() => setNow(new Date()), 60_000);
+		return () => clearInterval(id);
+	}, [isTimeGrid]);
 	const [activeId, setActiveId] = useState<string | null>(null);
 	const activeEvent = activeId ? allTaskItems.find((task) => task.id === activeId) : undefined;
 	// Mobile: the day whose agenda is shown below the compact grid.
@@ -175,6 +235,10 @@ export function CalendarView() {
 	);
 
 	const weeks = useMemo(() => monthMatrix(cursor.year, cursor.month), [cursor]);
+	const visibleDays = useMemo(
+		() => timeGridDays(anchor, view, prefs.customDays),
+		[anchor, view, prefs.customDays],
+	);
 
 	// Bucket scheduled tasks by their due day for O(1) cell lookups.
 	const eventsByDay = useMemo(() => {
@@ -244,11 +308,11 @@ export function CalendarView() {
 	const selectedGoogleIds = googleCalendarIds ?? [];
 
 	const range = useMemo(() => {
-		const first = weeks[0][0];
-		const last = weeks[5][6];
+		const first = isTimeGrid ? visibleDays[0] : weeks[0][0];
+		const last = isTimeGrid ? visibleDays[visibleDays.length - 1] : weeks[5][6];
 		const end = new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1);
 		return { timeMin: first.toISOString(), timeMax: end.toISOString() };
-	}, [weeks]);
+	}, [weeks, isTimeGrid, visibleDays]);
 
 	const eventsQuery = useQuery(
 		trpc.calendar.events.queryOptions(
@@ -326,14 +390,41 @@ export function CalendarView() {
 
 	const goToday = () => {
 		setCursor({ year: today.getFullYear(), month: today.getMonth() });
+		setAnchor(today);
 		setSelectedKey(dateKey(today));
 	};
-	const step = (delta: number) =>
+	const step = (delta: number) => {
+		if (isTimeGrid) {
+			const stride = view === "week" ? 7 : view === "day" ? 1 : prefs.customDays;
+			setAnchor((current) => addDays(current, delta * stride));
+			return;
+		}
 		setCursor((current) => {
 			const next = new Date(current.year, current.month + delta, 1);
 			setSelectedKey(dateKey(next));
 			return { year: next.getFullYear(), month: next.getMonth() };
 		});
+	};
+
+	// Title reflects the active view's visible window.
+	const rangeTitle = (() => {
+		if (!isTimeGrid) return `${MONTHS[cursor.month]} ${cursor.year}`;
+		const first = visibleDays[0];
+		const last = visibleDays[visibleDays.length - 1];
+		if (view === "day") {
+			return first.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+		}
+		const sameMonth = first.getMonth() === last.getMonth();
+		const left = first.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+		const right = last.toLocaleDateString("en-US", sameMonth ? { day: "numeric" } : { month: "short", day: "numeric" });
+		return `${left} – ${right}`;
+	})();
+
+	const setView = (next: CalendarViewMode) => {
+		// Entering a time-grid view from month → anchor on the selected/today day.
+		if (next !== "month" && view === "month") setAnchor(parseYMD(selectedKey));
+		setPrefs((p) => ({ ...p, view: next }));
+	};
 
 	// Mobile: tap a day → show its agenda; follow spillover days into their month.
 	const selectDay = (day: Date) => {
@@ -350,6 +441,22 @@ export function CalendarView() {
 			type: "task",
 			title: "New task",
 			dueAt: dateKey(day),
+			taskQueue: "later",
+			spaceId: space,
+			stayOnCurrentView: true,
+		});
+		openDetail(item.id);
+	};
+
+	// Time-grid: click an empty slot → new task at that minute-of-day.
+	const addEventAt = (day: Date, minutes: number) => {
+		const space = prefs.spaceId !== "all" ? prefs.spaceId : spaces[0]?.id;
+		if (!space) return;
+		const at = new Date(day.getFullYear(), day.getMonth(), day.getDate(), Math.floor(minutes / 60), minutes % 60, 0, 0);
+		const item = createItem({
+			type: "task",
+			title: "New task",
+			dueAt: at.toISOString(),
 			taskQueue: "later",
 			spaceId: space,
 			stayOnCurrentView: true,
@@ -436,11 +543,16 @@ export function CalendarView() {
 						</div>
 					</div>
 
-					<div className="mt-6 flex items-center justify-between">
-						<h3 className="font-semibold text-ink-bright text-xl">
-							{MONTHS[cursor.month]} {cursor.year}
-						</h3>
-						<div className="flex items-center gap-1.5">
+					<div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+						<h3 className="font-semibold text-ink-bright text-xl">{rangeTitle}</h3>
+						<div className="flex flex-wrap items-center gap-1.5">
+							<ViewSwitcher value={view} onChange={setView} />
+							{view === "custom" ? (
+								<CustomDaysPicker
+									value={prefs.customDays}
+									onChange={(customDays) => setPrefs((p) => ({ ...p, customDays }))}
+								/>
+							) : null}
 							<Button
 								type="button"
 								variant="ghost"
@@ -453,7 +565,7 @@ export function CalendarView() {
 							<button
 								type="button"
 								onClick={() => step(-1)}
-								aria-label="Previous month"
+								aria-label="Previous"
 								className="grid size-9 place-items-center rounded-[8px] border border-line-2 bg-sunken text-ink-muted hover:text-white"
 							>
 								<Icons.chevronLeft className="size-4" />
@@ -461,7 +573,7 @@ export function CalendarView() {
 							<button
 								type="button"
 								onClick={() => step(1)}
-								aria-label="Next month"
+								aria-label="Next"
 								className="grid size-9 place-items-center rounded-[8px] border border-line-2 bg-sunken text-ink-muted hover:text-white"
 							>
 								<Icons.chevronRight className="size-4" />
@@ -469,6 +581,25 @@ export function CalendarView() {
 						</div>
 					</div>
 
+					{isTimeGrid ? (
+						<TimeGridView
+							days={visibleDays}
+							view={view}
+							now={now}
+							eventsByDay={eventsByDay}
+							googleEvents={(eventsQuery.data as GoogleEvent[] | undefined) ?? []}
+							calendarColor={calendarColor}
+							sensors={sensors}
+							activeEvent={activeEvent}
+							onDragStart={handleDragStart}
+							onDragEnd={handleDragEnd}
+							onDragCancel={() => setActiveId(null)}
+							onAdd={addEventOn}
+							onAddAt={addEventAt}
+							onOpenEvent={openDetail}
+						/>
+					) : (
+					<>
 					{/* Desktop: full month grid with drag-to-reschedule. */}
 					<div className="hidden md:block">
 						<DndContext
@@ -551,6 +682,8 @@ export function CalendarView() {
 							onToggleDone={toggleDone}
 						/>
 					</div>
+					</>
+					)}
 				</div>
 			</div>
 		</section>
@@ -989,5 +1122,495 @@ function SpaceFilter({
 				</option>
 			))}
 		</select>
+	);
+}
+
+function ViewSwitcher({
+	value,
+	onChange,
+}: {
+	value: CalendarViewMode;
+	onChange: (value: CalendarViewMode) => void;
+}) {
+	return (
+		<div className="flex items-center rounded-[8px] border border-line-2 bg-sunken p-0.5">
+			{VIEW_OPTIONS.map((option) => (
+				<button
+					key={option.value}
+					type="button"
+					onClick={() => onChange(option.value)}
+					className={cn(
+						"h-8 rounded-[6px] px-3 font-medium text-sm",
+						value === option.value
+							? "bg-brand text-brand-ink"
+							: "text-ink-2 hover:text-white",
+					)}
+				>
+					{option.label}
+				</button>
+			))}
+		</div>
+	);
+}
+
+function CustomDaysPicker({
+	value,
+	onChange,
+}: {
+	value: number;
+	onChange: (value: number) => void;
+}) {
+	return (
+		<div className="flex items-center rounded-[8px] border border-line-2 bg-sunken p-0.5">
+			{CUSTOM_DAY_CHOICES.map((choice) => (
+				<button
+					key={choice}
+					type="button"
+					onClick={() => onChange(choice)}
+					aria-label={`${choice} days`}
+					className={cn(
+						"grid size-8 place-items-center rounded-[6px] font-mono text-sm tabular-nums",
+						value === choice ? "bg-fill text-white" : "text-ink-muted hover:text-white",
+					)}
+				>
+					{choice}
+				</button>
+			))}
+		</div>
+	);
+}
+
+// ── Time-grid views (week / day / custom) ────────────────────────────────────
+
+type TimedEntry = {
+	key: string;
+	id: string;
+	title: string;
+	startMin: number;
+	endMin: number;
+	lane: number;
+	cols: number;
+} & (
+	| { kind: "task"; task: Item }
+	| { kind: "google"; href: string | null; color: string }
+);
+
+type AllDayEntry =
+	| { kind: "task"; key: string; task: Item }
+	| { kind: "google"; key: string; event: GoogleEvent; color: string };
+
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
+
+/** Greedy lane assignment so overlapping timed entries sit side-by-side. */
+function layoutDay(entries: TimedEntry[]): TimedEntry[] {
+	const sorted = [...entries].sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
+	const out: TimedEntry[] = [];
+	let cluster: TimedEntry[] = [];
+	let clusterEnd = Number.NEGATIVE_INFINITY;
+	const flush = () => {
+		const laneEnds: number[] = [];
+		for (const entry of cluster) {
+			let lane = laneEnds.findIndex((end) => end <= entry.startMin);
+			if (lane === -1) {
+				lane = laneEnds.length;
+				laneEnds.push(entry.endMin);
+			} else {
+				laneEnds[lane] = entry.endMin;
+			}
+			entry.lane = lane;
+		}
+		for (const entry of cluster) entry.cols = laneEnds.length;
+		out.push(...cluster);
+		cluster = [];
+		clusterEnd = Number.NEGATIVE_INFINITY;
+	};
+	for (const entry of sorted) {
+		if (cluster.length && entry.startMin >= clusterEnd) flush();
+		cluster.push(entry);
+		clusterEnd = Math.max(clusterEnd, entry.endMin);
+	}
+	if (cluster.length) flush();
+	return out;
+}
+
+function TimeGridView({
+	days,
+	view,
+	now,
+	eventsByDay,
+	googleEvents,
+	calendarColor,
+	sensors,
+	activeEvent,
+	onDragStart,
+	onDragEnd,
+	onDragCancel,
+	onAdd,
+	onAddAt,
+	onOpenEvent,
+}: {
+	days: Date[];
+	view: CalendarViewMode;
+	now: Date;
+	eventsByDay: Map<string, Item[]>;
+	googleEvents: GoogleEvent[];
+	calendarColor: Map<string, string>;
+	sensors: ReturnType<typeof useSensors>;
+	activeEvent: Item | undefined;
+	onDragStart: (event: DragStartEvent) => void;
+	onDragEnd: (event: DragEndEvent) => void;
+	onDragCancel: () => void;
+	onAdd: (day: Date) => void;
+	onAddAt: (day: Date, minutes: number) => void;
+	onOpenEvent: (id: string) => void;
+}) {
+	const today = startOfDay(now);
+	const dayKeys = useMemo(() => days.map(dateKey), [days]);
+	const scrollRef = useRef<HTMLDivElement>(null);
+
+	// Open centered on "now" (or 8am if today isn't visible) instead of dead midnight.
+	useEffect(() => {
+		const el = scrollRef.current;
+		if (!el) return;
+		const showsToday = dayKeys.includes(dateKey(today));
+		const target = showsToday ? minutesOfDay(now) : 8 * 60;
+		el.scrollTop = Math.max(0, (target / 60) * HOUR_HEIGHT - 96);
+		// Intentionally not depending on `now` — we scroll on view/day change, not every minute.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [view, dayKeys]);
+
+	const { timedByKey, allDayByKey } = useMemo(() => {
+		const visible = new Set(dayKeys);
+		const timed = new Map<string, TimedEntry[]>();
+		const allDay = new Map<string, AllDayEntry[]>();
+		const pushTimed = (key: string, entry: TimedEntry) => {
+			const list = timed.get(key);
+			if (list) list.push(entry);
+			else timed.set(key, [entry]);
+		};
+		const pushAllDay = (key: string, entry: AllDayEntry) => {
+			const list = allDay.get(key);
+			if (list) list.push(entry);
+			else allDay.set(key, [entry]);
+		};
+
+		for (const key of dayKeys) {
+			for (const task of eventsByDay.get(key) ?? []) {
+				if (hasTime(task.dueAt)) {
+					const start = parseDue(task.dueAt!);
+					const startMin = minutesOfDay(start);
+					pushTimed(key, {
+						kind: "task",
+						key,
+						id: task.id,
+						title: taskTitle(task),
+						startMin,
+						endMin: Math.min(startMin + 45, 24 * 60),
+						lane: 0,
+						cols: 1,
+						task,
+					});
+				} else {
+					pushAllDay(key, { kind: "task", key, task });
+				}
+			}
+		}
+
+		for (const event of googleEvents) {
+			if (!event.start) continue;
+			const color = calendarColor.get(event.calendarId) ?? "var(--color-line-strong)";
+			if (event.allDay) {
+				const span = eventSpan(event);
+				for (const key of dayKeys) {
+					const day = parseYMD(key);
+					if (day >= span.start && day <= span.end) pushAllDay(key, { kind: "google", key, event, color });
+				}
+				continue;
+			}
+			const start = new Date(event.start);
+			const key = dateKey(start);
+			if (!visible.has(key)) continue;
+			const startMin = minutesOfDay(start);
+			const endMin = event.end
+				? Math.max(startMin + 15, Math.min(minutesOfDay(new Date(event.end)), 24 * 60))
+				: Math.min(startMin + 45, 24 * 60);
+			pushTimed(key, {
+				kind: "google",
+				key,
+				id: event.id,
+				title: event.title,
+				startMin,
+				endMin,
+				lane: 0,
+				cols: 1,
+				href: event.htmlLink,
+				color,
+			});
+		}
+
+		for (const [key, list] of timed) timed.set(key, layoutDay(list));
+		return { timedByKey: timed, allDayByKey: allDay };
+	}, [dayKeys, eventsByDay, googleEvents, calendarColor]);
+
+	const hasAnyAllDay = useMemo(
+		() => dayKeys.some((key) => (allDayByKey.get(key)?.length ?? 0) > 0),
+		[dayKeys, allDayByKey],
+	);
+
+	const colsClass = view === "day" ? "grid-cols-1" : undefined;
+	const gridStyle = view === "day" ? undefined : { gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` };
+
+	return (
+		<DndContext
+			sensors={sensors}
+			onDragStart={onDragStart}
+			onDragEnd={onDragEnd}
+			onDragCancel={onDragCancel}
+		>
+			<div className="mt-4 overflow-hidden rounded-[12px] border border-line">
+				{/* Day headers, aligned with the time gutter below. */}
+				<div className="flex border-line border-b bg-surface">
+					<div className="w-14 shrink-0 border-line border-r" />
+					<div className={cn("grid flex-1", colsClass)} style={gridStyle}>
+						{days.map((day) => {
+							const isToday = isSameDay(day, today);
+							return (
+								<button
+									key={dateKey(day)}
+									type="button"
+									onClick={() => onAdd(day)}
+									className="flex items-center justify-center gap-2 border-line border-r py-2 last:border-r-0 hover:bg-fill"
+									title="Add task this day"
+								>
+									<span className="font-medium text-ink-muted text-xs uppercase">
+										{day.toLocaleDateString("en-US", { weekday: "short" })}
+									</span>
+									<span
+										className={cn(
+											"grid size-6 place-items-center rounded-full text-sm",
+											isToday ? "bg-brand font-semibold text-brand-ink" : "text-ink-2",
+										)}
+									>
+										{day.getDate()}
+									</span>
+								</button>
+							);
+						})}
+					</div>
+				</div>
+
+				{/* All-day strip — only when something lands here. */}
+				{hasAnyAllDay ? (
+					<div className="flex border-line border-b bg-sunken/50">
+						<div className="grid w-14 shrink-0 place-items-center border-line border-r py-1 text-ink-faint text-[10px] uppercase">
+							All day
+						</div>
+						<div className={cn("grid flex-1", colsClass)} style={gridStyle}>
+							{dayKeys.map((key) => (
+								<div key={key} className="flex flex-col gap-1 border-line border-r p-1 last:border-r-0">
+									{(allDayByKey.get(key) ?? []).map((entry) =>
+										entry.kind === "task" ? (
+											<button
+												key={`t-${entry.task.id}`}
+												type="button"
+												onClick={() => onOpenEvent(entry.task.id)}
+												title={taskTitle(entry.task)}
+												className={cn(
+													"truncate rounded-[5px] border px-1.5 py-0.5 text-left text-[11px]",
+													EVENT_CLASSES[entry.task.priority ?? "none"],
+													entry.task.done && "opacity-50 line-through",
+												)}
+											>
+												{taskTitle(entry.task)}
+											</button>
+										) : (
+											<a
+												key={`g-${entry.event.id}`}
+												href={entry.event.htmlLink ?? undefined}
+												target="_blank"
+												rel="noreferrer"
+												title={entry.event.title}
+												style={{ background: `color-mix(in srgb, ${entry.color} 12%, transparent)`, borderLeftColor: entry.color }}
+												className="truncate rounded-[5px] border border-line border-l-2 px-1.5 py-0.5 text-left text-[11px] text-ink-2 hover:text-white"
+											>
+												{entry.event.title}
+											</a>
+										),
+									)}
+								</div>
+							))}
+						</div>
+					</div>
+				) : null}
+
+				{/* Scrollable hour grid. */}
+				<div ref={scrollRef} className="max-h-[calc(100vh-320px)] overflow-y-auto">
+					<div className="flex">
+						{/* Hour gutter. */}
+						<div className="w-14 shrink-0">
+							{HOURS.map((hour) => (
+								<div key={hour} className="relative border-line border-r" style={{ height: HOUR_HEIGHT }}>
+									{hour > 0 ? (
+										<span className="-top-2 absolute right-1.5 text-ink-faint text-[10px] tabular-nums">
+											{hour % 12 === 0 ? 12 : hour % 12}
+											{hour < 12 ? "am" : "pm"}
+										</span>
+									) : null}
+								</div>
+							))}
+						</div>
+						{/* Day columns. */}
+						<div className={cn("grid flex-1", colsClass)} style={gridStyle}>
+							{days.map((day) => (
+								<DayColumn
+									key={dateKey(day)}
+									day={day}
+									isToday={isSameDay(day, today)}
+									nowMin={minutesOfDay(now)}
+									timed={timedByKey.get(dateKey(day)) ?? []}
+									onAddAt={onAddAt}
+									onOpenEvent={onOpenEvent}
+								/>
+							))}
+						</div>
+					</div>
+				</div>
+			</div>
+			<DragOverlay dropAnimation={null}>
+				{activeEvent ? <EventChip event={activeEvent} overlay /> : null}
+			</DragOverlay>
+		</DndContext>
+	);
+}
+
+function DayColumn({
+	day,
+	isToday,
+	nowMin,
+	timed,
+	onAddAt,
+	onOpenEvent,
+}: {
+	day: Date;
+	isToday: boolean;
+	nowMin: number;
+	timed: TimedEntry[];
+	onAddAt: (day: Date, minutes: number) => void;
+	onOpenEvent: (id: string) => void;
+}) {
+	const { setNodeRef, isOver } = useDroppable({ id: `day-${dateKey(day)}` });
+	const columnRef = useRef<HTMLDivElement | null>(null);
+
+	// Click an empty slot → create a task there, snapped to the nearest 15 min.
+	const handleSlotClick = (event: MouseEvent<HTMLDivElement>) => {
+		// Only background clicks; clicks on event blocks/gridlines stop propagation or sit above.
+		if (event.target !== event.currentTarget) return;
+		const el = columnRef.current;
+		if (!el) return;
+		const y = event.clientY - el.getBoundingClientRect().top;
+		const raw = (y / HOUR_HEIGHT) * 60;
+		const minutes = Math.max(0, Math.min(23 * 60 + 45, Math.round(raw / 15) * 15));
+		onAddAt(day, minutes);
+	};
+
+	return (
+		<div
+			ref={(node) => {
+				columnRef.current = node;
+				setNodeRef(node);
+			}}
+			onClick={handleSlotClick}
+			className={cn(
+				"group/col relative cursor-pointer border-line border-r last:border-r-0",
+				isToday && "bg-brand-surface/15",
+				isOver && "bg-brand-surface",
+			)}
+			style={{ height: HOUR_HEIGHT * 24 }}
+		>
+			{/* Hour gridlines. */}
+			{HOURS.map((hour) => (
+				<div
+					key={hour}
+					className="pointer-events-none absolute right-0 left-0 border-line/60 border-t"
+					style={{ top: hour * HOUR_HEIGHT }}
+				/>
+			))}
+			{/* Current-time line. */}
+			{isToday ? (
+				<div className="pointer-events-none absolute right-0 left-0 z-20" style={{ top: (nowMin / 60) * HOUR_HEIGHT }}>
+					<div className="-left-1 -top-1 absolute size-2 rounded-full bg-coral" />
+					<div className="border-coral border-t" />
+				</div>
+			) : null}
+			{/* Timed entries. */}
+			{timed.map((entry) => (
+				<TimedBlock key={`${entry.kind}-${entry.id}`} entry={entry} onOpenEvent={onOpenEvent} />
+			))}
+		</div>
+	);
+}
+
+function TimedBlock({
+	entry,
+	onOpenEvent,
+}: {
+	entry: TimedEntry;
+	onOpenEvent: (id: string) => void;
+}) {
+	const draggable = useDraggable({ id: entry.id, disabled: entry.kind !== "task" });
+	const top = (entry.startMin / 60) * HOUR_HEIGHT;
+	const height = Math.max(((entry.endMin - entry.startMin) / 60) * HOUR_HEIGHT, 16);
+	const widthPct = 100 / entry.cols;
+	const position = {
+		top,
+		height,
+		left: `${entry.lane * widthPct}%`,
+		width: `calc(${widthPct}% - 2px)`,
+	} as const;
+	const time = formatMin(entry.startMin);
+	// Tall enough to stack a time line above the title; otherwise inline-prefix it.
+	const stacked = height >= 34;
+
+	if (entry.kind === "google") {
+		return (
+			<a
+				href={entry.href ?? undefined}
+				target="_blank"
+				rel="noreferrer"
+				title={`${time} · ${entry.title}`}
+				style={{ ...position, background: `color-mix(in srgb, ${entry.color} 18%, var(--color-base))`, borderLeftColor: entry.color }}
+				className="absolute z-10 flex flex-col overflow-hidden rounded-[5px] border border-line border-l-2 px-1.5 py-0.5 text-[11px] text-ink-2 leading-tight transition-colors hover:text-white"
+			>
+				{stacked ? <span className="font-mono text-[10px] opacity-70 tabular-nums">{time}</span> : null}
+				<span className="truncate">
+					{stacked ? null : <span className="mr-1 font-mono opacity-70 tabular-nums">{time}</span>}
+					{entry.title}
+				</span>
+			</a>
+		);
+	}
+
+	return (
+		<button
+			ref={draggable.setNodeRef}
+			type="button"
+			{...draggable.attributes}
+			{...draggable.listeners}
+			onClick={() => onOpenEvent(entry.id)}
+			title={`${time} · ${entry.title}`}
+			style={position}
+			className={cn(
+				"absolute z-10 flex cursor-grab flex-col overflow-hidden rounded-[5px] border px-1.5 py-0.5 text-left text-[11px] leading-tight transition-shadow hover:shadow-md",
+				EVENT_CLASSES[entry.task.priority ?? "none"],
+				entry.task.done && "opacity-50 line-through",
+				draggable.isDragging && "opacity-40",
+			)}
+		>
+			{stacked ? <span className="font-mono text-[10px] opacity-70 tabular-nums">{time}</span> : null}
+			<span className="truncate font-sans">
+				{stacked ? null : <span className="mr-1 font-mono opacity-70 tabular-nums">{time}</span>}
+				{entry.title}
+			</span>
+		</button>
 	);
 }
