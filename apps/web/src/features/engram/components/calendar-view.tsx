@@ -464,18 +464,50 @@ export function CalendarView() {
 		openDetail(item.id);
 	};
 
+	const handleResizeEnd = (id: string, startMin: number, _endMin: number) => {
+		const task = allTaskItems.find((item) => item.id === id);
+		if (!task?.dueAt) return;
+		const orig = parseDue(task.dueAt);
+		const next = new Date(orig.getFullYear(), orig.getMonth(), orig.getDate(), Math.floor(startMin / 60), startMin % 60, 0, 0);
+		updateItem(id, { dueAt: next.toISOString() });
+	};
+
 	const handleDragStart = ({ active }: DragStartEvent) => setActiveId(String(active.id));
 
-	const handleDragEnd = ({ active, over }: DragEndEvent) => {
+	const handleDragEnd = ({ active, over, delta }: DragEndEvent) => {
 		setActiveId(null);
 		if (!over) return;
 		const taskId = String(active.id);
-		const dayKey = String(over.id).replace("day-", "");
+		const overId = String(over.id);
+
+		// Strip prefix to get raw date key
+		let dayKey: string;
+		let isAllDayDrop = false;
+		if (overId.startsWith("allday-")) {
+			dayKey = overId.replace("allday-", "");
+			isAllDayDrop = true;
+		} else {
+			dayKey = overId.replace("day-", "");
+		}
+
 		const task = allTaskItems.find((item) => item.id === taskId);
 		if (!task) return;
-		if (task.dueAt && dateKey(parseDue(task.dueAt)) === dayKey) return;
 
 		const [year, month, day] = dayKey.split("-").map(Number);
+
+		// Time-grid drop onto a timed day column: shift time by drag delta.
+		if (isTimeGrid && !isAllDayDrop && hasTime(task.dueAt)) {
+			const prev = parseDue(task.dueAt!);
+			const deltaMin = Math.round((delta.y / HOUR_HEIGHT) * 60 / 15) * 15;
+			const origMin = minutesOfDay(prev);
+			const newMin = Math.max(0, Math.min(23 * 60 + 45, origMin + deltaMin));
+			const next = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1, Math.floor(newMin / 60), newMin % 60, 0, 0);
+			updateItem(taskId, { dueAt: next.toISOString() });
+			return;
+		}
+
+		// All other drops: just change the date, preserve time if any.
+		if (task.dueAt && dateKey(parseDue(task.dueAt)) === dayKey) return;
 		if (hasTime(task.dueAt)) {
 			const prev = parseDue(task.dueAt!);
 			const next = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1, prev.getHours(), prev.getMinutes(), 0, 0);
@@ -591,12 +623,14 @@ export function CalendarView() {
 							calendarColor={calendarColor}
 							sensors={sensors}
 							activeEvent={activeEvent}
+							isDraggingEvent={!!activeEvent}
 							onDragStart={handleDragStart}
 							onDragEnd={handleDragEnd}
 							onDragCancel={() => setActiveId(null)}
 							onAdd={addEventOn}
 							onAddAt={addEventAt}
 							onOpenEvent={openDetail}
+							onResizeEnd={handleResizeEnd}
 						/>
 					) : (
 					<>
@@ -909,6 +943,29 @@ function EventChip({
 		>
 			{timed ? <span className="shrink-0 tabular-nums opacity-80">{timed}</span> : null}
 			<span className="min-w-0 flex-1 truncate font-sans">{taskTitle(event)}</span>
+		</button>
+	);
+}
+
+/** Draggable all-day task chip for the time-grid all-day strip. */
+function AllDayTaskChip({ task, onOpen }: { task: Item; onOpen: () => void }) {
+	const draggable = useDraggable({ id: task.id });
+	return (
+		<button
+			ref={draggable.setNodeRef}
+			type="button"
+			{...draggable.attributes}
+			{...draggable.listeners}
+			onClick={onOpen}
+			title={taskTitle(task)}
+			className={cn(
+				"truncate rounded-[5px] border px-1.5 py-0.5 text-left text-[11px] cursor-grab",
+				EVENT_CLASSES[task.priority ?? "none"],
+				task.done && "opacity-50 line-through",
+				draggable.isDragging && "opacity-40",
+			)}
+		>
+			{taskTitle(task)}
 		</button>
 	);
 }
@@ -1233,6 +1290,22 @@ function layoutDay(entries: TimedEntry[]): TimedEntry[] {
 	return out;
 }
 
+/** Droppable all-day cell wrapper so tasks can be dragged into the all-day strip. */
+function AllDayDropCell({ dayKey, children }: { dayKey: string; children: React.ReactNode }) {
+	const { setNodeRef, isOver } = useDroppable({ id: `allday-${dayKey}` });
+	return (
+		<div
+			ref={setNodeRef}
+			className={cn(
+				"flex flex-col gap-1 border-line border-r p-1 last:border-r-0",
+				isOver && "bg-brand-surface/30",
+			)}
+		>
+			{children}
+		</div>
+	);
+}
+
 function TimeGridView({
 	days,
 	view,
@@ -1242,12 +1315,14 @@ function TimeGridView({
 	calendarColor,
 	sensors,
 	activeEvent,
+	isDraggingEvent,
 	onDragStart,
 	onDragEnd,
 	onDragCancel,
 	onAdd,
 	onAddAt,
 	onOpenEvent,
+	onResizeEnd,
 }: {
 	days: Date[];
 	view: CalendarViewMode;
@@ -1257,12 +1332,14 @@ function TimeGridView({
 	calendarColor: Map<string, string>;
 	sensors: ReturnType<typeof useSensors>;
 	activeEvent: Item | undefined;
+	isDraggingEvent: boolean;
 	onDragStart: (event: DragStartEvent) => void;
 	onDragEnd: (event: DragEndEvent) => void;
 	onDragCancel: () => void;
 	onAdd: (day: Date) => void;
 	onAddAt: (day: Date, minutes: number) => void;
 	onOpenEvent: (id: string) => void;
+	onResizeEnd: (id: string, startMin: number, endMin: number) => void;
 }) {
 	const today = startOfDay(now);
 	const dayKeys = useMemo(() => days.map(dateKey), [days]);
@@ -1407,22 +1484,14 @@ function TimeGridView({
 						</div>
 						<div className={cn("grid flex-1", colsClass)} style={gridStyle}>
 							{dayKeys.map((key) => (
-								<div key={key} className="flex flex-col gap-1 border-line border-r p-1 last:border-r-0">
+								<AllDayDropCell key={key} dayKey={key}>
 									{(allDayByKey.get(key) ?? []).map((entry) =>
 										entry.kind === "task" ? (
-											<button
+											<AllDayTaskChip
 												key={`t-${entry.task.id}`}
-												type="button"
-												onClick={() => onOpenEvent(entry.task.id)}
-												title={taskTitle(entry.task)}
-												className={cn(
-													"truncate rounded-[5px] border px-1.5 py-0.5 text-left text-[11px]",
-													EVENT_CLASSES[entry.task.priority ?? "none"],
-													entry.task.done && "opacity-50 line-through",
-												)}
-											>
-												{taskTitle(entry.task)}
-											</button>
+												task={entry.task}
+												onOpen={() => onOpenEvent(entry.task.id)}
+											/>
 										) : (
 											<a
 												key={`g-${entry.event.id}`}
@@ -1437,7 +1506,7 @@ function TimeGridView({
 											</a>
 										),
 									)}
-								</div>
+								</AllDayDropCell>
 							))}
 						</div>
 					</div>
@@ -1468,8 +1537,10 @@ function TimeGridView({
 									isToday={isSameDay(day, today)}
 									nowMin={minutesOfDay(now)}
 									timed={timedByKey.get(dateKey(day)) ?? []}
+									isDraggingEvent={isDraggingEvent}
 									onAddAt={onAddAt}
 									onOpenEvent={onOpenEvent}
+									onResizeEnd={onResizeEnd}
 								/>
 							))}
 						</div>
@@ -1488,29 +1559,91 @@ function DayColumn({
 	isToday,
 	nowMin,
 	timed,
+	isDraggingEvent,
 	onAddAt,
 	onOpenEvent,
+	onResizeEnd,
 }: {
 	day: Date;
 	isToday: boolean;
 	nowMin: number;
 	timed: TimedEntry[];
+	isDraggingEvent: boolean;
 	onAddAt: (day: Date, minutes: number) => void;
 	onOpenEvent: (id: string) => void;
+	onResizeEnd: (id: string, startMin: number, endMin: number) => void;
 }) {
 	const { setNodeRef, isOver } = useDroppable({ id: `day-${dateKey(day)}` });
 	const columnRef = useRef<HTMLDivElement | null>(null);
+	const [hoverMin, setHoverMin] = useState<number | null>(null);
+	const [createGesture, setCreateGesture] = useState<{ startMin: number; endMin: number } | null>(null);
+	const gestureRef = useRef<{ startMin: number; endMin: number } | null>(null);
+	// Resize state lives here (not in TimedBlock) so parent-controlled props survive React
+	// StrictMode double-invocation and any reconciliation that would discard child local state.
+	const [resizeState, setResizeState] = useState<{ id: string; startMin: number; endMin: number } | null>(null);
 
-	// Click an empty slot → create a task there, snapped to the nearest 15 min.
-	const handleSlotClick = (event: MouseEvent<HTMLDivElement>) => {
-		// Only background clicks; clicks on event blocks/gridlines stop propagation or sit above.
-		if (event.target !== event.currentTarget) return;
+	const getMin = (clientY: number) => {
 		const el = columnRef.current;
-		if (!el) return;
-		const y = event.clientY - el.getBoundingClientRect().top;
+		if (!el) return 0;
+		const y = clientY - el.getBoundingClientRect().top;
 		const raw = (y / HOUR_HEIGHT) * 60;
-		const minutes = Math.max(0, Math.min(23 * 60 + 45, Math.round(raw / 15) * 15));
-		onAddAt(day, minutes);
+		return Math.max(0, Math.min(23 * 60 + 45, Math.round(raw / 15) * 15));
+	};
+
+	const handleResizeStart = (id: string, edge: "top" | "bottom", anchorY: number, origStart: number, origEnd: number) => {
+		let curStart = origStart;
+		let curEnd = origEnd;
+		setResizeState({ id, startMin: curStart, endMin: curEnd });
+
+		const onMove = (me: PointerEvent) => {
+			const dy = me.clientY - anchorY;
+			const dm = Math.round((dy / HOUR_HEIGHT) * 60 / 15) * 15;
+			if (edge === "bottom") {
+				curEnd = Math.max(origStart + 15, Math.min(24 * 60, origEnd + dm));
+				curStart = origStart;
+			} else {
+				curStart = Math.max(0, Math.min(origEnd - 15, origStart + dm));
+				curEnd = origEnd;
+			}
+			setResizeState({ id, startMin: curStart, endMin: curEnd });
+		};
+		const onUp = () => {
+			window.removeEventListener("pointermove", onMove);
+			window.removeEventListener("pointerup", onUp);
+			setResizeState(null);
+			onResizeEnd(id, curStart, curEnd);
+		};
+		window.addEventListener("pointermove", onMove);
+		window.addEventListener("pointerup", onUp);
+	};
+
+	const handleColumnMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+		if (isDraggingEvent || e.target !== e.currentTarget || e.button !== 0) return;
+		const startMin = getMin(e.clientY);
+		// Start at 0 duration — grows as the user drags.
+		const gesture = { startMin, endMin: startMin };
+		gestureRef.current = gesture;
+		setCreateGesture({ ...gesture });
+		setHoverMin(null);
+
+		// Use window-level listeners so updates fire regardless of what element
+		// the cursor is over while dragging (timed blocks, gridlines, etc.).
+		const onMove = (me: MouseEvent) => {
+			if (!gestureRef.current) return;
+			const endMin = getMin(me.clientY);
+			gestureRef.current = { startMin: gestureRef.current.startMin, endMin };
+			setCreateGesture({ ...gestureRef.current });
+		};
+		const onUp = () => {
+			window.removeEventListener("mousemove", onMove);
+			window.removeEventListener("mouseup", onUp);
+			const g = gestureRef.current;
+			gestureRef.current = null;
+			setCreateGesture(null);
+			if (g) onAddAt(day, Math.min(g.startMin, g.endMin));
+		};
+		window.addEventListener("mousemove", onMove);
+		window.addEventListener("mouseup", onUp);
 	};
 
 	return (
@@ -1519,13 +1652,25 @@ function DayColumn({
 				columnRef.current = node;
 				setNodeRef(node);
 			}}
-			onClick={handleSlotClick}
 			className={cn(
-				"group/col relative cursor-pointer border-line border-r last:border-r-0",
+				"group/col relative border-line border-r last:border-r-0",
 				isToday && "bg-brand-surface/15",
 				isOver && "bg-brand-surface",
+				createGesture ? "cursor-crosshair" : "cursor-pointer",
 			)}
 			style={{ height: HOUR_HEIGHT * 24 }}
+			onMouseMove={(e) => {
+				if (isDraggingEvent || gestureRef.current) return;
+				if (e.target === e.currentTarget) {
+					setHoverMin(getMin(e.clientY));
+				} else {
+					setHoverMin(null);
+				}
+			}}
+			onMouseDown={handleColumnMouseDown}
+			onMouseLeave={() => {
+				if (!gestureRef.current) setHoverMin(null);
+			}}
 		>
 			{/* Hour gridlines. */}
 			{HOURS.map((hour) => (
@@ -1542,9 +1687,47 @@ function DayColumn({
 					<div className="border-coral border-t" />
 				</div>
 			) : null}
+			{/* Hover ghost — shown when hovering over empty space. */}
+			{hoverMin !== null && !createGesture && !isDraggingEvent ? (
+				<div
+					className="pointer-events-none absolute left-0.5 right-0.5 z-[5] rounded-[5px] border border-brand/50 bg-brand-surface/40"
+					style={{
+						top: (hoverMin / 60) * HOUR_HEIGHT,
+						height: 0.75 * HOUR_HEIGHT,
+					}}
+				>
+					<span className="block px-1.5 py-0.5 font-mono text-[10px] text-brand-soft">
+						{formatMin(hoverMin)}
+					</span>
+				</div>
+			) : null}
+			{/* Drag-to-create ghost. */}
+			{createGesture ? (() => {
+				const top = Math.min(createGesture.startMin, createGesture.endMin);
+				const bottom = Math.max(createGesture.startMin, createGesture.endMin);
+				return (
+					<div
+						className="pointer-events-none absolute left-0.5 right-0.5 z-[5] rounded-[5px] border border-brand/70 bg-brand-surface/60"
+						style={{
+							top: (top / 60) * HOUR_HEIGHT,
+							height: Math.max(16, ((bottom - top) / 60) * HOUR_HEIGHT),
+						}}
+					>
+						<span className="block px-1.5 py-0.5 font-mono text-[10px] text-brand-soft">
+							{formatMin(top)} – {formatMin(bottom)}
+						</span>
+					</div>
+				);
+			})() : null}
 			{/* Timed entries. */}
 			{timed.map((entry) => (
-				<TimedBlock key={`${entry.kind}-${entry.id}`} entry={entry} onOpenEvent={onOpenEvent} />
+				<TimedBlock
+					key={`${entry.kind}-${entry.id}`}
+					entry={entry}
+					resizeOverride={resizeState?.id === entry.id ? resizeState : null}
+					onResizeStart={handleResizeStart}
+					onOpenEvent={onOpenEvent}
+				/>
 			))}
 		</div>
 	);
@@ -1552,14 +1735,22 @@ function DayColumn({
 
 function TimedBlock({
 	entry,
+	resizeOverride,
+	onResizeStart,
 	onOpenEvent,
 }: {
 	entry: TimedEntry;
+	resizeOverride: { startMin: number; endMin: number } | null;
+	onResizeStart: (id: string, edge: "top" | "bottom", anchorY: number, origStart: number, origEnd: number) => void;
 	onOpenEvent: (id: string) => void;
 }) {
 	const draggable = useDraggable({ id: entry.id, disabled: entry.kind !== "task" });
-	const top = (entry.startMin / 60) * HOUR_HEIGHT;
-	const height = Math.max(((entry.endMin - entry.startMin) / 60) * HOUR_HEIGHT, 16);
+	// Use parent-controlled override for live resize; fall back to entry values.
+	const startMin = resizeOverride?.startMin ?? entry.startMin;
+	const endMin = resizeOverride?.endMin ?? entry.endMin;
+
+	const top = (startMin / 60) * HOUR_HEIGHT;
+	const height = Math.max(((endMin - startMin) / 60) * HOUR_HEIGHT, 16);
 	const widthPct = 100 / entry.cols;
 	const position = {
 		top,
@@ -1567,9 +1758,15 @@ function TimedBlock({
 		left: `${entry.lane * widthPct}%`,
 		width: `calc(${widthPct}% - 2px)`,
 	} as const;
-	const time = formatMin(entry.startMin);
+	const time = formatMin(startMin);
 	// Tall enough to stack a time line above the title; otherwise inline-prefix it.
 	const stacked = height >= 34;
+
+	const makeResizeHandler = (edge: "top" | "bottom") => (e: React.PointerEvent<HTMLDivElement>) => {
+		e.stopPropagation();
+		e.preventDefault();
+		onResizeStart(entry.id, edge, e.clientY, entry.startMin, entry.endMin);
+	};
 
 	if (entry.kind === "google") {
 		return (
@@ -1606,11 +1803,23 @@ function TimedBlock({
 				draggable.isDragging && "opacity-40",
 			)}
 		>
+			{/* Top resize handle */}
+			<div
+				onPointerDown={makeResizeHandler("top")}
+				onClick={(e) => e.stopPropagation()}
+				className="absolute top-0 left-0 right-0 z-20 h-1.5 cursor-n-resize rounded-t-[5px] hover:bg-white/20"
+			/>
 			{stacked ? <span className="font-mono text-[10px] opacity-70 tabular-nums">{time}</span> : null}
 			<span className="truncate font-sans">
 				{stacked ? null : <span className="mr-1 font-mono opacity-70 tabular-nums">{time}</span>}
 				{entry.title}
 			</span>
+			{/* Bottom resize handle */}
+			<div
+				onPointerDown={makeResizeHandler("bottom")}
+				onClick={(e) => e.stopPropagation()}
+				className="absolute bottom-0 left-0 right-0 z-20 h-1.5 cursor-s-resize rounded-b-[5px] hover:bg-white/20"
+			/>
 		</button>
 	);
 }
